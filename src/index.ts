@@ -125,6 +125,11 @@ export {
 export type { FrameHandler, Transport, WireFrame } from "./transport/base.js";
 export { MemoryTransport, pairMemoryTransports } from "./transport/memory.js";
 export { StdioTransport } from "./transport/stdio.js";
+export {
+  startWebSocketServer,
+  type WebSocketServerHandle,
+  WebSocketTransport,
+} from "./transport/websocket.js";
 export { combineSignals } from "./util/abort.js";
 export { Deferred } from "./util/deferred.js";
 export { safeSetInterval, safeSetTimeout } from "./util/timers.js";
