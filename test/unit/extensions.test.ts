@@ -20,7 +20,7 @@ describe("isExtensionName", () => {
 
   it("accepts reverse-DNS names", () => {
     expect(isExtensionName("com.acme.workflow.v2")).toBe(true);
-    expect(isExtensionName("dev.fizzpop.thing.v1")).toBe(true);
+    expect(isExtensionName("dev.example.thing.v1")).toBe(true);
   });
 
   it("rejects names without a version suffix", () => {
