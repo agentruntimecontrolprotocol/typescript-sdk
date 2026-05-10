@@ -44,15 +44,14 @@ const ALL_ENVELOPES = [
  * inbound message after it has been parsed from JSON; failures indicate
  * either an unknown `type` (§21.3) or a malformed payload.
  *
- * Implementation note: zod requires a non-empty tuple, so we slice via
- * spread-with-explicit-first-arg.
+ * Implementation note: zod's `discriminatedUnion` expects a non-empty tuple
+ * `[T, ...T[]]`. The single cast widens the heterogeneous tuple type from
+ * `as const` (above) to a homogeneous one over the element union.
  */
+type EnvelopeElement = (typeof ALL_ENVELOPES)[number];
 export const EnvelopeSchema = z.discriminatedUnion(
   "type",
-  ALL_ENVELOPES as unknown as readonly [
-    (typeof ALL_ENVELOPES)[0],
-    ...(typeof ALL_ENVELOPES)[number][],
-  ],
+  ALL_ENVELOPES as readonly [EnvelopeElement, ...EnvelopeElement[]],
 );
 
 export type Envelope = z.infer<typeof EnvelopeSchema>;
