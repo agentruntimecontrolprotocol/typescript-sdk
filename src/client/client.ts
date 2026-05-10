@@ -14,7 +14,15 @@ import {
   type ClientIdentity,
   type Envelope,
   EnvelopeSchema,
+  type HumanChoiceRequestPayload,
+  type HumanChoiceResponsePayload,
+  type HumanInputRequestPayload,
+  type HumanInputResponsePayload,
   type JobProgressPayload,
+  type LeaseRefreshPayload,
+  type PermissionDenyPayload,
+  type PermissionGrantPayload,
+  type PermissionRequestPayload,
   type SessionAcceptedPayload,
   type StreamChunkPayload,
   type ToolResultPayload,
@@ -25,6 +33,7 @@ import { StreamReader } from "../runtime/stream.js";
 import type { Transport, WireFrame } from "../transport/base.js";
 import { Deferred } from "../util/deferred.js";
 import { newMessageId, nowTimestamp } from "../util/ulid.js";
+import type { HumanInputHandler, PermissionDecisionHandler } from "./handlers.js";
 
 export interface ARCPClientOptions {
   /** Client identity broadcast in `session.open`. */
@@ -39,6 +48,10 @@ export interface ARCPClientOptions {
   logger?: Logger;
   /** Handshake timeout in milliseconds. Default 5000. */
   handshakeTimeoutMs?: number;
+  /** Handler for `human.input.request` and `human.choice.request` (§12). */
+  humanInputHandler?: HumanInputHandler;
+  /** Handler for `permission.request` (§15.4). */
+  permissionHandler?: PermissionDecisionHandler;
 }
 
 /** Inbound-message handler on the client side. */
@@ -336,6 +349,7 @@ export class ARCPClient {
     }
     const env = result.data;
     this.routeJobOrStreamEvent(env);
+    void this.handleAutoResponse(env);
     const handler = this.handlers.get(env.type);
     if (handler !== undefined) {
       try {
@@ -452,7 +466,157 @@ export class ARCPClient {
     }
     return undefined;
   }
+
+  /**
+   * Auto-respond to inbound HITL and permission requests by dispatching to
+   * the registered handlers. Errors from the handler reflect as `nack`.
+   */
+  private async handleAutoResponse(env: Envelope): Promise<void> {
+    if (this.transport === null) return;
+    const sessionId = this.state.id;
+    if (sessionId === undefined) return;
+
+    if (env.type === "human.input.request") {
+      const handler = this.options.humanInputHandler;
+      if (handler === undefined) {
+        this.logger.warn(
+          { id: env.id },
+          "human.input.request received but no humanInputHandler registered",
+        );
+        return;
+      }
+      try {
+        const response: HumanInputResponsePayload = await handler.onInputRequest(env.payload);
+        await this.send(
+          buildEnvelope({
+            id: newMessageId(),
+            type: "human.input.response" as const,
+            timestamp: nowTimestamp(),
+            payload: response,
+            optional: { session_id: sessionId, correlation_id: env.id },
+          }) as BaseEnvelope,
+        );
+      } catch (err) {
+        this.logger.error({ err }, "human input handler threw");
+      }
+      return;
+    }
+
+    if (env.type === "human.choice.request") {
+      const handler = this.options.humanInputHandler;
+      if (handler === undefined) {
+        this.logger.warn(
+          { id: env.id },
+          "human.choice.request received but no humanInputHandler registered",
+        );
+        return;
+      }
+      try {
+        const response: HumanChoiceResponsePayload = await handler.onChoiceRequest(env.payload);
+        await this.send(
+          buildEnvelope({
+            id: newMessageId(),
+            type: "human.choice.response" as const,
+            timestamp: nowTimestamp(),
+            payload: response,
+            optional: { session_id: sessionId, correlation_id: env.id },
+          }) as BaseEnvelope,
+        );
+      } catch (err) {
+        this.logger.error({ err }, "human choice handler threw");
+      }
+      return;
+    }
+
+    if (env.type === "permission.request") {
+      const handler = this.options.permissionHandler;
+      if (handler === undefined) {
+        this.logger.warn(
+          { id: env.id },
+          "permission.request received but no permissionHandler registered",
+        );
+        return;
+      }
+      try {
+        const decision = await handler.decide(env.payload);
+        if (decision.kind === "grant") {
+          await this.send(
+            buildEnvelope({
+              id: newMessageId(),
+              type: "permission.grant" as const,
+              timestamp: nowTimestamp(),
+              payload: decision.grant,
+              optional: { session_id: sessionId, correlation_id: env.id },
+            }) as BaseEnvelope,
+          );
+        } else {
+          await this.send(
+            buildEnvelope({
+              id: newMessageId(),
+              type: "permission.deny" as const,
+              timestamp: nowTimestamp(),
+              payload: decision.deny,
+              optional: { session_id: sessionId, correlation_id: env.id },
+            }) as BaseEnvelope,
+          );
+        }
+      } catch (err) {
+        this.logger.error({ err }, "permission handler threw");
+      }
+      return;
+    }
+  }
+
+  /**
+   * Send a `lease.refresh` request and return the new expiry on success.
+   * Resolves with the `lease.extended` payload; rejects on `nack`.
+   */
+  public async refreshLease(payload: LeaseRefreshPayload): Promise<{ expires_at: string }> {
+    if (this.transport === null) throw new FailedPreconditionError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined) throw new FailedPreconditionError("session has no id");
+    const env = buildEnvelope({
+      id: newMessageId(),
+      type: "lease.refresh" as const,
+      timestamp: nowTimestamp(),
+      payload,
+      optional: { session_id: sessionId },
+    });
+    await this.transport.send(env as unknown as WireFrame);
+    // For v0.1 the runtime emits `lease.extended` (no correlation_id) on success
+    // and `nack` on failure. The caller is expected to listen to those events.
+    return new Promise<{ expires_at: string }>((resolve, reject) => {
+      const onExtended = (e: Envelope): void => {
+        if (e.type === "lease.extended" && e.payload.lease_id === payload.lease_id) {
+          this.handlers.delete("lease.extended");
+          resolve({ expires_at: e.payload.expires_at });
+        }
+      };
+      const onNack = (e: Envelope): void => {
+        if (e.type === "nack" && e.payload.ack_for === env.id) {
+          this.handlers.delete("nack");
+          reject(ARCPError.fromPayload(e.payload));
+        }
+      };
+      this.handlers.set("lease.extended", onExtended);
+      this.handlers.set("nack", onNack);
+    });
+  }
 }
+
+// PermissionGrantPayload, PermissionRequestPayload, etc. are surfaced through
+// the public `arcp` import; re-export here for tooling that imports from
+// the client subpath directly.
+export type {
+  HumanChoiceRequestPayload,
+  HumanChoiceResponsePayload,
+  HumanInputRequestPayload,
+  HumanInputResponsePayload,
+  LeaseRefreshPayload,
+  PermissionDenyPayload,
+  PermissionGrantPayload,
+  PermissionRequestPayload,
+};
 
 interface InvocationState {
   readonly originId: string;

@@ -2,6 +2,16 @@ import { CancelledError, DeadlineExceededError } from "../errors.js";
 import { Deferred } from "../util/deferred.js";
 
 /**
+ * Per-entry metadata that handlers can stash to validate or annotate
+ * responses. Currently used by the HITL flow to carry the original
+ * `response_schema` for validation against the inbound `human.input.response`.
+ */
+export type PendingMeta =
+  | { kind: "human.input"; responseSchema: Record<string, unknown> }
+  | { kind: "human.choice" }
+  | { kind: "permission" };
+
+/**
  * Registry of in-flight requests keyed by `correlation_id`.
  *
  * The bidirectional spine of ARCP: every command that expects a response
@@ -14,6 +24,7 @@ import { Deferred } from "../util/deferred.js";
  */
 export class PendingRegistry {
   private readonly entries = new Map<string, PendingEntry<unknown>>();
+  private readonly meta = new Map<string, PendingMeta>();
 
   /** Number of currently-pending entries. */
   public get size(): number {
@@ -60,11 +71,22 @@ export class PendingRegistry {
     return deferred.promise;
   }
 
+  /** Attach metadata to an entry for later inspection by response handlers. */
+  public registerMeta(correlationId: string, meta: PendingMeta): void {
+    this.meta.set(correlationId, meta);
+  }
+
+  /** Read attached metadata; returns `undefined` if none was registered. */
+  public peekMeta(correlationId: string): PendingMeta | undefined {
+    return this.meta.get(correlationId);
+  }
+
   /** Resolve the entry for `correlationId` with `value`. No-op if missing. */
   public resolve<T>(correlationId: string, value: T): boolean {
     const entry = this.entries.get(correlationId) as PendingEntry<T> | undefined;
     if (entry === undefined) return false;
     this.entries.delete(correlationId);
+    this.meta.delete(correlationId);
     entry.cancelTimer?.();
     entry.deferred.resolve(value);
     return true;
@@ -75,6 +97,7 @@ export class PendingRegistry {
     const entry = this.entries.get(correlationId);
     if (entry === undefined) return false;
     this.entries.delete(correlationId);
+    this.meta.delete(correlationId);
     entry.cancelTimer?.();
     entry.deferred.reject(reason);
     return true;

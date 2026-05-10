@@ -397,6 +397,21 @@ export interface JobContext {
   ): Promise<void>;
   metric(metric: MetricPayload): Promise<void>;
   openStream(options: { kind: StreamKind; contentType?: string; encoding?: string }): StreamWriter;
+  /**
+   * Ask the connected client for free-form human input. Resolves with the
+   * validated value once the client returns `human.input.response`. Rejects
+   * with `DEADLINE_EXCEEDED` on expiry, `INVALID_ARGUMENT` on a malformed
+   * response, or `CANCELLED` if the job is cancelled.
+   */
+  requestHumanInput(req: import("../messages/index.js").HumanInputRequestPayload): Promise<unknown>;
+  /** Ask the client to pick an option from a list (§12.2). */
+  requestHumanChoice(
+    req: import("../messages/index.js").HumanChoiceRequestPayload,
+  ): Promise<string>;
+  /** Issue a permission challenge (§15.4). Resolves on grant; rejects on deny. */
+  requestPermission(
+    req: import("../messages/index.js").PermissionRequestPayload,
+  ): Promise<import("../messages/index.js").PermissionGrantPayload>;
 }
 
 export type ToolHandler<Args = Record<string, unknown>, Result = unknown> = (
@@ -404,8 +419,29 @@ export type ToolHandler<Args = Record<string, unknown>, Result = unknown> = (
   ctx: JobContext,
 ) => Promise<Result>;
 
+/** Hooks the server passes to {@link makeJobContext} for HITL/permission flow. */
+export interface JobContextHooks {
+  requestHumanInput: (
+    job: Job,
+    req: import("../messages/index.js").HumanInputRequestPayload,
+  ) => Promise<unknown>;
+  requestHumanChoice: (
+    job: Job,
+    req: import("../messages/index.js").HumanChoiceRequestPayload,
+  ) => Promise<string>;
+  requestPermission: (
+    job: Job,
+    req: import("../messages/index.js").PermissionRequestPayload,
+  ) => Promise<import("../messages/index.js").PermissionGrantPayload>;
+}
+
 /** Build a {@link JobContext} backed by a {@link Job}. */
-export function makeJobContext(job: Job): JobContext {
+export function makeJobContext(job: Job, hooks?: JobContextHooks): JobContext {
+  const noHooks = (): Promise<never> => {
+    return Promise.reject(
+      new InternalError("JobContext: HITL/permission hooks not registered on this runtime"),
+    );
+  };
   return {
     jobId: job.jobId,
     sessionId: job.sessionId,
@@ -422,6 +458,9 @@ export function makeJobContext(job: Job): JobContext {
     },
     metric: (m) => job.emitMetric(m),
     openStream: (opts) => job.openStream(opts),
+    requestHumanInput: hooks ? (req) => hooks.requestHumanInput(job, req) : () => noHooks(),
+    requestHumanChoice: hooks ? (req) => hooks.requestHumanChoice(job, req) : () => noHooks(),
+    requestPermission: hooks ? (req) => hooks.requestPermission(job, req) : () => noHooks(),
   };
 }
 

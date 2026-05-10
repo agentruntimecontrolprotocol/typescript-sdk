@@ -4,12 +4,16 @@ import type { JwtVerifier } from "../auth/jwt.js";
 import { type BaseEnvelope, buildEnvelope, RoundTripEnvelopeSchema } from "../envelope.js";
 import {
   ARCPError,
+  CancelledError,
   FailedPreconditionError,
   InternalError,
+  InvalidArgumentError,
   NotImplementedError,
+  PermissionDeniedError,
   UnauthenticatedError,
 } from "../errors.js";
 import { type Logger, sessionLogger as makeSessionLogger, rootLogger } from "../logger.js";
+import type { PermissionGrantPayload } from "../messages/index.js";
 import {
   type Capabilities,
   type ClientIdentity,
@@ -24,8 +28,11 @@ import {
 } from "../messages/index.js";
 import { EventLog } from "../store/eventlog.js";
 import type { Transport, WireFrame } from "../transport/base.js";
+import { validateAgainstSchema } from "../util/json-schema.js";
 import { newMessageId, newSessionId, nowTimestamp } from "../util/ulid.js";
-import { Job, JobManager, makeJobContext, type ToolHandler } from "./job.js";
+import { Job, type JobContextHooks, JobManager, makeJobContext, type ToolHandler } from "./job.js";
+import { LeaseManager } from "./lease.js";
+import { PendingRegistry } from "./pending.js";
 import { negotiateCapabilities, SessionState } from "./session.js";
 
 const HANDSHAKE_TYPES = new Set<string>([
@@ -65,6 +72,8 @@ export interface ARCPServerOptions {
 export class SessionContext {
   public readonly state = new SessionState();
   public readonly jobs = new JobManager();
+  public readonly pending = new PendingRegistry();
+  public readonly leases = new LeaseManager();
   public readonly logger: Logger;
   private readonly handlers = new Map<string, Handler>();
   private closed = false;
@@ -357,6 +366,193 @@ export class ARCPServer {
       ctx.state.transition("closing");
       await ctx.terminate(env.payload.reason);
     });
+
+    // HITL: human.input.response, human.input.cancelled, human.choice.response.
+    ctx.registerHandler("human.input.response", async (env) => {
+      if (env.type !== "human.input.response") return;
+      const correlation = env.correlation_id;
+      if (correlation === undefined) return;
+      // Look up the matching pending entry's request to validate the value.
+      const reqRecord = ctx.pending.peekMeta(correlation);
+      if (reqRecord !== undefined && reqRecord.kind === "human.input") {
+        const errors = validateAgainstSchema(
+          env.payload.value,
+          reqRecord.responseSchema as Record<string, unknown>,
+        );
+        if (errors.length > 0) {
+          await ctx.sendNack(
+            env.id,
+            new InvalidArgumentError(
+              `human.input.response failed schema: ${errors.map((e) => e.message).join("; ")}`,
+              { details: { errors } },
+            ),
+          );
+          return;
+        }
+      }
+      ctx.pending.resolve(correlation, env.payload.value);
+    });
+
+    ctx.registerHandler("human.input.cancelled", async (env) => {
+      if (env.type !== "human.input.cancelled") return;
+      const correlation = env.correlation_id;
+      if (correlation === undefined) return;
+      ctx.pending.reject(correlation, new CancelledError(env.payload.message ?? env.payload.code));
+    });
+
+    ctx.registerHandler("human.choice.response", async (env) => {
+      if (env.type !== "human.choice.response") return;
+      const correlation = env.correlation_id;
+      if (correlation === undefined) return;
+      ctx.pending.resolve(correlation, env.payload.choice_id);
+    });
+
+    // Permissions: permission.grant, permission.deny.
+    ctx.registerHandler("permission.grant", async (env) => {
+      if (env.type !== "permission.grant") return;
+      const correlation = env.correlation_id;
+      if (correlation === undefined) return;
+      ctx.pending.resolve(correlation, env.payload);
+    });
+
+    ctx.registerHandler("permission.deny", async (env) => {
+      if (env.type !== "permission.deny") return;
+      const correlation = env.correlation_id;
+      if (correlation === undefined) return;
+      ctx.pending.reject(
+        correlation,
+        new PermissionDeniedError(`Permission denied: ${env.payload.reason}`, {
+          details: {
+            permission: env.payload.permission,
+            resource: env.payload.resource,
+            operation: env.payload.operation,
+          },
+        }),
+      );
+    });
+
+    // Lease refresh requests come from the client side; the runtime grants extension.
+    ctx.registerHandler("lease.refresh", async (env) => {
+      if (env.type !== "lease.refresh") return;
+      try {
+        const ext = ctx.leases.extend(env.payload.lease_id, env.payload.requested_seconds);
+        const out = buildEnvelope({
+          id: newMessageId(),
+          type: "lease.extended" as const,
+          timestamp: nowTimestamp(),
+          payload: ext,
+          optional: { session_id: ctx.state.id ?? "" },
+        });
+        await ctx.send(out as BaseEnvelope);
+      } catch (err) {
+        const wrapped =
+          err instanceof ARCPError
+            ? err
+            : new InternalError(err instanceof Error ? err.message : String(err));
+        await ctx.sendNack(env.id, wrapped);
+      }
+    });
+  }
+
+  /** Build the {@link JobContextHooks} that wire HITL/permission flow. */
+  private makeHooks(ctx: SessionContext): JobContextHooks {
+    return {
+      requestHumanInput: async (job, req) => {
+        const reqId = newMessageId();
+        const env = buildEnvelope({
+          id: reqId,
+          type: "human.input.request" as const,
+          timestamp: nowTimestamp(),
+          payload: req,
+          optional: { session_id: ctx.state.id ?? "", job_id: job.jobId },
+        });
+        const expiresAt = Date.parse(req.expires_at);
+        const deadlineMs = Number.isFinite(expiresAt)
+          ? Math.max(50, expiresAt - Date.now())
+          : 60_000;
+        job.block();
+        try {
+          ctx.pending.registerMeta(reqId, {
+            kind: "human.input",
+            responseSchema: req.response_schema,
+          });
+          const promise = ctx.pending.register<unknown>(reqId, {
+            deadlineMs,
+            signal: job.signal,
+          });
+          await ctx.send(env as BaseEnvelope);
+          const value = await promise;
+          return value;
+        } finally {
+          if (!job.isTerminal && job.state === "blocked") {
+            try {
+              job.unblock();
+            } catch {
+              /* job moved on */
+            }
+          }
+        }
+      },
+      requestHumanChoice: async (job, req) => {
+        const reqId = newMessageId();
+        const env = buildEnvelope({
+          id: reqId,
+          type: "human.choice.request" as const,
+          timestamp: nowTimestamp(),
+          payload: req,
+          optional: { session_id: ctx.state.id ?? "", job_id: job.jobId },
+        });
+        const expiresAt = Date.parse(req.expires_at);
+        const deadlineMs = Number.isFinite(expiresAt)
+          ? Math.max(50, expiresAt - Date.now())
+          : 60_000;
+        job.block();
+        try {
+          const promise = ctx.pending.register<string>(reqId, {
+            deadlineMs,
+            signal: job.signal,
+          });
+          await ctx.send(env as BaseEnvelope);
+          return await promise;
+        } finally {
+          if (!job.isTerminal && job.state === "blocked") {
+            try {
+              job.unblock();
+            } catch {
+              /* job moved on */
+            }
+          }
+        }
+      },
+      requestPermission: async (job, req) => {
+        const reqId = newMessageId();
+        const env = buildEnvelope({
+          id: reqId,
+          type: "permission.request" as const,
+          timestamp: nowTimestamp(),
+          payload: req,
+          optional: { session_id: ctx.state.id ?? "", job_id: job.jobId },
+        });
+        const deadlineMs = (req.requested_lease_seconds ?? 60) * 1000;
+        job.block();
+        try {
+          const promise = ctx.pending.register<PermissionGrantPayload>(reqId, {
+            deadlineMs,
+            signal: job.signal,
+          });
+          await ctx.send(env as BaseEnvelope);
+          return await promise;
+        } finally {
+          if (!job.isTerminal && job.state === "blocked") {
+            try {
+              job.unblock();
+            } catch {
+              /* job moved on */
+            }
+          }
+        }
+      },
+    };
   }
 
   private async handleToolInvoke(ctx: SessionContext, env: Envelope): Promise<void> {
@@ -387,7 +583,7 @@ export class ARCPServer {
     await job.emitStarted();
 
     const args = env.payload.arguments ?? {};
-    const jobCtx = makeJobContext(job);
+    const jobCtx = makeJobContext(job, this.makeHooks(ctx));
     void this.runHandler(ctx, job, handler, args, jobCtx);
   }
 
