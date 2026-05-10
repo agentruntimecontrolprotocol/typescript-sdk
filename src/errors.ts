@@ -128,9 +128,23 @@ export class ARCPError extends Error {
     };
   }
 
+  private static readonly MAX_CAUSE_DEPTH = 16;
+
   /** Re-hydrate an {@link ARCPError} from a wire payload. */
   public static fromPayload(payload: ErrorPayload): ARCPError {
-    const cause = payload.cause === undefined ? undefined : ARCPError.fromPayload(payload.cause);
+    return ARCPError.fromPayloadDepth(payload, 0);
+  }
+
+  private static fromPayloadDepth(payload: ErrorPayload, depth: number): ARCPError {
+    const cause =
+      payload.cause === undefined
+        ? undefined
+        : depth >= ARCPError.MAX_CAUSE_DEPTH
+          ? new ARCPError({
+              code: "INTERNAL",
+              message: "error cause chain exceeded maximum depth",
+            })
+          : ARCPError.fromPayloadDepth(payload.cause, depth + 1);
     return new ARCPError({
       code: payload.code,
       message: payload.message,

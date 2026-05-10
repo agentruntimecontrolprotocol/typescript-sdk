@@ -4,6 +4,7 @@ import type { ArtifactPutPayload, ArtifactRef, ArtifactReleasePayload } from "..
 import { newArtifactId } from "../util/ulid.js";
 
 interface StoredArtifact {
+  readonly sessionId: string;
   readonly artifactId: string;
   readonly mediaType: string;
   readonly data: Buffer;
@@ -67,6 +68,7 @@ export class ArtifactStore {
     const artifactId = payload.artifact_id ?? newArtifactId();
     const expiresAtMs = Date.now() + ttlMs;
     this.artifacts.set(artifactId, {
+      sessionId,
       artifactId,
       mediaType: payload.media_type,
       data: buffer,
@@ -88,6 +90,9 @@ export class ArtifactStore {
     const record = this.artifacts.get(artifactId);
     if (record === undefined || record.expiresAtMs <= Date.now()) {
       this.artifacts.delete(artifactId);
+      throw new NotFoundError(`Artifact "${artifactId}" not found or expired`);
+    }
+    if (record.sessionId !== sessionId) {
       throw new NotFoundError(`Artifact "${artifactId}" not found or expired`);
     }
     return {

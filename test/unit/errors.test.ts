@@ -7,6 +7,7 @@ import {
   DataLossError,
   DeadlineExceededError,
   ERROR_CODES,
+  type ErrorPayload,
   ErrorPayloadSchema,
   FailedPreconditionError,
   HeartbeatLostError,
@@ -150,6 +151,24 @@ describe("ARCPError", () => {
     if (cause instanceof ARCPError) {
       expect(cause.code).toBe("INVALID_ARGUMENT");
     }
+  });
+
+  it("truncates pathologically nested causes from wire payloads", () => {
+    let inner: ErrorPayload = { code: "INVALID_ARGUMENT", message: "leaf" };
+    for (let i = 0; i < 30; i++) {
+      inner = { code: "INTERNAL", message: `layer-${i}`, cause: inner };
+    }
+    const e = ARCPError.fromPayload(inner);
+    let depth = 0;
+    let cur: unknown = e;
+    while (cur instanceof ARCPError && cur.cause instanceof ARCPError) {
+      depth++;
+      cur = cur.cause;
+    }
+    // Depth 16 stops recursion into the next wire cause; the synthetic
+    // replacement is still an ARCPError, so the walk counts one more link.
+    expect(depth).toBeLessThanOrEqual(17);
+    expect(e.cause).toBeInstanceOf(ARCPError);
   });
 });
 

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Reference TypeScript implementation of the Agent Runtime Control Protocol (ARCP) v1.0.",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@9.15.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -43,17 +44,19 @@
     "dist",
     "RFC-0001-v2.md",
     "README.md",
-    "CONFORMANCE.md"
+    "CONFORMANCE.md",
+    "LICENSE"
   ],
   "scripts": {
+    "prepack": "pnpm run build",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest --passWithNoTests",
-    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prepare": "simple-git-hooks || true"
   },
   "dependencies": {

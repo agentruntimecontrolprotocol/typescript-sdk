@@ -17,6 +17,7 @@ export class StdioTransport implements Transport {
   private closeHandler: ((err?: Error) => void) | null = null;
   private rl: Interface | null = null;
   private isClosed = false;
+  private inboundChain: Promise<void> = Promise.resolve();
 
   public constructor(
     private readonly readable: Readable,
@@ -73,7 +74,12 @@ export class StdioTransport implements Transport {
         return;
       }
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return;
-      void handler(parsed as WireFrame);
+      const frame = parsed as WireFrame;
+      this.inboundChain = this.inboundChain
+        .then(() => Promise.resolve(handler(frame)))
+        .catch((): void => {
+          /* Keep the queue alive on handler failure. */
+        });
     });
     this.rl.on("close", () => {
       this.fireClose();

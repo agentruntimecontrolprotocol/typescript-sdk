@@ -1,4 +1,3 @@
-import { type AddressInfo, createServer, type Server } from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
 import { InvalidArgumentError } from "../errors.js";
 import type { FrameHandler, SendableFrame, Transport, WireFrame } from "./base.js";
@@ -15,6 +14,8 @@ export class WebSocketTransport implements Transport {
   private handler: FrameHandler | null = null;
   private closeHandler: ((err?: Error) => void) | null = null;
   private isClosed = false;
+  /** Serializes inbound handler invocations to preserve ordering (see Transport contract). */
+  private inboundChain: Promise<void> = Promise.resolve();
 
   public constructor(private readonly socket: WebSocket) {
     socket.on("message", (data, isBinary) => {
@@ -32,7 +33,13 @@ export class WebSocketTransport implements Transport {
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return;
       const frame = parsed as WireFrame;
       const h = this.handler;
-      if (h !== null) void h(frame);
+      if (h !== null) {
+        this.inboundChain = this.inboundChain
+          .then(() => Promise.resolve(h(frame)))
+          .catch((): void => {
+            /* Keep the queue alive; runtime logs protocol errors. */
+          });
+      }
     });
     socket.on("close", () => {
       this.fireClose();
@@ -143,35 +150,27 @@ export async function startWebSocketServer(args: {
   const host = args.host ?? "127.0.0.1";
   const port = args.port ?? 0; // 0 = ephemeral
 
-  // We use a regular net.Server only to obtain an ephemeral port reliably; the
-  // ws module accepts the same `host`/`port` directly.
-  const httpAddr = await new Promise<AddressInfo>((resolve, reject) => {
-    const probe: Server = createServer();
-    probe.unref();
-    probe.listen(port, host, () => {
-      const addr = probe.address();
-      if (addr === null || typeof addr === "string") {
-        probe.close();
-        reject(new Error("failed to bind ephemeral port"));
-        return;
-      }
-      probe.close(() => resolve(addr));
-    });
-    probe.on("error", reject);
-  });
-
-  const wss = new WebSocketServer({ host, port: httpAddr.port });
+  const wss = new WebSocketServer({ host, port });
   wss.on("connection", (socket) => {
     args.onTransport(new WebSocketTransport(socket));
   });
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
     wss.once("listening", resolve);
+    wss.once("error", reject);
   });
 
+  const addr = wss.address();
+  if (addr === null || typeof addr === "string") {
+    await new Promise<void>((resolve, reject) => {
+      wss.close((err) => (err !== undefined && err !== null ? reject(err) : resolve()));
+    });
+    throw new Error("WebSocketServer address unavailable");
+  }
+
   return {
-    port: httpAddr.port,
-    url: `ws://${host}:${httpAddr.port}`,
+    port: addr.port,
+    url: `ws://${host}:${addr.port}`,
     close: () =>
       new Promise<void>((resolve, reject) => {
         wss.close((err) => {
