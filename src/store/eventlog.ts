@@ -135,7 +135,7 @@ export class EventLog {
     if (this.closed) throw new InvalidArgumentError("EventLog is closed");
     if (this.readOnly) throw new InvalidArgumentError("EventLog is read-only");
     let inserted = 0;
-    const tx = this.db.transaction((rows: BaseEnvelope[]) => {
+    const tx = this.db.transaction((rows: readonly BaseEnvelope[]) => {
       for (const env of rows) {
         if (env.session_id === undefined || env.session_id === "") {
           throw new InvalidArgumentError("appendBatch requires session_id on every envelope", {
@@ -146,7 +146,7 @@ export class EventLog {
         if (result.changes === 1) inserted += 1;
       }
     });
-    tx(envs as BaseEnvelope[]);
+    tx(envs);
     return inserted;
   }
 
@@ -239,7 +239,7 @@ function rowToEnvelope(row: EventRow): BaseEnvelope {
       details: { id: row.id, session_id: row.session_id, issues: result.error.issues },
     });
   }
-  return result.data as BaseEnvelope;
+  return result.data;
 }
 
 interface BuiltQuery {
