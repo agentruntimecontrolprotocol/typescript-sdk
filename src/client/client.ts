@@ -87,6 +87,11 @@ export class ARCPClient {
   // Maps `stream_id` → owning invocation correlation id.
   private readonly streamOwners = new Map<string, string>();
 
+  // Subscription entries keyed by subscription_id, managed independently of
+  // the per-subscribe() async iterator so events that arrive before the
+  // caller's `subscribe()` resumes from `await` are not lost.
+  private readonly subscriptionEntries = new Map<string, SubscriptionEntry>();
+
   public constructor(public readonly options: ARCPClientOptions) {
     this.logger = options.logger ?? rootLogger.child({ component: "arcp-client" });
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 5000;
@@ -278,6 +283,174 @@ export class ARCPClient {
     await this.transport.send(env as unknown as WireFrame);
   }
 
+  /**
+   * Subscribe to events. Returns an async iterable of unwrapped envelopes
+   * (the inner `payload.event` from `subscribe.event`), terminated when
+   * `subscribe.closed` arrives or {@link close} is called.
+   *
+   * Backfill events are followed by a synthetic `event.emit` whose
+   * `payload.name = "subscription.backfill_complete"` (§13.3).
+   */
+  public async subscribe(payload: import("../messages/index.js").SubscribePayload): Promise<{
+    subscriptionId: string;
+    feed: AsyncIterableIterator<BaseEnvelope>;
+    close: () => Promise<void>;
+  }> {
+    if (this.transport === null) throw new FailedPreconditionError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined) throw new FailedPreconditionError("session has no id");
+
+    const reqId = newMessageId();
+    const env = buildEnvelope({
+      id: reqId,
+      type: "subscribe" as const,
+      timestamp: nowTimestamp(),
+      payload,
+      optional: { session_id: sessionId },
+    });
+
+    const acceptedPromise = this.pending.register<{ subscription_id: string }>(reqId, {
+      deadlineMs: 5000,
+    });
+    await this.transport.send(env as unknown as WireFrame);
+    const accepted = await acceptedPromise;
+    const subscriptionId = accepted.subscription_id;
+
+    // The entry was created synchronously by routeJobOrStreamEvent when the
+    // `subscribe.accepted` envelope arrived; pull it out here.
+    const entry = this.subscriptionEntries.get(subscriptionId);
+    if (entry === undefined) {
+      throw new FailedPreconditionError(
+        `Subscription "${subscriptionId}" entry was not initialized`,
+      );
+    }
+
+    const feed: AsyncIterableIterator<BaseEnvelope> = {
+      next: async () => {
+        if (entry.buffer.length > 0) {
+          const v = entry.buffer.shift();
+          if (v !== undefined) return { value: v, done: false };
+        }
+        if (entry.closed) return { value: undefined, done: true };
+        return new Promise<IteratorResult<BaseEnvelope>>((resolve) => {
+          entry.waiter = resolve;
+        });
+      },
+      return: async () => {
+        entry.closed = true;
+        return { value: undefined, done: true };
+      },
+      [Symbol.asyncIterator](): AsyncIterableIterator<BaseEnvelope> {
+        return this;
+      },
+    };
+
+    const closeFn = async (): Promise<void> => {
+      if (entry.closed) return;
+      const unsubEnv = buildEnvelope({
+        id: newMessageId(),
+        type: "unsubscribe" as const,
+        timestamp: nowTimestamp(),
+        payload: { subscription_id: subscriptionId },
+        optional: { session_id: sessionId },
+      });
+      if (this.transport !== null) {
+        await this.transport.send(unsubEnv as unknown as WireFrame);
+      }
+      entry.closed = true;
+      if (entry.waiter !== null) {
+        const w = entry.waiter;
+        entry.waiter = null;
+        w({ value: undefined, done: true });
+      }
+      this.subscriptionEntries.delete(subscriptionId);
+    };
+
+    return { subscriptionId, feed, close: closeFn };
+  }
+
+  /** Upload an artifact and return its `artifact.ref`. */
+  public async putArtifact(
+    payload: import("../messages/index.js").ArtifactPutPayload,
+  ): Promise<import("../messages/index.js").ArtifactRef> {
+    if (this.transport === null) throw new FailedPreconditionError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined) throw new FailedPreconditionError("session has no id");
+    const reqId = newMessageId();
+    const env = buildEnvelope({
+      id: reqId,
+      type: "artifact.put" as const,
+      timestamp: nowTimestamp(),
+      payload,
+      optional: { session_id: sessionId },
+    });
+    const promise = this.pending.register<import("../messages/index.js").ArtifactRef>(reqId, {
+      deadlineMs: 10_000,
+    });
+    await this.transport.send(env as unknown as WireFrame);
+    return promise;
+  }
+
+  /** Fetch an artifact by id. Resolves with an `artifact.put`-shaped payload. */
+  public async fetchArtifact(
+    artifactId: string,
+  ): Promise<import("../messages/index.js").ArtifactPutPayload> {
+    if (this.transport === null) throw new FailedPreconditionError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined) throw new FailedPreconditionError("session has no id");
+    const reqId = newMessageId();
+    const env = buildEnvelope({
+      id: reqId,
+      type: "artifact.fetch" as const,
+      timestamp: nowTimestamp(),
+      payload: { artifact_id: artifactId },
+      optional: { session_id: sessionId },
+    });
+    const promise = this.pending.register<import("../messages/index.js").ArtifactPutPayload>(
+      reqId,
+      { deadlineMs: 10_000 },
+    );
+    await this.transport.send(env as unknown as WireFrame);
+    return promise;
+  }
+
+  /** Release an artifact (no response). */
+  public async releaseArtifact(artifactId: string): Promise<void> {
+    if (this.transport === null) throw new FailedPreconditionError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined) throw new FailedPreconditionError("session has no id");
+    const env = buildEnvelope({
+      id: newMessageId(),
+      type: "artifact.release" as const,
+      timestamp: nowTimestamp(),
+      payload: { artifact_id: artifactId },
+      optional: { session_id: sessionId },
+    });
+    await this.transport.send(env as unknown as WireFrame);
+  }
+
+  /**
+   * Send a `resume` request to replay envelopes for this session past
+   * `afterMessageId`. Resolves once the runtime acknowledges; replayed
+   * envelopes arrive through registered handlers.
+   */
+  public async resume(args: { sessionId: string; afterMessageId?: string }): Promise<void> {
+    if (this.transport === null) throw new FailedPreconditionError("Client not connected");
+    const reqId = newMessageId();
+    const env = buildEnvelope({
+      id: reqId,
+      type: "resume" as const,
+      timestamp: nowTimestamp(),
+      payload: {
+        ...(args.afterMessageId !== undefined ? { after_message_id: args.afterMessageId } : {}),
+      },
+      optional: { session_id: args.sessionId },
+    });
+    const ack = this.pending.register<unknown>(reqId, { deadlineMs: 30_000 });
+    await this.transport.send(env as unknown as WireFrame);
+    await ack;
+  }
+
   /** Send an `interrupt` envelope for the given target job. */
   public async interruptJob(jobId: string, prompt?: string): Promise<void> {
     if (this.transport === null) throw new FailedPreconditionError("Client not connected");
@@ -370,12 +543,67 @@ export class ARCPClient {
   private routeJobOrStreamEvent(env: Envelope): void {
     if (env.type === "nack") {
       const ackFor = env.payload.ack_for;
-      if (ackFor !== undefined && this.invocations.has(ackFor)) {
+      if (ackFor !== undefined) {
+        // First try invocations.
         const inv = this.invocations.get(ackFor);
         if (inv !== undefined) {
           inv.completion.reject(ARCPError.fromPayload(env.payload));
         }
+        // Then try the generic pending registry (for subscribe/artifact/resume).
+        this.pending.reject(ackFor, ARCPError.fromPayload(env.payload));
       }
+      return;
+    }
+    if (env.type === "subscribe.accepted" && env.correlation_id !== undefined) {
+      // Create the subscription entry SYNCHRONOUSLY before resolving the
+      // pending request. Otherwise, backfill events that arrive in the same
+      // microtask cycle as `subscribe.accepted` would not find a target.
+      const subId = env.payload.subscription_id;
+      if (!this.subscriptionEntries.has(subId)) {
+        this.subscriptionEntries.set(subId, { buffer: [], waiter: null, closed: false });
+      }
+      this.pending.resolve(env.correlation_id, env.payload);
+      return;
+    }
+    if (env.type === "subscribe.event" && env.subscription_id !== undefined) {
+      const entry = this.subscriptionEntries.get(env.subscription_id);
+      if (entry !== undefined) {
+        const inner = (env.payload as { event?: BaseEnvelope }).event;
+        if (inner !== undefined) {
+          if (entry.waiter !== null) {
+            const w = entry.waiter;
+            entry.waiter = null;
+            w({ value: inner, done: false });
+          } else {
+            entry.buffer.push(inner);
+          }
+        }
+      }
+      return;
+    }
+    if (env.type === "subscribe.closed" && env.subscription_id !== undefined) {
+      const entry = this.subscriptionEntries.get(env.subscription_id);
+      if (entry !== undefined) {
+        entry.closed = true;
+        if (entry.waiter !== null) {
+          const w = entry.waiter;
+          entry.waiter = null;
+          w({ value: undefined, done: true });
+        }
+      }
+      return;
+    }
+    if (env.type === "artifact.ref" && env.correlation_id !== undefined) {
+      this.pending.resolve(env.correlation_id, env.payload);
+      return;
+    }
+    if (env.type === "artifact.put" && env.correlation_id !== undefined) {
+      // This is a fetch response; the runtime echoes artifact.put with the data.
+      this.pending.resolve(env.correlation_id, env.payload);
+      return;
+    }
+    if (env.type === "ack" && env.correlation_id !== undefined) {
+      this.pending.resolve(env.correlation_id, env.payload);
       return;
     }
     if (env.type === "job.accepted" && env.correlation_id !== undefined) {
@@ -624,6 +852,12 @@ interface InvocationState {
   readonly streams: Map<string, StreamReader>;
   readonly progress: JobProgressPayload[];
   readonly completion: Deferred<ToolResultPayload>;
+}
+
+interface SubscriptionEntry {
+  readonly buffer: BaseEnvelope[];
+  waiter: ((v: IteratorResult<BaseEnvelope>) => void) | null;
+  closed: boolean;
 }
 
 /**

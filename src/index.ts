@@ -95,6 +95,9 @@ export * from "./messages/index.js";
 export {
   ARCPServer,
   type ARCPServerOptions,
+  ArtifactStore,
+  type ArtifactStoreOptions,
+  type CompiledFilter,
   type Handler,
   Job,
   type JobContext,
@@ -114,10 +117,14 @@ export {
   StreamReader,
   type StreamSendFn,
   StreamWriter,
+  type Subscription,
+  type SubscriptionEntitlements,
+  SubscriptionManager,
   type ToolHandler,
 } from "./runtime/index.js";
 export type { FrameHandler, Transport, WireFrame } from "./transport/base.js";
 export { MemoryTransport, pairMemoryTransports } from "./transport/memory.js";
+export { StdioTransport } from "./transport/stdio.js";
 export { combineSignals } from "./util/abort.js";
 export { Deferred } from "./util/deferred.js";
 export { safeSetInterval, safeSetTimeout } from "./util/timers.js";

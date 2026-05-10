@@ -38,6 +38,8 @@ export function makeBearerVerifier(extra: ReadonlyMap<string, { principal: strin
 export interface PairedHarness {
   server: ARCPServer;
   client: ARCPClient;
+  /** Direct access to the client-side memory transport, for raw-frame tests. */
+  clientTransport: import("../../src/index.js").MemoryTransport;
   /** Drives the handshake and returns when the client has been accepted. */
   connect(): Promise<void>;
   close(): Promise<void>;
@@ -73,6 +75,7 @@ export function makePairedHarness(
   return {
     server,
     client,
+    clientTransport,
     async connect() {
       server.accept(serverTransport);
       await client.connect(clientTransport);

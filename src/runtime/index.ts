@@ -1,3 +1,4 @@
+export { ArtifactStore, type ArtifactStoreOptions } from "./artifact.js";
 export {
   Job,
   type JobContext,
@@ -16,3 +17,9 @@ export {
   SessionState,
 } from "./session.js";
 export { StreamReader, type StreamSendFn, StreamWriter } from "./stream.js";
+export {
+  type CompiledFilter,
+  type Subscription,
+  type SubscriptionEntitlements,
+  SubscriptionManager,
+} from "./subscription.js";

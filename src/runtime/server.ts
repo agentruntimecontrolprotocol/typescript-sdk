@@ -12,6 +12,7 @@ import {
   PermissionDeniedError,
   UnauthenticatedError,
 } from "../errors.js";
+import { classifyUnknownType } from "../extensions.js";
 import { type Logger, sessionLogger as makeSessionLogger, rootLogger } from "../logger.js";
 import type { PermissionGrantPayload } from "../messages/index.js";
 import {
@@ -30,10 +31,12 @@ import { EventLog } from "../store/eventlog.js";
 import type { Transport, WireFrame } from "../transport/base.js";
 import { validateAgainstSchema } from "../util/json-schema.js";
 import { newMessageId, newSessionId, nowTimestamp } from "../util/ulid.js";
+import { ArtifactStore } from "./artifact.js";
 import { Job, type JobContextHooks, JobManager, makeJobContext, type ToolHandler } from "./job.js";
 import { LeaseManager } from "./lease.js";
 import { PendingRegistry } from "./pending.js";
 import { negotiateCapabilities, SessionState } from "./session.js";
+import { SubscriptionManager } from "./subscription.js";
 
 const HANDSHAKE_TYPES = new Set<string>([
   "session.open",
@@ -61,6 +64,8 @@ export interface ARCPServerOptions {
   allowAnonymous?: boolean;
   /** Event log to persist envelopes. Defaults to an in-memory log. */
   eventLog?: EventLog;
+  /** Artifact store. Defaults to a new in-memory store. */
+  artifacts?: ArtifactStore;
   /** Logger. Defaults to {@link rootLogger}. */
   logger?: Logger;
 }
@@ -74,6 +79,7 @@ export class SessionContext {
   public readonly jobs = new JobManager();
   public readonly pending = new PendingRegistry();
   public readonly leases = new LeaseManager();
+  public readonly subscriptions: SubscriptionManager;
   public readonly logger: Logger;
   private readonly handlers = new Map<string, Handler>();
   private closed = false;
@@ -84,6 +90,7 @@ export class SessionContext {
     logger: Logger,
   ) {
     this.logger = logger;
+    this.subscriptions = new SubscriptionManager(server.eventLog, logger);
   }
 
   public registerHandler(type: string, handler: Handler): void {
@@ -99,6 +106,11 @@ export class SessionContext {
     if (envelope.session_id !== undefined && envelope.session_id !== "") {
       try {
         await this.server.eventLog.append(envelope);
+        // Don't fan subscribe.event back into the subscription manager;
+        // that would create a feedback loop.
+        if (envelope.type !== "subscribe.event") {
+          await this.subscriptions.publish(envelope);
+        }
       } catch (err) {
         this.logger.error({ err }, "event log append (outbound) failed");
       }
@@ -155,14 +167,30 @@ export class SessionContext {
     if (result.success) {
       envelope = result.data;
     } else {
-      // Unknown or malformed: nack with UNIMPLEMENTED for unknown types.
       const issue = result.error.issues[0];
       const looksUnknownType = issue?.code === z.ZodIssueCode.invalid_union_discriminator;
-      const code = looksUnknownType ? "UNIMPLEMENTED" : "INVALID_ARGUMENT";
-      const message = looksUnknownType
-        ? `Unknown message type "${parsed.type}" (§21.3)`
-        : `Invalid envelope: ${issue?.message ?? "schema validation failed"}`;
-      await this.sendNack(parsed.id, new ARCPError({ code, message }));
+      if (looksUnknownType) {
+        // §21.3 dispatch: drop optional extensions silently; nack the rest.
+        const disposition = classifyUnknownType(parsed.type, {
+          extensionsObject: parsed.extensions,
+        });
+        if (disposition.kind === "drop") {
+          this.logger.debug({ type: parsed.type }, disposition.reason);
+          return;
+        }
+        await this.sendNack(
+          parsed.id,
+          new ARCPError({ code: disposition.code, message: disposition.reason }),
+        );
+        return;
+      }
+      await this.sendNack(
+        parsed.id,
+        new ARCPError({
+          code: "INVALID_ARGUMENT",
+          message: `Invalid envelope: ${issue?.message ?? "schema validation failed"}`,
+        }),
+      );
       return;
     }
 
@@ -213,12 +241,16 @@ export class SessionContext {
  */
 export class ARCPServer {
   public readonly eventLog: EventLog;
+  public readonly artifacts: ArtifactStore;
   public readonly logger: Logger;
   private readonly tools = new Map<string, ToolHandler>();
+  private artifactSweepCancel: (() => void) | null = null;
 
   public constructor(public readonly options: ARCPServerOptions) {
     this.eventLog = options.eventLog ?? new EventLog();
+    this.artifacts = options.artifacts ?? new ArtifactStore();
     this.logger = options.logger ?? rootLogger;
+    this.artifactSweepCancel = this.artifacts.startSweep();
   }
 
   /**
@@ -254,6 +286,10 @@ export class ARCPServer {
 
   /** Close the runtime and the underlying event log. */
   public async close(): Promise<void> {
+    if (this.artifactSweepCancel !== null) {
+      this.artifactSweepCancel();
+      this.artifactSweepCancel = null;
+    }
     await this.eventLog.close();
   }
 
@@ -429,6 +465,148 @@ export class ARCPServer {
           },
         }),
       );
+    });
+
+    // Subscriptions ----------------------------------------------------
+    ctx.registerHandler("subscribe", async (env) => {
+      if (env.type !== "subscribe") return;
+      const sessionId = ctx.state.id;
+      if (sessionId === undefined) return;
+      let sub: import("./subscription.js").Subscription;
+      try {
+        sub = ctx.subscriptions.create({
+          ownerSessionId: sessionId,
+          entitlements: { sessions: [sessionId] },
+          payload: env.payload,
+          emit: (event) => ctx.send(event),
+        });
+      } catch (err) {
+        const wrapped =
+          err instanceof ARCPError
+            ? err
+            : new InternalError(err instanceof Error ? err.message : String(err));
+        await ctx.sendNack(env.id, wrapped);
+        return;
+      }
+      // Send the accept FIRST so the client wires its handler, then run backfill.
+      const accepted = buildEnvelope({
+        id: newMessageId(),
+        type: "subscribe.accepted" as const,
+        timestamp: nowTimestamp(),
+        payload: { subscription_id: sub.id },
+        optional: { session_id: sessionId, correlation_id: env.id },
+      });
+      await ctx.send(accepted as BaseEnvelope);
+      if (env.payload.since !== undefined) {
+        try {
+          await ctx.subscriptions.runBackfill(sub, env.payload.since.after_message_id);
+        } catch (err) {
+          ctx.logger.error({ err, subscription_id: sub.id }, "subscription backfill failed");
+        }
+      }
+    });
+
+    ctx.registerHandler("unsubscribe", async (env) => {
+      if (env.type !== "unsubscribe") return;
+      const removed = ctx.subscriptions.unsubscribe(env.payload.subscription_id);
+      if (removed) {
+        const closed = buildEnvelope({
+          id: newMessageId(),
+          type: "subscribe.closed" as const,
+          timestamp: nowTimestamp(),
+          payload: {
+            subscription_id: env.payload.subscription_id,
+            reason: "unsubscribed",
+          },
+          optional: {
+            session_id: ctx.state.id ?? "",
+            subscription_id: env.payload.subscription_id,
+          },
+        });
+        await ctx.send(closed as BaseEnvelope);
+      }
+    });
+
+    // Artifacts --------------------------------------------------------
+    ctx.registerHandler("artifact.put", async (env) => {
+      if (env.type !== "artifact.put") return;
+      const sessionId = ctx.state.id;
+      if (sessionId === undefined) return;
+      try {
+        const ref = this.artifacts.put(sessionId, env.payload);
+        const out = buildEnvelope({
+          id: newMessageId(),
+          type: "artifact.ref" as const,
+          timestamp: nowTimestamp(),
+          payload: ref,
+          optional: { session_id: sessionId, correlation_id: env.id },
+        });
+        await ctx.send(out as BaseEnvelope);
+      } catch (err) {
+        const wrapped =
+          err instanceof ARCPError
+            ? err
+            : new InternalError(err instanceof Error ? err.message : String(err));
+        await ctx.sendNack(env.id, wrapped);
+      }
+    });
+
+    ctx.registerHandler("artifact.fetch", async (env) => {
+      if (env.type !== "artifact.fetch") return;
+      const sessionId = ctx.state.id;
+      if (sessionId === undefined) return;
+      try {
+        const { ref, data } = this.artifacts.fetch(sessionId, env.payload.artifact_id);
+        const out = buildEnvelope({
+          id: newMessageId(),
+          type: "artifact.put" as const,
+          timestamp: nowTimestamp(),
+          payload: {
+            artifact_id: ref.artifact_id,
+            media_type: ref.media_type,
+            data: data.toString("base64"),
+            encoding: "base64" as const,
+          },
+          optional: { session_id: sessionId, correlation_id: env.id },
+        });
+        await ctx.send(out as BaseEnvelope);
+      } catch (err) {
+        const wrapped =
+          err instanceof ARCPError
+            ? err
+            : new InternalError(err instanceof Error ? err.message : String(err));
+        await ctx.sendNack(env.id, wrapped);
+      }
+    });
+
+    ctx.registerHandler("artifact.release", async (env) => {
+      if (env.type !== "artifact.release") return;
+      this.artifacts.release(env.payload);
+    });
+
+    // Resume (§19) -----------------------------------------------------
+    ctx.registerHandler("resume", async (env) => {
+      if (env.type !== "resume") return;
+      const sessionId = ctx.state.id;
+      if (sessionId === undefined) return;
+      // v0.1: replay envelopes for `payload.session_id` (defaulting to the
+      // current session) after `after_message_id`.
+      const targetSessionId = env.session_id ?? sessionId;
+      const after = env.payload.after_message_id ?? "";
+      const events = await this.eventLog.readSince(targetSessionId, after, 10_000);
+      for (const replayed of events) {
+        // Skip the resume envelope itself if it ended up in the log.
+        if (replayed.id === env.id) continue;
+        await ctx.transport.send(replayed as unknown as WireFrame);
+      }
+      const ack = buildEnvelope({
+        id: newMessageId(),
+        type: "ack" as const,
+        timestamp: nowTimestamp(),
+        payload: { ack_for: env.id, received_at: nowTimestamp() },
+        optional: { session_id: sessionId, correlation_id: env.id },
+      });
+      await ctx.send(ack as BaseEnvelope);
     });
 
     // Lease refresh requests come from the client side; the runtime grants extension.
