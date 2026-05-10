@@ -1,7 +1,7 @@
 import { type AddressInfo, createServer, type Server } from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
 import { InvalidArgumentError } from "../errors.js";
-import type { FrameHandler, Transport, WireFrame } from "./base.js";
+import type { FrameHandler, SendableFrame, Transport, WireFrame } from "./base.js";
 
 /**
  * WebSocket transport (§22 mandatory).
@@ -46,7 +46,7 @@ export class WebSocketTransport implements Transport {
     return this.isClosed || this.socket.readyState === WebSocket.CLOSED;
   }
 
-  public async send(frame: WireFrame): Promise<void> {
+  public async send(frame: SendableFrame): Promise<void> {
     if (this.closed) throw new InvalidArgumentError("WebSocketTransport is closed");
     if (this.socket.readyState !== WebSocket.OPEN) {
       // Wait until the socket opens; happens on freshly-created clients.

@@ -1,5 +1,5 @@
 import { InvalidArgumentError } from "../errors.js";
-import type { FrameHandler, Transport, WireFrame } from "./base.js";
+import type { FrameHandler, SendableFrame, Transport, WireFrame } from "./base.js";
 
 /**
  * Two transports sharing a Promise-coupled queue. Used by tests to drive a
@@ -15,7 +15,7 @@ export class MemoryTransport implements Transport {
   private peer?: MemoryTransport;
   private handler: FrameHandler | null = null;
   private closeHandler: ((err?: Error) => void) | null = null;
-  private buffer: WireFrame[] = [];
+  private buffer: SendableFrame[] = [];
   private isClosed = false;
 
   /** Connect this transport to its peer. Internal — use {@link pairMemoryTransports}. */
@@ -27,7 +27,7 @@ export class MemoryTransport implements Transport {
     return this.isClosed;
   }
 
-  public async send(frame: WireFrame): Promise<void> {
+  public async send(frame: SendableFrame): Promise<void> {
     if (this.isClosed) throw new InvalidArgumentError("MemoryTransport is closed");
     const peer = this.peer;
     if (peer === undefined) {
@@ -63,20 +63,20 @@ export class MemoryTransport implements Transport {
     }
   }
 
-  private async deliver(frame: WireFrame): Promise<void> {
+  private async deliver(frame: SendableFrame): Promise<void> {
     if (this.isClosed) return;
     const handler = this.handler;
     if (handler === null) {
       this.buffer.push(frame);
       return;
     }
-    await handler(frame);
+    await handler(frame as WireFrame);
   }
 }
 
-async function drainBuffered(buffered: WireFrame[], handler: FrameHandler): Promise<void> {
+async function drainBuffered(buffered: SendableFrame[], handler: FrameHandler): Promise<void> {
   for (const frame of buffered) {
-    await handler(frame);
+    await handler(frame as WireFrame);
   }
 }
 

@@ -11,8 +11,18 @@
  * guarantee the protocol relies on.
  */
 
+import type { BaseEnvelope } from "../envelope.js";
+
 /** Raw message frame: a JSON-encodable object. */
 export type WireFrame = Record<string, unknown>;
+
+/**
+ * Anything that may be handed to {@link Transport.send}. Accepts a typed
+ * {@link BaseEnvelope} (the common case — outbound traffic is always typed)
+ * or a raw {@link WireFrame} (used when forwarding a frame received from
+ * another peer without re-typing it).
+ */
+export type SendableFrame = BaseEnvelope | WireFrame;
 
 /** A handler for inbound frames; returns the parsed-and-dispatched promise. */
 export type FrameHandler = (frame: WireFrame) => Promise<void> | void;
@@ -23,7 +33,7 @@ export type FrameHandler = (frame: WireFrame) => Promise<void> | void;
  */
 export interface Transport {
   /** Send a frame to the peer. May reject if the transport is closed. */
-  send(frame: WireFrame): Promise<void>;
+  send(frame: SendableFrame): Promise<void>;
 
   /**
    * Register the handler called for each inbound frame.

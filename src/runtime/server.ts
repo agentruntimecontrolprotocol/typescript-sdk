@@ -102,7 +102,7 @@ export class SessionContext {
     if (this.closed || this.transport.closed) {
       throw new FailedPreconditionError("Cannot send: session closed");
     }
-    await this.transport.send(envelope as unknown as WireFrame);
+    await this.transport.send(envelope);
     if (envelope.session_id !== undefined && envelope.session_id !== "") {
       try {
         await this.server.eventLog.append(envelope);
@@ -126,7 +126,7 @@ export class SessionContext {
       payload: { ...error.toPayload(), ack_for: toId },
       ...(this.state.id !== undefined ? { optional: { session_id: this.state.id } } : {}),
     });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
   }
 
   /** Dispatch an inbound, raw frame. Errors are caught and reflected as `nack`. */
@@ -597,7 +597,7 @@ export class ARCPServer {
       for (const replayed of events) {
         // Skip the resume envelope itself if it ended up in the log.
         if (replayed.id === env.id) continue;
-        await ctx.transport.send(replayed as unknown as WireFrame);
+        await ctx.transport.send(replayed);
       }
       const ack = buildEnvelope({
         id: newMessageId(),
@@ -909,7 +909,7 @@ export class ARCPServer {
       payload,
       optional: { correlation_id: correlationId },
     });
-    await ctx.transport.send(env as unknown as WireFrame);
+    await ctx.transport.send(env);
   }
 
   /** Bind the client identity into the session context's logger. */

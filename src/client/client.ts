@@ -135,7 +135,7 @@ export class ARCPClient {
         capabilities: this.options.capabilities,
       },
     });
-    await transport.send(openEnv as unknown as WireFrame);
+    await transport.send(openEnv);
 
     const timeout = setTimeout(() => {
       if (this.handshake !== null && !this.handshake.settled) {
@@ -165,7 +165,7 @@ export class ARCPClient {
     if (!this.state.isAccepted) {
       throw new UnauthenticatedError("Cannot send: session not accepted");
     }
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
   }
 
   /** Close the underlying transport. */
@@ -236,7 +236,7 @@ export class ARCPClient {
       );
     }
 
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
 
     try {
       const result = await invocation.completion.promise;
@@ -280,7 +280,7 @@ export class ARCPClient {
       payload,
       optional: { session_id: sessionId },
     });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
   }
 
   /**
@@ -312,7 +312,7 @@ export class ARCPClient {
     const acceptedPromise = this.pending.register<{ subscription_id: string }>(reqId, {
       deadlineMs: 5000,
     });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
     const accepted = await acceptedPromise;
     const subscriptionId = accepted.subscription_id;
 
@@ -355,7 +355,7 @@ export class ARCPClient {
         optional: { session_id: sessionId },
       });
       if (this.transport !== null) {
-        await this.transport.send(unsubEnv as unknown as WireFrame);
+        await this.transport.send(unsubEnv);
       }
       entry.closed = true;
       if (entry.waiter !== null) {
@@ -387,7 +387,7 @@ export class ARCPClient {
     const promise = this.pending.register<import("../messages/index.js").ArtifactRef>(reqId, {
       deadlineMs: 10_000,
     });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
     return promise;
   }
 
@@ -410,7 +410,7 @@ export class ARCPClient {
       reqId,
       { deadlineMs: 10_000 },
     );
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
     return promise;
   }
 
@@ -426,7 +426,7 @@ export class ARCPClient {
       payload: { artifact_id: artifactId },
       optional: { session_id: sessionId },
     });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
   }
 
   /**
@@ -447,7 +447,7 @@ export class ARCPClient {
       optional: { session_id: args.sessionId },
     });
     const ack = this.pending.register<unknown>(reqId, { deadlineMs: 30_000 });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
     await ack;
   }
 
@@ -467,7 +467,7 @@ export class ARCPClient {
       },
       optional: { session_id: sessionId },
     });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
   }
 
   private async cancelInvocation(inv: InvocationState, reason: unknown): Promise<void> {
@@ -810,7 +810,7 @@ export class ARCPClient {
       payload,
       optional: { session_id: sessionId },
     });
-    await this.transport.send(env as unknown as WireFrame);
+    await this.transport.send(env);
     // For v0.1 the runtime emits `lease.extended` (no correlation_id) on success
     // and `nack` on failure. The caller is expected to listen to those events.
     return new Promise<{ expires_at: string }>((resolve, reject) => {

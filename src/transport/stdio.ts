@@ -1,7 +1,7 @@
 import { createInterface, type Interface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { InvalidArgumentError } from "../errors.js";
-import type { FrameHandler, Transport, WireFrame } from "./base.js";
+import type { FrameHandler, SendableFrame, Transport, WireFrame } from "./base.js";
 
 /**
  * Newline-delimited JSON transport over a pair of streams (§22).
@@ -46,7 +46,7 @@ export class StdioTransport implements Transport {
     return new StdioTransport(child.stdout, child.stdin);
   }
 
-  public async send(frame: WireFrame): Promise<void> {
+  public async send(frame: SendableFrame): Promise<void> {
     if (this.isClosed) throw new InvalidArgumentError("StdioTransport is closed");
     const line = `${JSON.stringify(frame)}\n`;
     return new Promise<void>((resolve, reject) => {
