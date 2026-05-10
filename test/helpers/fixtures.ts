@@ -97,3 +97,22 @@ export async function waitFor(
   }
   throw new Error("waitFor: predicate never became true");
 }
+
+/**
+ * Wait until `getter()` returns a non-null value and return it. Solves the
+ * TypeScript narrowing problem where a `let x: T | null = null` mutated inside
+ * a closure cannot be narrowed at the await site.
+ */
+export async function awaitNonNull<T>(
+  getter: () => T | null | undefined,
+  options: { intervalMs?: number; timeoutMs?: number } = {},
+): Promise<T> {
+  const intervalMs = options.intervalMs ?? 5;
+  const deadline = Date.now() + (options.timeoutMs ?? 1000);
+  while (Date.now() < deadline) {
+    const v = getter();
+    if (v !== null && v !== undefined) return v;
+    await new Promise<void>((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error("awaitNonNull: getter never returned a non-null value");
+}

@@ -25,6 +25,7 @@ import {
 import { EventLog } from "../store/eventlog.js";
 import type { Transport, WireFrame } from "../transport/base.js";
 import { newMessageId, newSessionId, nowTimestamp } from "../util/ulid.js";
+import { Job, JobManager, makeJobContext, type ToolHandler } from "./job.js";
 import { negotiateCapabilities, SessionState } from "./session.js";
 
 const HANDSHAKE_TYPES = new Set<string>([
@@ -63,6 +64,7 @@ export interface ARCPServerOptions {
  */
 export class SessionContext {
   public readonly state = new SessionState();
+  public readonly jobs = new JobManager();
   public readonly logger: Logger;
   private readonly handlers = new Map<string, Handler>();
   private closed = false;
@@ -203,10 +205,26 @@ export class SessionContext {
 export class ARCPServer {
   public readonly eventLog: EventLog;
   public readonly logger: Logger;
+  private readonly tools = new Map<string, ToolHandler>();
 
   public constructor(public readonly options: ARCPServerOptions) {
     this.eventLog = options.eventLog ?? new EventLog();
     this.logger = options.logger ?? rootLogger;
+  }
+
+  /**
+   * Register a tool handler. Tools are looked up by name on `tool.invoke`.
+   * Re-registering the same name overwrites the previous handler.
+   */
+  public registerTool<Args = Record<string, unknown>, Result = unknown>(
+    name: string,
+    handler: ToolHandler<Args, Result>,
+  ): void {
+    this.tools.set(name, handler as ToolHandler);
+  }
+
+  public hasTool(name: string): boolean {
+    return this.tools.has(name);
   }
 
   /**
@@ -301,6 +319,175 @@ export class ARCPServer {
     await ctx.send(acceptEnv as BaseEnvelope);
     this.recordIdentity(ctx, payload.client);
     ctx.logger.info({ session_id: sessionId, principal: identity.principal }, "session accepted");
+    this.registerPostHandshakeHandlers(ctx);
+  }
+
+  /** Register handlers that only become valid once the session is accepted. */
+  private registerPostHandshakeHandlers(ctx: SessionContext): void {
+    ctx.registerHandler("tool.invoke", async (env) => {
+      if (env.type !== "tool.invoke") return;
+      await this.handleToolInvoke(ctx, env);
+    });
+    ctx.registerHandler("cancel", async (env) => {
+      if (env.type !== "cancel") return;
+      await this.handleCancel(ctx, env);
+    });
+    ctx.registerHandler("interrupt", async (env) => {
+      if (env.type !== "interrupt") return;
+      await this.handleInterrupt(ctx, env);
+    });
+    ctx.registerHandler("ping", async (env) => {
+      if (env.type !== "ping") return;
+      const pong = buildEnvelope({
+        id: newMessageId(),
+        type: "pong" as const,
+        timestamp: nowTimestamp(),
+        payload: { ack_for: env.id, received_at: nowTimestamp() },
+        optional: {
+          session_id: ctx.state.id ?? "",
+          correlation_id: env.id,
+        },
+      });
+      await ctx.send(pong as BaseEnvelope);
+    });
+    ctx.registerHandler("session.close", async (env) => {
+      if (env.type !== "session.close") return;
+      const dispose = env.payload.dispose_jobs ?? "cancel";
+      if (dispose === "cancel") ctx.jobs.cancelAll("session closed");
+      ctx.state.transition("closing");
+      await ctx.terminate(env.payload.reason);
+    });
+  }
+
+  private async handleToolInvoke(ctx: SessionContext, env: Envelope): Promise<void> {
+    if (env.type !== "tool.invoke") return;
+    const sessionId = ctx.state.id;
+    if (sessionId === undefined) return;
+    const handler = this.tools.get(env.payload.tool);
+    if (handler === undefined) {
+      await ctx.sendNack(
+        env.id,
+        new NotImplementedError(`Tool "${env.payload.tool}" not registered`),
+      );
+      return;
+    }
+    const heartbeatSec = ctx.state.heartbeatInterval;
+    const job = new Job(
+      {
+        originId: env.id,
+        sessionId,
+        heartbeatIntervalSeconds: heartbeatSec,
+      },
+      (out) => ctx.send(out),
+      ctx.logger.child({ job_id: "<pending>" }),
+    );
+    ctx.jobs.register(job);
+    Object.assign(job, { logger: ctx.logger.child({ job_id: job.jobId }) });
+    await job.emitAccepted();
+    await job.emitStarted();
+
+    const args = env.payload.arguments ?? {};
+    const jobCtx = makeJobContext(job);
+    void this.runHandler(ctx, job, handler, args, jobCtx);
+  }
+
+  private async runHandler(
+    ctx: SessionContext,
+    job: Job,
+    handler: ToolHandler,
+    args: Record<string, unknown>,
+    jobCtx: ReturnType<typeof makeJobContext>,
+  ): Promise<void> {
+    try {
+      const value = await handler(args, jobCtx);
+      if (!job.isTerminal) await job.emitToolResult(value);
+    } catch (err) {
+      if (job.isTerminal) {
+        // Already cancelled or failed by the watchdog; nothing to do.
+        return;
+      }
+      const wrapped =
+        err instanceof ARCPError
+          ? err
+          : new InternalError(err instanceof Error ? err.message : String(err), {
+              cause: err instanceof Error ? err : undefined,
+            });
+      await job.emitToolError(wrapped);
+    } finally {
+      ctx.jobs.retire(job.jobId);
+    }
+  }
+
+  private async handleCancel(ctx: SessionContext, env: Envelope): Promise<void> {
+    if (env.type !== "cancel") return;
+    const { target, target_id, reason, deadline_ms } = env.payload;
+    if (target !== "job") {
+      await ctx.sendNack(
+        env.id,
+        new NotImplementedError(`cancel target "${target}" not supported in v0.1`),
+      );
+      return;
+    }
+    const job = ctx.jobs.get(target_id);
+    if (job === undefined || job.isTerminal) {
+      const refused = buildEnvelope({
+        id: newMessageId(),
+        type: "cancel.refused" as const,
+        timestamp: nowTimestamp(),
+        payload: {
+          target,
+          target_id,
+          reason: job === undefined ? "not_found" : "already_terminal",
+        },
+        optional: { session_id: ctx.state.id ?? "", correlation_id: env.id },
+      });
+      await ctx.send(refused as BaseEnvelope);
+      return;
+    }
+    const accepted = buildEnvelope({
+      id: newMessageId(),
+      type: "cancel.accepted" as const,
+      timestamp: nowTimestamp(),
+      payload: { target, target_id },
+      optional: { session_id: ctx.state.id ?? "", correlation_id: env.id },
+    });
+    await ctx.send(accepted as BaseEnvelope);
+    job.cancel(reason ?? "client_cancel", "client");
+    if (deadline_ms !== undefined && deadline_ms > 0) {
+      const timer = setTimeout(() => {
+        if (!job.isTerminal) job.abortHard("cancellation deadline exceeded");
+      }, deadline_ms);
+      timer.unref();
+    }
+  }
+
+  private async handleInterrupt(ctx: SessionContext, env: Envelope): Promise<void> {
+    if (env.type !== "interrupt") return;
+    const { target, target_id, prompt } = env.payload;
+    if (target !== "job") return;
+    const job = ctx.jobs.get(target_id);
+    if (job === undefined || job.isTerminal) return;
+    if (this.options.capabilities.interrupt === false) {
+      await ctx.sendNack(env.id, new NotImplementedError("interrupt capability not advertised"));
+      return;
+    }
+    job.block();
+    const human = buildEnvelope({
+      id: newMessageId(),
+      type: "human.input.request" as const,
+      timestamp: nowTimestamp(),
+      payload: {
+        prompt: prompt ?? "Job interrupted; awaiting human guidance.",
+        response_schema: { type: "object" },
+        expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+      },
+      optional: {
+        session_id: ctx.state.id ?? "",
+        job_id: job.jobId,
+        causation_id: env.id,
+      },
+    });
+    await ctx.send(human as BaseEnvelope);
   }
 
   private async authenticateOpen(
