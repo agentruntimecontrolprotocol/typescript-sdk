@@ -486,7 +486,7 @@ export class ARCPClient {
   private async dispatchRaw(frame: WireFrame): Promise<void> {
     let parsed: BaseEnvelope;
     try {
-      parsed = RoundTripEnvelopeSchema.parse(frame) as BaseEnvelope;
+      parsed = RoundTripEnvelopeSchema.parse(frame);
     } catch (err) {
       this.logger.warn({ err }, "client received malformed frame");
       return;
@@ -722,7 +722,7 @@ export class ARCPClient {
             timestamp: nowTimestamp(),
             payload: response,
             optional: { session_id: sessionId, correlation_id: env.id },
-          }) as BaseEnvelope,
+          }),
         );
       } catch (err) {
         this.logger.error({ err }, "human input handler threw");
@@ -748,7 +748,7 @@ export class ARCPClient {
             timestamp: nowTimestamp(),
             payload: response,
             optional: { session_id: sessionId, correlation_id: env.id },
-          }) as BaseEnvelope,
+          }),
         );
       } catch (err) {
         this.logger.error({ err }, "human choice handler threw");
@@ -775,7 +775,7 @@ export class ARCPClient {
               timestamp: nowTimestamp(),
               payload: decision.grant,
               optional: { session_id: sessionId, correlation_id: env.id },
-            }) as BaseEnvelope,
+            }),
           );
         } else {
           await this.send(
@@ -785,7 +785,7 @@ export class ARCPClient {
               timestamp: nowTimestamp(),
               payload: decision.deny,
               optional: { session_id: sessionId, correlation_id: env.id },
-            }) as BaseEnvelope,
+            }),
           );
         }
       } catch (err) {

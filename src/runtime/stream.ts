@@ -81,7 +81,7 @@ export class StreamWriter {
       payload: { ...chunk, sequence: seq },
       optional: { session_id: this.sessionId, stream_id: this.streamId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   /** Close the stream cleanly. Idempotent; subsequent writes throw. */
@@ -95,7 +95,7 @@ export class StreamWriter {
       payload: { ...payload, total_chunks: this.sequence },
       optional: { session_id: this.sessionId, stream_id: this.streamId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   /** Close the stream with an error. */
@@ -109,7 +109,7 @@ export class StreamWriter {
       payload: err.toPayload(),
       optional: { session_id: this.sessionId, stream_id: this.streamId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   private async emitOpen(options: {
@@ -131,7 +131,7 @@ export class StreamWriter {
       payload,
       optional: { session_id: this.sessionId, stream_id: this.streamId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 }
 

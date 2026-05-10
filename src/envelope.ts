@@ -135,6 +135,13 @@ export function messageEnvelope<T extends string, P extends z.ZodTypeAny>(type: 
  * so the result is acceptable under `exactOptionalPropertyTypes`.
  *
  * Validation is the caller's job — the result is shape-typed but not parsed.
+ *
+ * The declared return type is `BaseEnvelope` intersected with the literal
+ * `type` and the typed `payload` so callers retain the narrow info they need
+ * while still being able to pass the result anywhere a `BaseEnvelope` is
+ * expected. The single internal cast bridges the gap between the structural
+ * literal we build and the schema-inferred `BaseEnvelope` (which uses
+ * `?:` for optionals rather than `?: T | undefined`).
  */
 export function buildEnvelope<T extends string, P>(args: {
   id: string;
@@ -142,14 +149,8 @@ export function buildEnvelope<T extends string, P>(args: {
   timestamp: string;
   payload: P;
   optional?: EnvelopeOptionalFields;
-}): {
-  arcp: typeof PROTOCOL_VERSION;
-  id: string;
-  type: T;
-  timestamp: string;
-  payload: P;
-} & Partial<EnvelopeOptionalFields> {
-  return {
+}): BaseEnvelope & { type: T; payload: P } {
+  const env = {
     arcp: PROTOCOL_VERSION,
     id: args.id,
     type: args.type,
@@ -157,6 +158,7 @@ export function buildEnvelope<T extends string, P>(args: {
     ...(args.optional !== undefined ? pickDefined(args.optional) : {}),
     payload: args.payload,
   };
+  return env as BaseEnvelope & { type: T; payload: P };
 }
 
 /**

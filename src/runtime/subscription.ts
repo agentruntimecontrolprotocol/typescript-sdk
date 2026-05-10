@@ -168,7 +168,7 @@ export class SubscriptionManager {
       payload: { event },
       optional: { session_id: sub.ownerSessionId, subscription_id: sub.id },
     });
-    await sub.emit(wrapper as BaseEnvelope);
+    await sub.emit(wrapper);
   }
 
   private async emitBackfillComplete(sub: Subscription): Promise<void> {
@@ -179,7 +179,7 @@ export class SubscriptionManager {
       payload: { name: "subscription.backfill_complete" },
       optional: { session_id: sub.ownerSessionId, subscription_id: sub.id },
     });
-    await this.deliver(sub, synthetic as BaseEnvelope);
+    await this.deliver(sub, synthetic);
   }
 }
 

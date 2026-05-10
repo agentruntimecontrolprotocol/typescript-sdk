@@ -133,7 +133,7 @@ export class SessionContext {
   public async dispatchRaw(frame: WireFrame): Promise<void> {
     let parsed: BaseEnvelope;
     try {
-      parsed = RoundTripEnvelopeSchema.parse(frame) as BaseEnvelope;
+      parsed = RoundTripEnvelopeSchema.parse(frame);
     } catch (err) {
       this.logger.warn({ err }, "inbound envelope failed base-shape validation");
       return;
@@ -361,7 +361,7 @@ export class ARCPServer {
       },
     });
     ctx.state.transition("accepted");
-    await ctx.send(acceptEnv as BaseEnvelope);
+    await ctx.send(acceptEnv);
     this.recordIdentity(ctx, payload.client);
     ctx.logger.info({ session_id: sessionId, principal: identity.principal }, "session accepted");
     this.registerPostHandshakeHandlers(ctx);
@@ -393,7 +393,7 @@ export class ARCPServer {
           correlation_id: env.id,
         },
       });
-      await ctx.send(pong as BaseEnvelope);
+      await ctx.send(pong);
     });
     ctx.registerHandler("session.close", async (env) => {
       if (env.type !== "session.close") return;
@@ -496,7 +496,7 @@ export class ARCPServer {
         payload: { subscription_id: sub.id },
         optional: { session_id: sessionId, correlation_id: env.id },
       });
-      await ctx.send(accepted as BaseEnvelope);
+      await ctx.send(accepted);
       if (env.payload.since !== undefined) {
         try {
           await ctx.subscriptions.runBackfill(sub, env.payload.since.after_message_id);
@@ -523,7 +523,7 @@ export class ARCPServer {
             subscription_id: env.payload.subscription_id,
           },
         });
-        await ctx.send(closed as BaseEnvelope);
+        await ctx.send(closed);
       }
     });
 
@@ -541,7 +541,7 @@ export class ARCPServer {
           payload: ref,
           optional: { session_id: sessionId, correlation_id: env.id },
         });
-        await ctx.send(out as BaseEnvelope);
+        await ctx.send(out);
       } catch (err) {
         const wrapped =
           err instanceof ARCPError
@@ -569,7 +569,7 @@ export class ARCPServer {
           },
           optional: { session_id: sessionId, correlation_id: env.id },
         });
-        await ctx.send(out as BaseEnvelope);
+        await ctx.send(out);
       } catch (err) {
         const wrapped =
           err instanceof ARCPError
@@ -606,7 +606,7 @@ export class ARCPServer {
         payload: { ack_for: env.id, received_at: nowTimestamp() },
         optional: { session_id: sessionId, correlation_id: env.id },
       });
-      await ctx.send(ack as BaseEnvelope);
+      await ctx.send(ack);
     });
 
     // Lease refresh requests come from the client side; the runtime grants extension.
@@ -621,7 +621,7 @@ export class ARCPServer {
           payload: ext,
           optional: { session_id: ctx.state.id ?? "" },
         });
-        await ctx.send(out as BaseEnvelope);
+        await ctx.send(out);
       } catch (err) {
         const wrapped =
           err instanceof ARCPError
@@ -658,7 +658,7 @@ export class ARCPServer {
             deadlineMs,
             signal: job.signal,
           });
-          await ctx.send(env as BaseEnvelope);
+          await ctx.send(env);
           const value = await promise;
           return value;
         } finally {
@@ -690,7 +690,7 @@ export class ARCPServer {
             deadlineMs,
             signal: job.signal,
           });
-          await ctx.send(env as BaseEnvelope);
+          await ctx.send(env);
           return await promise;
         } finally {
           if (!job.isTerminal && job.state === "blocked") {
@@ -718,7 +718,7 @@ export class ARCPServer {
             deadlineMs,
             signal: job.signal,
           });
-          await ctx.send(env as BaseEnvelope);
+          await ctx.send(env);
           return await promise;
         } finally {
           if (!job.isTerminal && job.state === "blocked") {
@@ -815,7 +815,7 @@ export class ARCPServer {
         },
         optional: { session_id: ctx.state.id ?? "", correlation_id: env.id },
       });
-      await ctx.send(refused as BaseEnvelope);
+      await ctx.send(refused);
       return;
     }
     const accepted = buildEnvelope({
@@ -825,7 +825,7 @@ export class ARCPServer {
       payload: { target, target_id },
       optional: { session_id: ctx.state.id ?? "", correlation_id: env.id },
     });
-    await ctx.send(accepted as BaseEnvelope);
+    await ctx.send(accepted);
     job.cancel(reason ?? "client_cancel", "client");
     if (deadline_ms !== undefined && deadline_ms > 0) {
       const timer = setTimeout(() => {
@@ -861,7 +861,7 @@ export class ARCPServer {
         causation_id: env.id,
       },
     });
-    await ctx.send(human as BaseEnvelope);
+    await ctx.send(human);
   }
 
   private async authenticateOpen(

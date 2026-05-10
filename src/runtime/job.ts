@@ -161,7 +161,7 @@ export class Job {
         correlation_id: this.originId,
       },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   public async emitStarted(): Promise<void> {
@@ -173,7 +173,7 @@ export class Job {
       payload: { job_id: this.jobId, started_at: nowTimestamp() },
       optional: { session_id: this.sessionId, job_id: this.jobId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
     this.startWatchdog();
   }
 
@@ -186,7 +186,7 @@ export class Job {
       payload: progress,
       optional: { session_id: this.sessionId, job_id: this.jobId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   public async emitHeartbeat(): Promise<void> {
@@ -203,7 +203,7 @@ export class Job {
       optional: { session_id: this.sessionId, job_id: this.jobId },
     });
     this.heartbeatSequence += 1;
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   public async emitLog(log: LogPayload): Promise<void> {
@@ -214,7 +214,7 @@ export class Job {
       payload: log,
       optional: { session_id: this.sessionId, job_id: this.jobId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   public async emitMetric(metric: MetricPayload): Promise<void> {
@@ -225,7 +225,7 @@ export class Job {
       payload: metric,
       optional: { session_id: this.sessionId, job_id: this.jobId },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   public async emitToolResult(value: unknown): Promise<void> {
@@ -242,7 +242,7 @@ export class Job {
         correlation_id: this.originId,
       },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   public async emitToolError(err: ARCPError): Promise<void> {
@@ -259,7 +259,7 @@ export class Job {
         correlation_id: this.originId,
       },
     });
-    await this.send(env as BaseEnvelope);
+    await this.send(env);
   }
 
   /** Open a new outbound stream associated with this job. */
@@ -322,7 +322,7 @@ export class Job {
         payload,
         optional: { session_id: this.sessionId, job_id: this.jobId },
       });
-      await this.send(env as BaseEnvelope);
+      await this.send(env);
     } catch (err) {
       this.logger.error({ err, type, jobId: this.jobId }, "failed to emit terminal envelope");
     }
