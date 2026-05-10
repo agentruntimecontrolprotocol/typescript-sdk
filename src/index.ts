@@ -72,3 +72,37 @@ export {
   nowTimestamp,
 } from "./util/ulid.js";
 export { IMPL_VERSION, isCompatibleVersion, PROTOCOL_VERSION } from "./version.js";
+
+// Phase 2 surface ----------------------------------------------------------
+
+export {
+  type BearerIdentity,
+  type BearerVerifier,
+  type JwtKey,
+  JwtVerifier,
+  StaticBearerVerifier,
+} from "./auth/index.js";
+export {
+  ARCPClient,
+  type ARCPClientOptions,
+  asEnvelopeOfType,
+  type ClientHandler,
+  DenyAllPermissionHandler,
+  type HumanInputHandler,
+  type PermissionDecisionHandler,
+} from "./client/index.js";
+export * from "./messages/index.js";
+export {
+  ARCPServer,
+  type ARCPServerOptions,
+  type Handler,
+  negotiateCapabilities,
+  SessionContext,
+  type SessionPhase,
+  type SessionSnapshot,
+  SessionState,
+} from "./runtime/index.js";
+export type { FrameHandler, Transport, WireFrame } from "./transport/base.js";
+export { MemoryTransport, pairMemoryTransports } from "./transport/memory.js";
+
+export { Deferred } from "./util/deferred.js";

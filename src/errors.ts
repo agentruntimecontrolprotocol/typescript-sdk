@@ -82,10 +82,10 @@ export type ErrorPayload = z.infer<typeof ErrorPayloadSchema>;
 export interface ARCPErrorOptions {
   message: string;
   code: ErrorCode;
-  retryable?: boolean;
-  details?: Record<string, unknown>;
-  cause?: ARCPError | Error;
-  traceId?: string;
+  retryable?: boolean | undefined;
+  details?: Record<string, unknown> | undefined;
+  cause?: ARCPError | Error | undefined;
+  traceId?: string | undefined;
 }
 
 /**
