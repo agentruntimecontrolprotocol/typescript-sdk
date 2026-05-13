@@ -49,14 +49,14 @@ async function callViaMcp(
   try {
     result = await mcp.callTool({ name: args.tool, arguments: args.arguments });
   } catch (exc) {
-    throw new InternalError({ message: String(exc) });
+    throw new InternalError(String(exc));
   }
 
   if (result.isError === true) {
     const text = (result.content as { text?: string }[]).map((c) => c.text ?? "").join("\n");
     // MCP doesn't carry a typed error code; FAILED_PRECONDITION is the
     // right canonical mapping for "tool ran, said no".
-    throw new FailedPreconditionError({ message: text || "tool error" });
+    throw new FailedPreconditionError(text || "tool error");
   }
 
   return { content: result.content };

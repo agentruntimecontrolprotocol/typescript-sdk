@@ -55,9 +55,9 @@ async function cancelJob(
     args.deadlineMs + 5000,
   );
   if (reply.type === "cancel.refused") {
-    throw new FailedPreconditionError({
-      message: String((reply.payload as { reason?: string }).reason ?? "cancel refused"),
-    });
+    throw new FailedPreconditionError(
+      String((reply.payload as { reason?: string }).reason ?? "cancel refused"),
+    );
   }
   return reply;
 }

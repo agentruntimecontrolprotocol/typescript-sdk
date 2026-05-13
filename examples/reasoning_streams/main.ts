@@ -63,7 +63,7 @@ async function runPrimary(
       continue;
     }
     last = next.value;
-    if (last.severity === "halt") break;
+    if (last["severity"] === "halt") break;
   }
   return answer;
 }

@@ -36,9 +36,7 @@ async function main(): Promise<void> {
   // refuse the session — RFC §7 / §21.2.
   const advertised = new Set(advertisedExtensions(client));
   if (!ALL_EXTENSIONS.every((e) => advertised.has(e))) {
-    throw new NotImplementedError({
-      message: `runtime missing SDR extensions: ${[...advertised].join(",")}`,
-    });
+    throw new NotImplementedError(`runtime missing SDR extensions: ${[...advertised].join(",")}`);
   }
 
   const handle = randomUUID().slice(0, 8);

@@ -24,7 +24,7 @@ async function subscribe(
   opts: { sessionId: string; types?: string[] },
 ): Promise<{ subscriptionId: string; feed: AsyncIterator<BaseEnvelope> }> {
   const filter: Record<string, unknown> = { session_id: [opts.sessionId] };
-  if (opts.types !== undefined) filter.types = opts.types;
+  if (opts.types !== undefined) filter["types"] = opts.types;
   const sub = await client.subscribe({ filter });
   return { subscriptionId: sub.subscriptionId, feed: sub.feed };
 }
@@ -56,7 +56,10 @@ async function attach(
   handler: (env: BaseEnvelope) => Promise<void>,
 ): Promise<void> {
   const client = null as unknown as ARCPClient; // transport, identity, auth elided
-  const sub = await subscribe(client, { sessionId: "...", types });
+  const sub = await subscribe(client, {
+    sessionId: "...",
+    ...(types !== undefined ? { types } : {}),
+  });
   try {
     for (;;) {
       const next = await sub.feed.next();

@@ -47,7 +47,7 @@ async function requestLease(
     180_000,
   );
   if (reply.type === "permission.deny") {
-    throw new PermissionDeniedError({ message: `${args.permission} denied on ${args.table}` });
+    throw new PermissionDeniedError(`${args.permission} denied on ${args.table}`);
   }
   const p = reply.payload as { lease_id: string; expires_at: string };
   return { leaseId: String(p.lease_id), expiresAt: new Date(p.expires_at) };
@@ -56,7 +56,7 @@ async function requestLease(
 async function authorize(client: ARCPClient, sql: string, leases: Leases): Promise<string> {
   const klass = classify(sql);
   if (klass.tables.size === 0) {
-    throw new InvalidArgumentError({ message: "no table referenced" });
+    throw new InvalidArgumentError("no table referenced");
   }
   const op = klass.op; // "read" / "write" / "ddl"
   const seconds = op === "read" ? READ_LEASE_SECONDS : WRITE_LEASE_SECONDS;

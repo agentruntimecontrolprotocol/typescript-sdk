@@ -116,7 +116,7 @@ function supervise(client: ARCPClient, roster: Roster, jobsToTasks: Map<string, 
       const jid = (env as BaseEnvelope & { job_id?: string }).job_id ?? "";
       jobsToTasks.delete(jid);
       for (const w of roster.workers.values()) {
-        if (w.inFlightJob === jid) w.inFlightJob = undefined;
+        if (w.inFlightJob === jid) delete w.inFlightJob;
       }
     });
   }

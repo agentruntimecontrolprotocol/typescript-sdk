@@ -50,7 +50,7 @@ async function requestApply(
   );
   if (reply.type === "permission.deny") {
     const reason = (reply.payload as { reason?: string })?.reason ?? "denied";
-    throw new PermissionDeniedError({ message: reason });
+    throw new PermissionDeniedError(reason);
   }
   return String((reply.payload as { lease_id: string }).lease_id);
 }
@@ -68,9 +68,9 @@ async function respond(
         timestamp: nowTimestamp(),
         optional: { correlation_id: args.request.id },
         payload: {
-          permission: reqPayload.permission,
-          resource: reqPayload.resource,
-          operation: reqPayload.operation,
+          permission: reqPayload["permission"],
+          resource: reqPayload["resource"],
+          operation: reqPayload["operation"],
           lease_seconds: 90,
         },
       }) as BaseEnvelope,
@@ -83,7 +83,7 @@ async function respond(
         timestamp: nowTimestamp(),
         optional: { correlation_id: args.request.id },
         payload: {
-          permission: reqPayload.permission,
+          permission: reqPayload["permission"],
           reason: args.verdict.reason,
           code: "FAILED_PRECONDITION",
         },
@@ -112,7 +112,10 @@ async function main(): Promise<void> {
   let priorDenial: string | undefined;
   try {
     for (let i = 0; i < MAX_REVISIONS; i++) {
-      const patch = await propose({ ticket, priorDenial });
+      const patch = await propose({
+        ticket,
+        ...(priorDenial !== undefined ? { priorDenial } : {}),
+      });
       try {
         const lease = await requestApply(generator, { ticketId, patch });
         process.stdout.write(`applied ${fingerprint(patch.diff)} lease=${lease}\n`);

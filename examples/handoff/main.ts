@@ -48,7 +48,7 @@ async function packageContext(
     15_000,
   );
   if (reply.type !== "artifact.ref") {
-    throw new InternalError({ message: `got ${reply.type}` });
+    throw new InternalError(`got ${reply.type}`);
   }
   return reply.payload as Record<string, unknown>;
 }
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
   const accepted = await cheap.connect(null as never);
   // Pin runtime kind + fingerprint (RFC §8.3); refuse on mismatch.
   if (accepted.runtime.kind !== "arcp-haiku-pool") {
-    throw new UnauthenticatedError({ message: "cheap kind mismatch" });
+    throw new UnauthenticatedError("cheap kind mismatch");
   }
 
   const reqText = "what does CRDT stand for?";

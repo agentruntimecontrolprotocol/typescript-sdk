@@ -82,6 +82,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^22.7.5",
     "@types/ws": "^8.5.12",

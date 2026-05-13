@@ -45,7 +45,7 @@ function classify(
       seconds: WRITE_LEASE_SECONDS,
     };
   }
-  throw new PermissionDeniedError({ message: `binary not allowed: ${binary}` });
+  throw new PermissionDeniedError(`binary not allowed: ${binary}`);
 }
 
 // Illustrative `client.request()` shape: send + await correlated reply.
@@ -84,7 +84,7 @@ async function acquireLease(
   );
   if (reply.type === "permission.deny") {
     const reason = (reply.payload as { reason?: string })?.reason ?? "denied";
-    throw new PermissionDeniedError({ message: reason });
+    throw new PermissionDeniedError(reason);
   }
   return String((reply.payload as { lease_id: string }).lease_id);
 }

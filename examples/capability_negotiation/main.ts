@@ -118,14 +118,14 @@ function consumeMetric(env: BaseEnvelope, totals: Map<string, Usage>): void {
   const p = env.payload as { name?: string; value?: number; dims?: Record<string, string> };
   const dims = p.dims ?? {};
   if (typeof p.value !== "number") return;
-  const tenant = dims.tenant ?? "unknown";
+  const tenant = dims["tenant"] ?? "unknown";
   const u = totals.get(tenant) ?? { tokensIn: 0, tokensOut: 0, costUsd: 0, byPeer: {} };
   if (p.name === "tokens.used") {
-    if (dims.kind === "input") u.tokensIn += p.value;
-    else if (dims.kind === "output") u.tokensOut += p.value;
+    if (dims["kind"] === "input") u.tokensIn += p.value;
+    else if (dims["kind"] === "output") u.tokensOut += p.value;
   } else if (p.name === "cost.usd") {
     u.costUsd += p.value;
-    const peer = dims.peer ?? "unknown";
+    const peer = dims["peer"] ?? "unknown";
     u.byPeer[peer] = (u.byPeer[peer] ?? 0) + p.value;
   }
   totals.set(tenant, u);

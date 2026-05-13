@@ -113,7 +113,7 @@ async function issueResume(
     after_message_id: args.afterMessageId,
     include_open_streams: true,
   };
-  if (args.checkpointId !== undefined) payload.checkpoint_id = args.checkpointId;
+  if (args.checkpointId !== undefined) payload["checkpoint_id"] = args.checkpointId;
   await client.send(
     buildEnvelope({
       id: newMessageId(),
@@ -128,7 +128,7 @@ async function issueResume(
   for await (const env of events(client)) {
     if ((env as BaseEnvelope & { job_id?: string }).job_id !== args.jobId) continue;
     if (env.type === "tool.error" && (env.payload as { code?: string }).code === "DATA_LOSS") {
-      throw new DataLossError({ message: "retention expired" });
+      throw new DataLossError("retention expired");
     }
     if (env.type === "job.checkpoint") {
       last = String((env.payload as { label: string }).label);
@@ -151,10 +151,10 @@ async function issueResume(
 async function main(): Promise<void> {
   const client = null as unknown as ARCPClient; // transport, identity, auth elided
 
-  const rjId = process.env.RESUME_JOB_ID;
-  const rjAfter = process.env.RESUME_AFTER_MSG_ID;
+  const rjId = process.env["RESUME_JOB_ID"];
+  const rjAfter = process.env["RESUME_AFTER_MSG_ID"];
   if (rjId !== undefined && rjAfter !== undefined) {
-    const checkpointId = process.env.RESUME_CHECKPOINT_ID;
+    const checkpointId = process.env["RESUME_CHECKPOINT_ID"];
     const last = await issueResume(client, {
       jobId: rjId,
       afterMessageId: rjAfter,
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
           client,
           jobId: rjId,
           request: "<replayed>",
-          startingAt: STEPS[nextIdx] ?? STEPS[STEPS.length - 1],
+          startingAt: STEPS[nextIdx] ?? "finalize",
           crashAfter: undefined,
         });
         await client.send(
@@ -202,7 +202,7 @@ async function main(): Promise<void> {
       jobId,
       request: reqText,
       startingAt: STEPS[0],
-      crashAfter: process.env.CRASH_AFTER_STEP,
+      crashAfter: process.env["CRASH_AFTER_STEP"],
     });
     await client.send(
       buildEnvelope({
