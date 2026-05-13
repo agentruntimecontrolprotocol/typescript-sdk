@@ -1,0 +1,94 @@
+# Publishes @agentruntimecontrolprotocol/arcp to npm after the `test` workflow
+# succeeds on main, but only when package.json `version` differs from the
+# version currently published on npm.
+#
+# Required repo configuration:
+#   - Secret: NPM_TOKEN (npm automation token with publish rights to the
+#     @agentruntimecontrolprotocol scope)
+#   - Settings > Actions > General > Workflow permissions: "Read and write"
+#     is NOT required; this workflow only needs id-token:write (set below)
+#     for npm provenance.
+
+name: publish
+
+on:
+  workflow_run:
+    workflows: ["test"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish to npm
+    runs-on: ubuntu-latest
+    # Only run if the test workflow succeeded (or this was manually dispatched).
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # For workflow_run, check out the exact commit that passed CI.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        # pnpm/action-setup v4.0.0
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.0.0
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Read local version
+        id: local
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Read published version
+        id: published
+        run: |
+          name=$(node -p "require('./package.json').name")
+          # `npm view` exits non-zero if the package has never been published.
+          published=$(npm view "$name" version 2>/dev/null || echo "")
+          echo "version=$published" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to publish
+        id: decide
+        run: |
+          if [ "${{ steps.local.outputs.version }}" = "${{ steps.published.outputs.version }}" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Local version (${{ steps.local.outputs.version }}) matches npm; skipping publish."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Publishing ${{ steps.local.outputs.version }} (npm has '${{ steps.published.outputs.version }}')."
+          fi
+
+      - name: Install dependencies
+        if: steps.decide.outputs.publish == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        if: steps.decide.outputs.publish == 'true'
+        run: pnpm run build
+
+      - name: Publish
+        if: steps.decide.outputs.publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance

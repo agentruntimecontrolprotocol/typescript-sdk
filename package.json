@@ -1,8 +1,20 @@
 {
-  "name": "arcp",
+  "name": "@agentruntimecontrolprotocol/arcp",
   "version": "0.1.0",
   "description": "Reference TypeScript implementation of the Agent Runtime Control Protocol (ARCP) v1.0.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentruntimecontrolprotocol/typescript-sdk.git"
+  },
+  "homepage": "https://github.com/agentruntimecontrolprotocol/typescript-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "packageManager": "pnpm@9.15.0",
   "type": "module",
   "engines": {
