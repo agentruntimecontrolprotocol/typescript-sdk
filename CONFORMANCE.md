@@ -129,7 +129,7 @@ Five runnable examples under `examples/`:
 | File | Spec |
 |---|---|
 | `submit-and-stream.ts` | §13.1 |
-| `delegate.ts` | §13.2 / §10 |
+| `delegate/` (server + client) | §13.2 / §10 |
 | `resume.ts` | §13.3 / §6.3 |
 | `idempotent-retry.ts` | §13.5 / §7.2 |
 | `lease-violation.ts` | §13.4 / §9.3 |
