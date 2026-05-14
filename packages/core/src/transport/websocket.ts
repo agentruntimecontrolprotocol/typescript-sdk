@@ -93,8 +93,11 @@ export class WebSocketTransport implements Transport {
     }
     return new Promise<void>((resolve, reject) => {
       this.socket.send(JSON.stringify(frame), (err) => {
-        if (err === undefined) resolve();
-        else reject(err);
+        // `ws`'s typings declare `err: Error | undefined`, but on some
+        // Node / OS combinations the callback is invoked with `null`
+        // for success. Treat any non-truthy value as success.
+        if (err) reject(err);
+        else resolve();
       });
     });
   }

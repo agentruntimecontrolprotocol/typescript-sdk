@@ -130,6 +130,9 @@ export default tseslint.config(
       "no-console": "off",
       "n/no-process-exit": "off",
       "unicorn/no-process-exit": "off",
+      // Node 22+ has stable `fetch`; the rule's default engines range flags
+      // it broadly.
+      "n/no-unsupported-features/node-builtins": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/restrict-template-expressions": "off",

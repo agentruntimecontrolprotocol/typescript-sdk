@@ -1,9 +1,10 @@
 # ARCP TypeScript Examples
 
-Eighteen end-to-end examples covering ARCP v1.0 and v1.1. Each one
-is a pair of two processes — a runtime (`server.ts`) and a client
-(`client.ts`) — that talk over a real `Transport`. No mocks. No
-in-memory shortcuts. Each example exits 0 on success.
+Twenty-three end-to-end examples covering ARCP v1.0 and v1.1 plus the
+host-integration middlewares. Each one is a pair of two processes — a
+runtime (`server.ts`) and a client (`client.ts`) — that talk over a
+real `Transport`. No mocks. No in-memory shortcuts. Each example exits
+0 on success.
 
 ### v1.0 core
 
@@ -32,6 +33,15 @@ in-memory shortcuts. Each example exits 0 on success.
 | [`cost-budget/`](./cost-budget/)           | `cost.budget` lease capability; `cost.*` metrics auto-decrement the counter; runtime emits debounced `cost.budget.remaining`; final call hits `BUDGET_EXHAUSTED`.                                    | §9.6, §12  |
 | [`progress/`](./progress/)                 | `progress` event kind; client renders a text progress bar.                                                                                                                                           | §8.2.1     |
 | [`result-chunk/`](./result-chunk/)         | `ctx.streamResult()` writes ~30 chunks; terminal `job.result` carries `result_id` + `result_size`; client `handle.collectChunks()` reassembles.                                                      | §8.4       |
+
+### Host integrations
+
+| Example                  | Demonstrates                                                                                                                                                                  | Spec |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| [`tracing/`](./tracing/) | `@arcp/middleware-otel` wired on BOTH sides; W3C trace context propagated through `extensions["x-vendor.opentelemetry.tracecontext"]`; spans printed via ConsoleSpanExporter. | §11  |
+| [`express/`](./express/) | `@arcp/express` — one Node HTTP server serving both Express routes and the ARCP WS upgrade at `/arcp`, with `allowedHosts` DNS-rebind protection.                             | §4.1 |
+| [`fastify/`](./fastify/) | `@arcp/fastify` — Fastify HTTP routes alongside ARCP on a single port, with Fastify's pino logger and per-request `req.id`.                                                   | §4.1 |
+| [`bun/`](./bun/)         | `@arcp/bun` — `serveArcp({...})` listener running under Bun (no `ws` dependency); Node and Bun clients both interoperate.                                                     | §4.1 |
 
 ## Running
 

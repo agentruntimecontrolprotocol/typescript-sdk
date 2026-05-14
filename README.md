@@ -37,7 +37,9 @@ Optional middleware:
 | ----------------------- | ----------------------------------------------------------------------------------- |
 | `@arcp/node`            | Attach the ARCP WebSocket upgrade to an existing Node `http.Server`.                |
 | `@arcp/express`         | Express app helper + WS upgrade attachment, with Host-header DNS-rebind protection. |
+| `@arcp/fastify`         | Fastify upgrade attachment that mounts on `app.server`.                             |
 | `@arcp/hono`            | Hono app helper + WS upgrade attachment for `@hono/node-server`.                    |
+| `@arcp/bun`             | Bun-native `serveArcp({...})` listener built on `Bun.serve({ websocket })`.         |
 | `@arcp/middleware-otel` | Emit OpenTelemetry spans and propagate W3C trace context per §11.                   |
 
 ## Quickstart
@@ -315,8 +317,8 @@ Spec sections implemented:
 
 ## Examples
 
-Eighteen end-to-end examples, each a `server.ts` + `client.ts` pair
-that talks over a real `Transport`. See
+Twenty-three end-to-end examples, each a `server.ts` + `client.ts`
+pair that talks over a real `Transport`. See
 [`examples/README.md`](./examples/README.md):
 
 v1.0 core:
@@ -347,6 +349,15 @@ v1.1 features:
 | `progress/`         | §8.2.1      |
 | `result-chunk/`     | §8.4        |
 
+Host integrations:
+
+| Example    | Middleware              |
+| ---------- | ----------------------- |
+| `tracing/` | `@arcp/middleware-otel` |
+| `express/` | `@arcp/express`         |
+| `fastify/` | `@arcp/fastify`         |
+| `bun/`     | `@arcp/bun`             |
+
 ## Repository layout
 
 ```
@@ -358,9 +369,11 @@ packages/
   middleware/
     node/              # @arcp/node — Node http.Server WS upgrade
     express/           # @arcp/express
+    fastify/           # @arcp/fastify
     hono/              # @arcp/hono
+    bun/               # @arcp/bun
     otel/              # @arcp/middleware-otel
-examples/              # Eighteen runnable two-process demos (§13 + §4.2 + §7.4 + §15 + all v1.1)
+examples/              # Twenty-three runnable two-process demos (v1.0 + v1.1 + host integrations)
 ```
 
 ## Development

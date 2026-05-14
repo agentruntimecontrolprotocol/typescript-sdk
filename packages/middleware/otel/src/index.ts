@@ -42,7 +42,10 @@ import type { WithTracingOptions } from "./types.js";
 
 export type { WithTracingOptions } from "./types.js";
 
-const OTEL_EXTENSION_NAME = "x.otel" as const;
+// Per ARCP §15 (IANA / extension namespace), all envelope extensions must be
+// in the `x-vendor.<vendor>.<name>` namespace. The OTel propagation carrier
+// rides under the OpenTelemetry vendor key.
+const OTEL_EXTENSION_NAME = "x-vendor.opentelemetry.tracecontext" as const;
 
 /**
  * Wrap a {@link Transport} so each frame produces a span and W3C trace

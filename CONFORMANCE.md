@@ -123,9 +123,9 @@ new v1.1 subsections appear after them.
 
 ## §13. Examples
 
-Eighteen runnable two-process examples under `examples/`. Each
-exercises one v1.0 or v1.1 feature end-to-end (no mocks; real
-transport).
+Twenty-three runnable two-process examples under `examples/`. Each
+exercises one v1.0 or v1.1 feature or one host-integration middleware
+end-to-end (no mocks; real transport).
 
 v1.0 core:
 
@@ -154,6 +154,15 @@ v1.1 features (one example per addition):
 | `cost-budget/`      | §9.6 / §12  |
 | `progress/`         | §8.2.1      |
 | `result-chunk/`     | §8.4        |
+
+Host integrations (one example per middleware):
+
+| Directory  | Middleware              |
+| ---------- | ----------------------- |
+| `tracing/` | `@arcp/middleware-otel` |
+| `express/` | `@arcp/express`         |
+| `fastify/` | `@arcp/fastify`         |
+| `bun/`     | `@arcp/bun`             |
 
 ## §14. Security Considerations
 
@@ -392,5 +401,7 @@ The package set:
 | `@arcp/sdk`             | Implemented (v1.1)       |
 | `@arcp/node`            | Implemented              |
 | `@arcp/express`         | Implemented              |
+| `@arcp/fastify`         | Implemented              |
 | `@arcp/hono`            | Implemented              |
+| `@arcp/bun`             | Implemented              |
 | `@arcp/middleware-otel` | Implemented (v1.1 attrs) |
