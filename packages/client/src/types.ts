@@ -1,3 +1,4 @@
+import type { JobId, TraceId } from "@arcp/core";
 import type { Logger } from "@arcp/core/logger";
 import type {
   AuthScheme,
@@ -63,11 +64,11 @@ export type ClientHandler = (env: Envelope) => Promise<void> | void;
  */
 export interface JobHandle {
   /** Server-assigned `job.accepted.payload.job_id`. */
-  readonly jobId: string;
+  readonly jobId: JobId;
   /** Effective lease as returned in `job.accepted`. */
   readonly lease: Lease;
   /** Trace id echoed by the runtime, if any. */
-  readonly traceId: string | undefined;
+  readonly traceId: TraceId | undefined;
   /**
    * Resolved agent identifier echoed by the runtime
    * (v1.1 `name@version` form when versioning is in play).
@@ -91,7 +92,7 @@ export interface JobHandle {
  * to release the subscription.
  */
 export interface JobSubscription {
-  readonly jobId: string;
+  readonly jobId: JobId;
   readonly subscribedFrom: number;
   readonly replayed: boolean;
   unsubscribe(): Promise<void>;
@@ -121,7 +122,7 @@ export interface SubmitOptions {
   /** Job-level deadline. Exceeding it produces `TIMEOUT`. */
   maxRuntimeSec?: number;
   /** Explicit W3C 32-hex trace id. Runtime generates one if omitted. */
-  traceId?: string;
+  traceId?: TraceId;
   /** Cancel signal. Aborting triggers `cancelJob(jobId)`. */
   signal?: AbortSignal;
 }

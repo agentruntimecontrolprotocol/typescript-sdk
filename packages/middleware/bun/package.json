@@ -1,0 +1,57 @@
+{
+  "name": "@arcp/bun",
+  "version": "0.1.0",
+  "description": "Bun runtime helpers for the Agent Runtime Control Protocol (ARCP). Uses Bun's native WebSocket server (Bun.serve) to terminate ARCP connections; no external dependency on `ws`.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentruntimecontrolprotocol/typescript-sdk.git",
+    "directory": "packages/middleware/bun"
+  },
+  "homepage": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/tree/main/packages/middleware/bun#readme",
+  "bugs": {
+    "url": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "engines": {
+    "bun": ">=1.1",
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "peerDependencies": {
+    "@arcp/core": "workspace:^",
+    "@arcp/runtime": "workspace:^"
+  },
+  "devDependencies": {
+    "@arcp/core": "workspace:*",
+    "@arcp/runtime": "workspace:*",
+    "@types/node": "^22.7.5",
+    "bun-types": "^1.1.30",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

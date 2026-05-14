@@ -104,9 +104,9 @@ export function normalizeAgentInventory(
 
 /** §6.3 resume block embedded in session.hello to recover a prior session. */
 export const SessionResumeSchema = z.object({
-  session_id: z.string().min(1),
-  resume_token: z.string().min(1),
-  last_event_seq: z.number().int().nonnegative(),
+  session_id: z.string().min(1).brand<"SessionId">(),
+  resume_token: z.string().min(1).brand<"ResumeToken">(),
+  last_event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
 });
 export type SessionResume = z.infer<typeof SessionResumeSchema>;
 
@@ -128,7 +128,7 @@ export type SessionHelloPayload = z.infer<typeof SessionHelloPayloadSchema>;
  */
 export const SessionWelcomePayloadSchema = z.object({
   runtime: RuntimeIdentitySchema,
-  resume_token: z.string().min(1),
+  resume_token: z.string().min(1).brand<"ResumeToken">(),
   resume_window_sec: z.number().int().positive(),
   heartbeat_interval_sec: z.number().int().positive().optional(),
   capabilities: CapabilitiesSchema,
@@ -193,14 +193,14 @@ export type SessionListJobsPayload = z.infer<
 >;
 
 export const JobListEntrySchema = z.object({
-  job_id: z.string().min(1),
+  job_id: z.string().min(1).brand<"JobId">(),
   agent: z.string().min(1),
   status: z.string().min(1),
   lease: z.record(z.string(), z.array(z.string())),
-  parent_job_id: z.string().nullable().optional(),
+  parent_job_id: z.string().brand<"JobId">().nullable().optional(),
   created_at: z.string().min(1),
-  trace_id: z.string().optional(),
-  last_event_seq: z.number().int().nonnegative(),
+  trace_id: z.string().brand<"TraceId">().optional(),
+  last_event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
 });
 export type JobListEntry = z.infer<typeof JobListEntrySchema>;
 
@@ -220,7 +220,7 @@ export const SessionHelloEnvelopeSchema = messageEnvelope(
 export const SessionWelcomeEnvelopeSchema = messageEnvelope(
   "session.welcome",
   SessionWelcomePayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 export const SessionErrorEnvelopeSchema = messageEnvelope(
   "session.error",
   SessionErrorPayloadSchema,
@@ -228,28 +228,28 @@ export const SessionErrorEnvelopeSchema = messageEnvelope(
 export const SessionByeEnvelopeSchema = messageEnvelope(
   "session.bye",
   SessionByePayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const SessionPingEnvelopeSchema = messageEnvelope(
   "session.ping",
   SessionPingPayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 export const SessionPongEnvelopeSchema = messageEnvelope(
   "session.pong",
   SessionPongPayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 export const SessionAckEnvelopeSchema = messageEnvelope(
   "session.ack",
   SessionAckPayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 export const SessionListJobsEnvelopeSchema = messageEnvelope(
   "session.list_jobs",
   SessionListJobsPayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 export const SessionJobsEnvelopeSchema = messageEnvelope(
   "session.jobs",
   SessionJobsPayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const SESSION_ENVELOPES = [
   SessionHelloEnvelopeSchema,

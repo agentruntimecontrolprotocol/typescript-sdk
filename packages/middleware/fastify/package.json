@@ -1,0 +1,64 @@
+{
+  "name": "@arcp/fastify",
+  "version": "0.1.0",
+  "description": "Fastify helpers for the Agent Runtime Control Protocol (ARCP). Registers @fastify/websocket and attaches the ARCP upgrade handler at a configurable path.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentruntimecontrolprotocol/typescript-sdk.git",
+    "directory": "packages/middleware/fastify"
+  },
+  "homepage": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/tree/main/packages/middleware/fastify#readme",
+  "bugs": {
+    "url": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@arcp/node": "workspace:*"
+  },
+  "peerDependencies": {
+    "@arcp/core": "workspace:^",
+    "@arcp/runtime": "workspace:^",
+    "@fastify/websocket": "^11.0.0",
+    "fastify": "^4.28.0 || ^5.0.0"
+  },
+  "devDependencies": {
+    "@arcp/core": "workspace:*",
+    "@arcp/runtime": "workspace:*",
+    "@fastify/websocket": "^11.2.0",
+    "@types/node": "^22.7.5",
+    "@types/ws": "^8.5.12",
+    "fastify": "^5.8.5",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2",
+    "ws": "^8.18.0"
+  }
+}

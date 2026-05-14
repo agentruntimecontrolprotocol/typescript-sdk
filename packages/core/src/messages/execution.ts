@@ -168,7 +168,7 @@ export const JobBudgetSchema = z.record(z.string().min(1), z.number());
 export type JobBudget = z.infer<typeof JobBudgetSchema>;
 
 export const JobAcceptedPayloadSchema = z.object({
-  job_id: z.string().min(1),
+  job_id: z.string().min(1).brand<"JobId">(),
   /** Resolved `name@version` when v1.1 agent_versions is in use; bare name otherwise. */
   agent: z.string().min(1).optional(),
   lease: LeaseSchema,
@@ -177,9 +177,9 @@ export const JobAcceptedPayloadSchema = z.object({
   /** v1.1 §9.6 — initial budget counters, when `cost.budget` is in the lease. */
   budget: JobBudgetSchema.optional(),
   accepted_at: z.string().min(1),
-  parent_job_id: z.string().optional(),
+  parent_job_id: z.string().brand<"JobId">().optional(),
   delegate_id: z.string().optional(),
-  trace_id: z.string().optional(),
+  trace_id: z.string().brand<"TraceId">().optional(),
 });
 export type JobAcceptedPayload = z.infer<typeof JobAcceptedPayloadSchema>;
 
@@ -342,73 +342,96 @@ export type ArtifactRefBody = z.infer<typeof ArtifactRefBodySchema>;
 export type DelegateBody = z.infer<typeof DelegateBodySchema>;
 
 /**
+ * Map a reserved event kind to its strongly-typed body.
+ *
+ * Used by {@link parseJobEventBody} to ensure compile-time exhaustiveness
+ * over the v1.0 + v1.1 reserved set (§8.2). Adding a new reserved kind
+ * without updating this map (and the matching `parseReservedEventBody`
+ * case) is a type error.
+ */
+export interface ReservedEventBodyMap {
+  log: LogBody;
+  thought: ThoughtBody;
+  tool_call: ToolCallBody;
+  tool_result: ToolResultBody;
+  status: StatusBody;
+  metric: MetricBody;
+  artifact_ref: ArtifactRefBody;
+  delegate: DelegateBody;
+  progress: ProgressBody;
+  result_chunk: ResultChunkBody;
+}
+
+/**
+ * Parse the body of a reserved §8.2 event kind. Exhaustive over the ten
+ * reserved kinds — the `default` branch is `never`, so adding a new entry
+ * to {@link RESERVED_EVENT_KINDS} without extending this switch is a
+ * compile-time error.
+ */
+function parseReservedEventBody<K extends ReservedEventKind>(
+  kind: K,
+  body: unknown,
+): ReservedEventBodyMap[K] {
+  switch (kind) {
+    case "log": {
+      return LogPayloadSchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "thought": {
+      return ThoughtBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "tool_call": {
+      return ToolCallBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "tool_result": {
+      return ToolResultBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "status": {
+      return StatusBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "metric": {
+      return MetricPayloadSchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "artifact_ref": {
+      return ArtifactRefBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "delegate": {
+      return DelegateBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "progress": {
+      return ProgressBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    case "result_chunk": {
+      return ResultChunkBodySchema.parse(body) as ReservedEventBodyMap[K];
+    }
+    default: {
+      // Exhaustiveness guard: every member of ReservedEventKind MUST appear
+      // in the switch above. If a new kind is added to RESERVED_EVENT_KINDS
+      // without a corresponding case here, this assignment fails to compile.
+      const _exhaustive: never = kind;
+      throw new Error(`Unhandled reserved event kind: ${String(_exhaustive)}`);
+    }
+  }
+}
+
+/**
  * Parse a `job.event.payload.body` against the kind-specific schema.
  *
- * Unknown kinds (including `x-vendor.*`) return the raw body unchanged.
- * Reserved kinds throw on body schema mismatch.
+ * Reserved kinds (§8.2) are validated against their schemas via the
+ * exhaustively-checked {@link parseReservedEventBody}; vendor (`x-vendor.*`)
+ * and unknown kinds pass through unchanged (caller MUST treat them as
+ * opaque per §15).
  */
 export function parseJobEventBody<K extends ReservedEventKind>(
   kind: K,
   body: unknown,
-): K extends "log"
-  ? LogBody
-  : K extends "thought"
-    ? ThoughtBody
-    : K extends "tool_call"
-      ? ToolCallBody
-      : K extends "tool_result"
-        ? ToolResultBody
-        : K extends "status"
-          ? StatusBody
-          : K extends "metric"
-            ? MetricBody
-            : K extends "artifact_ref"
-              ? ArtifactRefBody
-              : K extends "delegate"
-                ? DelegateBody
-                : K extends "progress"
-                  ? ProgressBody
-                  : K extends "result_chunk"
-                    ? ResultChunkBody
-                    : unknown;
+): ReservedEventBodyMap[K];
 export function parseJobEventBody(kind: string, body: unknown): unknown;
 export function parseJobEventBody(kind: string, body: unknown): unknown {
-  switch (kind) {
-    case "log": {
-      return LogPayloadSchema.parse(body);
-    }
-    case "thought": {
-      return ThoughtBodySchema.parse(body);
-    }
-    case "tool_call": {
-      return ToolCallBodySchema.parse(body);
-    }
-    case "tool_result": {
-      return ToolResultBodySchema.parse(body);
-    }
-    case "status": {
-      return StatusBodySchema.parse(body);
-    }
-    case "metric": {
-      return MetricPayloadSchema.parse(body);
-    }
-    case "artifact_ref": {
-      return ArtifactRefBodySchema.parse(body);
-    }
-    case "delegate": {
-      return DelegateBodySchema.parse(body);
-    }
-    case "progress": {
-      return ProgressBodySchema.parse(body);
-    }
-    case "result_chunk": {
-      return ResultChunkBodySchema.parse(body);
-    }
-    default: {
-      // Unknown / vendor kinds pass through unchecked.
-      return body;
-    }
+  if (isReservedEventKind(kind)) {
+    return parseReservedEventBody(kind, body);
   }
+  // Vendor (`x-vendor.*`) or unknown kind — pass through unchecked.
+  return body;
 }
 
 // ---------------------------------------------------------------------------
@@ -460,43 +483,49 @@ export function jobErrorToErrorPayload(p: JobErrorPayload): ErrorPayload {
 export const JobSubmitEnvelopeSchema = messageEnvelope(
   "job.submit",
   JobSubmitPayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const JobAcceptedEnvelopeSchema = messageEnvelope(
   "job.accepted",
   JobAcceptedPayloadSchema,
-).extend({ session_id: z.string().min(1), job_id: z.string().min(1) });
+).extend({
+  session_id: z.string().min(1).brand<"SessionId">(),
+  job_id: z.string().min(1).brand<"JobId">(),
+});
 
 export const JobCancelEnvelopeSchema = messageEnvelope(
   "job.cancel",
   JobCancelPayloadSchema,
-).extend({ session_id: z.string().min(1), job_id: z.string().min(1) });
+).extend({
+  session_id: z.string().min(1).brand<"SessionId">(),
+  job_id: z.string().min(1).brand<"JobId">(),
+});
 
 export const JobEventEnvelopeSchema = messageEnvelope(
   "job.event",
   JobEventPayloadSchema,
 ).extend({
-  session_id: z.string().min(1),
-  job_id: z.string().min(1),
-  event_seq: z.number().int().nonnegative(),
+  session_id: z.string().min(1).brand<"SessionId">(),
+  job_id: z.string().min(1).brand<"JobId">(),
+  event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
 });
 
 export const JobResultEnvelopeSchema = messageEnvelope(
   "job.result",
   JobResultPayloadSchema,
 ).extend({
-  session_id: z.string().min(1),
-  job_id: z.string().min(1),
-  event_seq: z.number().int().nonnegative(),
+  session_id: z.string().min(1).brand<"SessionId">(),
+  job_id: z.string().min(1).brand<"JobId">(),
+  event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
 });
 
 export const JobErrorEnvelopeSchema = messageEnvelope(
   "job.error",
   JobErrorPayloadSchema,
 ).extend({
-  session_id: z.string().min(1),
-  job_id: z.string().min(1),
-  event_seq: z.number().int().nonnegative(),
+  session_id: z.string().min(1).brand<"SessionId">(),
+  job_id: z.string().min(1).brand<"JobId">(),
+  event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
 });
 
 // ---------------------------------------------------------------------------
@@ -504,45 +533,48 @@ export const JobErrorEnvelopeSchema = messageEnvelope(
 // ---------------------------------------------------------------------------
 
 export const JobSubscribePayloadSchema = z.object({
-  job_id: z.string().min(1),
-  from_event_seq: z.number().int().nonnegative().optional(),
+  job_id: z.string().min(1).brand<"JobId">(),
+  from_event_seq: z.number().int().nonnegative().brand<"EventSeq">().optional(),
   history: z.boolean().optional(),
 });
 export type JobSubscribePayload = z.infer<typeof JobSubscribePayloadSchema>;
 
 export const JobSubscribedPayloadSchema = z.object({
-  job_id: z.string().min(1),
+  job_id: z.string().min(1).brand<"JobId">(),
   current_status: JobStateSchema,
   agent: z.string().min(1),
   lease: LeaseSchema,
   lease_constraints: LeaseConstraintsSchema.optional(),
   budget: JobBudgetSchema.optional(),
-  parent_job_id: z.string().nullable().optional(),
-  trace_id: z.string().optional(),
-  subscribed_from: z.number().int().nonnegative(),
+  parent_job_id: z.string().brand<"JobId">().nullable().optional(),
+  trace_id: z.string().brand<"TraceId">().optional(),
+  subscribed_from: z.number().int().nonnegative().brand<"EventSeq">(),
   replayed: z.boolean(),
 });
 export type JobSubscribedPayload = z.infer<typeof JobSubscribedPayloadSchema>;
 
 export const JobUnsubscribePayloadSchema = z.object({
-  job_id: z.string().min(1),
+  job_id: z.string().min(1).brand<"JobId">(),
 });
 export type JobUnsubscribePayload = z.infer<typeof JobUnsubscribePayloadSchema>;
 
 export const JobSubscribeEnvelopeSchema = messageEnvelope(
   "job.subscribe",
   JobSubscribePayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const JobSubscribedEnvelopeSchema = messageEnvelope(
   "job.subscribed",
   JobSubscribedPayloadSchema,
-).extend({ session_id: z.string().min(1), job_id: z.string().min(1) });
+).extend({
+  session_id: z.string().min(1).brand<"SessionId">(),
+  job_id: z.string().min(1).brand<"JobId">(),
+});
 
 export const JobUnsubscribeEnvelopeSchema = messageEnvelope(
   "job.unsubscribe",
   JobUnsubscribePayloadSchema,
-).extend({ session_id: z.string().min(1) });
+).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const EXECUTION_ENVELOPES = [
   JobSubmitEnvelopeSchema,

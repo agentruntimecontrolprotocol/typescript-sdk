@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import type { EventSeq, JobId, ResumeToken, TraceId } from "@arcp/core";
 import type { BearerIdentity } from "@arcp/core/auth";
 import {
   type BaseEnvelope,
@@ -93,7 +94,7 @@ const DEFAULT_MAX_CONCURRENT_JOBS = 100;
 const DEFAULT_BACK_PRESSURE_THRESHOLD = 1000;
 
 interface IdempotencyEntry {
-  jobId: string;
+  jobId: JobId;
   agent: string;
   inputDigest: string;
   expiresAt: number;
@@ -109,8 +110,8 @@ function digest(input: unknown): string {
   return JSON.stringify(input);
 }
 
-function newResumeToken(): string {
-  return `rt_${randomBytes(32).toString("hex")}`;
+function newResumeToken(): ResumeToken {
+  return `rt_${randomBytes(32).toString("hex")}` as ResumeToken;
 }
 
 function defaultJobAuthorizationPolicy(
@@ -166,13 +167,13 @@ export class SessionContext implements EventSeqSource {
   }
 
   /** Per-session monotonic event sequence (§8.3). */
-  public nextEventSeq(): number {
+  public nextEventSeq(): EventSeq {
     this.eventSeq += 1;
-    return this.eventSeq;
+    return this.eventSeq as EventSeq;
   }
 
-  public get latestEventSeq(): number {
-    return this.eventSeq;
+  public get latestEventSeq(): EventSeq {
+    return this.eventSeq as EventSeq;
   }
 
   public setEventSeq(value: number): void {
@@ -346,7 +347,7 @@ export class SessionContext implements EventSeqSource {
 
   /** Emit a `job.error` envelope on the given job and retire it. */
   public async emitJobError(
-    jobId: string,
+    jobId: JobId,
     payload: JobErrorPayload,
   ): Promise<void> {
     const job = this.jobs.get(jobId);
@@ -1208,7 +1209,8 @@ export class ARCPServer {
 
     // Generate or echo trace_id (§11). Runtime MUST mint one if absent so
     // `job.accepted.payload.trace_id` always has a value to echo back.
-    const traceId = env.trace_id ?? randomBytes(16).toString("hex");
+    const traceId: TraceId =
+      env.trace_id ?? (randomBytes(16).toString("hex") as TraceId);
 
     const job = new Job(
       {

@@ -5,7 +5,9 @@
     { "path": "./packages/client/tsconfig.build.json" },
     { "path": "./packages/runtime/tsconfig.build.json" },
     { "path": "./packages/sdk/tsconfig.build.json" },
+    { "path": "./packages/middleware/bun/tsconfig.build.json" },
     { "path": "./packages/middleware/express/tsconfig.build.json" },
+    { "path": "./packages/middleware/fastify/tsconfig.build.json" },
     { "path": "./packages/middleware/hono/tsconfig.build.json" },
     { "path": "./packages/middleware/node/tsconfig.build.json" },
     { "path": "./packages/middleware/otel/tsconfig.build.json" }

@@ -34,7 +34,9 @@
       "@arcp/sdk": ["packages/sdk/src/index.ts"],
       "@arcp/node": ["packages/middleware/node/src/index.ts"],
       "@arcp/express": ["packages/middleware/express/src/index.ts"],
+      "@arcp/fastify": ["packages/middleware/fastify/src/index.ts"],
       "@arcp/hono": ["packages/middleware/hono/src/index.ts"],
+      "@arcp/bun": ["packages/middleware/bun/src/index.ts"],
       "@arcp/middleware-otel": ["packages/middleware/otel/src/index.ts"]
     }
   }

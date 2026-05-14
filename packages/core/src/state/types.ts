@@ -1,4 +1,5 @@
 import type { BearerIdentity } from "../auth/types.js";
+import type { SessionId } from "../brands.js";
 import type { Capabilities } from "../messages/types.js";
 
 /**
@@ -10,7 +11,7 @@ export type SessionPhase = "opening" | "accepted" | "closing" | "rejected";
 
 /** Snapshot of session state shared between server-side and client-side. */
 export interface SessionSnapshot {
-  readonly id: string | undefined;
+  readonly id: SessionId | undefined;
   readonly phase: SessionPhase;
   readonly identity: BearerIdentity | undefined;
   readonly capabilities: Capabilities | undefined;

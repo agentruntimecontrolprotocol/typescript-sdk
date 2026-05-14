@@ -5,7 +5,9 @@ import {
   ARCPServer,
   type Envelope,
   EventLog,
+  type EventSeq,
   pairMemoryTransports,
+  type ResumeToken,
   StaticBearerVerifier,
   silentLogger,
 } from "@arcp/sdk";
@@ -71,7 +73,7 @@ describe("§6.3 resumability (in-memory)", () => {
     const welcome2 = await client2.resume(c2, {
       session_id: sessionId,
       resume_token: welcome1.resume_token,
-      last_event_seq: 0,
+      last_event_seq: 0 as EventSeq,
     });
     // Fresh token issued.
     expect(welcome2.resume_token).not.toBe(welcome1.resume_token);
@@ -132,8 +134,8 @@ describe("§6.3 resumability (in-memory)", () => {
     await expect(
       client2.resume(c2, {
         session_id: sessionId,
-        resume_token: `${welcome.resume_token}-bogus`,
-        last_event_seq: 0,
+        resume_token: `${welcome.resume_token}-bogus` as ResumeToken,
+        last_event_seq: 0 as EventSeq,
       }),
     ).rejects.toMatchObject({ code: "RESUME_WINDOW_EXPIRED" });
 

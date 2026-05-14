@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import type { JobId, TraceId } from "@arcp/core";
 import {
   type BaseEnvelope,
   buildEnvelope,
@@ -53,12 +54,12 @@ import type {
 //   - v1.1: `ack(seq)`, `listJobs(filter, opts)`, `subscribe(jobId, opts)`.
 
 interface InvocationState {
-  jobId: string | null;
+  jobId: JobId | null;
   lease: Lease | null;
   agent: string | undefined;
   leaseConstraints: LeaseConstraints | undefined;
   budget: Record<string, number> | undefined;
-  traceId: string | undefined;
+  traceId: TraceId | undefined;
   events: JobEventPayload[];
   acceptance: Deferred<JobAcceptedPayload>;
   completion: Deferred<JobResultPayload>;
@@ -382,7 +383,7 @@ export class ARCPClient {
 
   /** Send a `job.cancel` envelope. */
   public async cancelJob(
-    jobId: string,
+    jobId: JobId,
     options: { reason?: string } = {},
   ): Promise<void> {
     if (this.transport === null)
@@ -470,7 +471,7 @@ export class ARCPClient {
    * (`client.on("job.event", ...)`) as they would for any in-session job.
    */
   public async subscribe(
-    jobId: string,
+    jobId: JobId,
     opts: { history?: boolean; fromEventSeq?: number } = {},
   ): Promise<JobSubscription> {
     if (!this.hasFeature("subscribe")) {
@@ -764,8 +765,8 @@ export class ARCPClient {
 
 function makeHandleFromInvocation(inv: InvocationState): JobHandle {
   return {
-    get jobId() {
-      return inv.jobId ?? "";
+    get jobId(): JobId {
+      return inv.jobId ?? ("" as JobId);
     },
     get lease() {
       return inv.lease ?? {};

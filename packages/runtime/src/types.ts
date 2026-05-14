@@ -1,3 +1,4 @@
+import type { EventSeq, JobId, SessionId, TraceId } from "@arcp/core";
 import type { BearerVerifier } from "@arcp/core/auth";
 import type { BaseEnvelope } from "@arcp/core/envelope";
 import type { Logger } from "@arcp/core/logger";
@@ -33,7 +34,7 @@ export type Handler = (
 /** Sequence-number provider (§8.3), implemented by `SessionContext`. */
 export interface EventSeqSource {
   /** Increment and return the next session-scoped event_seq. */
-  nextEventSeq(): number;
+  nextEventSeq(): EventSeq;
 }
 
 /** Send hook the Job uses to flush an outbound envelope. */
@@ -42,9 +43,9 @@ export type JobSend = (env: BaseEnvelope) => Promise<void>;
 /** Constructor options for `Job`. */
 export interface JobOptions {
   /** Pre-assigned `job_id` (used on idempotency hits to reuse an existing id). */
-  jobId?: string;
+  jobId?: JobId;
   /** Owning session id. Stamped on every outbound envelope. */
-  sessionId: string;
+  sessionId: SessionId;
   /** Agent name handling the job. */
   agent: string;
   /** v1.1 §7.5 — resolved agent version. May be null when no version is registered. */
@@ -56,11 +57,11 @@ export interface JobOptions {
   /** v1.1 §9.6 — initial per-currency budget counters. */
   initialBudget?: ReadonlyMap<string, number> | undefined;
   /** Parent job id when this is a delegated child (§10). */
-  parentJobId?: string;
+  parentJobId?: JobId;
   /** Delegate id assigned by the parent in its `delegate` event (§10). */
   delegateId?: string;
   /** W3C trace id propagated for OTel correlation (§11). */
-  traceId?: string;
+  traceId?: TraceId;
   /** Heartbeat watchdog interval. */
   heartbeatIntervalSeconds: number;
   /** Heartbeats missed before HEARTBEAT_LOST. Default 2. */
@@ -100,9 +101,9 @@ export interface ResultStream {
  */
 export interface JobContext {
   /** Server-assigned job id. */
-  readonly jobId: string;
+  readonly jobId: JobId;
   /** Owning session id. */
-  readonly sessionId: string;
+  readonly sessionId: SessionId;
   /** Agent name handling this job (bare name). */
   readonly agent: string;
   /** v1.1 §7.5 — resolved agent version, or null when unversioned. */
@@ -119,7 +120,7 @@ export interface JobContext {
    */
   readonly budget: ReadonlyMap<string, number>;
   /** W3C trace id (§11). */
-  readonly traceId: string | undefined;
+  readonly traceId: TraceId | undefined;
   /** Abort signal — fires on `job.cancel` or grace-expired termination. */
   readonly signal: AbortSignal;
   /** Job-scoped logger pre-bound to `job_id`. */

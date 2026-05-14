@@ -1,4 +1,5 @@
 import type { BearerIdentity } from "../auth/types.js";
+import type { SessionId } from "../brands.js";
 import { InvalidRequestError, UnauthenticatedError } from "../errors.js";
 import type { Capabilities } from "../messages/types.js";
 
@@ -26,14 +27,14 @@ const VALID_TRANSITIONS = {
  */
 export class SessionState {
   private _phase: SessionPhase = "opening";
-  private _id: string | undefined;
+  private _id: SessionId | undefined;
   private _identity: BearerIdentity | undefined;
   private _capabilities: Capabilities | undefined;
 
   public get phase(): SessionPhase {
     return this._phase;
   }
-  public get id(): string | undefined {
+  public get id(): SessionId | undefined {
     return this._id;
   }
   public get identity(): BearerIdentity | undefined {
@@ -59,7 +60,7 @@ export class SessionState {
     this._phase = next;
   }
 
-  public assignId(id: string): void {
+  public assignId(id: SessionId): void {
     if (this._id !== undefined && this._id !== id) {
       throw new InvalidRequestError("session_id already assigned");
     }

@@ -1,5 +1,7 @@
 import { monotonicFactory } from "ulid";
 
+import type { JobId, MessageId, SessionId } from "../brands.js";
+
 const factory = monotonicFactory();
 
 /**
@@ -14,18 +16,18 @@ export function newId(prefix?: string): string {
 }
 
 /** Mint a session id (`sess_<ulid>`). */
-export function newSessionId(): string {
-  return newId("sess");
+export function newSessionId(): SessionId {
+  return newId("sess") as SessionId;
 }
 
 /** Mint a job id (`job_<ulid>`). */
-export function newJobId(): string {
-  return newId("job");
+export function newJobId(): JobId {
+  return newId("job") as JobId;
 }
 
 /** Mint a message id (`msg_<ulid>`). */
-export function newMessageId(): string {
-  return newId("msg");
+export function newMessageId(): MessageId {
+  return newId("msg") as MessageId;
 }
 
 /** RFC 3339 timestamp suitable for `payload.ts` on a `job.event`. */

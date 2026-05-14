@@ -1,3 +1,4 @@
+import type { JobId, SessionId, TraceId } from "@arcp/core";
 import { buildEnvelope } from "@arcp/core/envelope";
 import {
   CancelledError,
@@ -69,8 +70,8 @@ const TERMINAL = new Set<JobStateName>([
  * provides the monotonic `event_seq` source.
  */
 export class Job {
-  public readonly jobId: string;
-  public readonly sessionId: string;
+  public readonly jobId: JobId;
+  public readonly sessionId: SessionId;
   public readonly agent: string;
   /** v1.1 §7.5 — resolved version, or null if none was advertised. */
   public readonly agentVersion: string | null;
@@ -80,9 +81,9 @@ export class Job {
   public readonly budget: Map<string, number>;
   /** v1.1 §9.6 — initial budget for inclusion in `job.accepted`. */
   public readonly initialBudget: Map<string, number>;
-  public readonly parentJobId: string | undefined;
+  public readonly parentJobId: JobId | undefined;
   public readonly delegateId: string | undefined;
-  public readonly traceId: string | undefined;
+  public readonly traceId: TraceId | undefined;
   /** Timestamp at which the job was constructed (for §6.6 listing). */
   public readonly createdAt: string = nowTimestamp();
   /**
@@ -97,7 +98,7 @@ export class Job {
    * history replay. Set by the runtime on job creation; typed as `unknown`
    * to avoid an import cycle, but in practice is a `SessionContext`.
    */
-  public owningSession: { state: { id: string | undefined } } | undefined =
+  public owningSession: { state: { id: SessionId | undefined } } | undefined =
     undefined;
   public state: JobStateName = "pending";
   public readonly abortController = new AbortController();

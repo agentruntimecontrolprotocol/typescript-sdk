@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+import type {
+  EventSeq,
+  JobId,
+  MessageId,
+  SessionId,
+  TraceId,
+} from "./brands.js";
 import { validateExtensionsObject } from "./extensions.js";
 import { PROTOCOL_VERSION } from "./version.js";
 
@@ -42,9 +49,12 @@ export function isValidTraceId(value: string): boolean {
   return TRACE_ID_PATTERN.test(value);
 }
 
-const TraceIdSchema = z.string().regex(TRACE_ID_PATTERN, {
-  message: "trace_id MUST be 32 lowercase hex characters (W3C Trace Context)",
-});
+const TraceIdSchema = z
+  .string()
+  .regex(TRACE_ID_PATTERN, {
+    message: "trace_id MUST be 32 lowercase hex characters (W3C Trace Context)",
+  })
+  .brand<"TraceId">();
 
 /**
  * Types where `session_id` is OPTIONAL on the wire (pre-welcome handshake).
@@ -69,12 +79,12 @@ export function isPreSessionType(type: string): boolean {
  */
 export const BaseEnvelopeSchema = z.object({
   arcp: z.literal(PROTOCOL_VERSION),
-  id: z.string().min(1),
+  id: z.string().min(1).brand<"MessageId">(),
   type: z.string().min(1),
-  session_id: z.string().optional(),
-  job_id: z.string().optional(),
+  session_id: z.string().brand<"SessionId">().optional(),
+  job_id: z.string().brand<"JobId">().optional(),
   trace_id: TraceIdSchema.optional(),
-  event_seq: z.number().int().nonnegative().optional(),
+  event_seq: z.number().int().nonnegative().brand<"EventSeq">().optional(),
   extensions: EnvelopeExtensionsSchema.optional(),
   payload: z.unknown(),
 });
@@ -97,10 +107,10 @@ export type BaseEnvelope = z.infer<typeof BaseEnvelopeSchema>;
 // `Record<string, unknown>` when spread through `pickDefined`.
 // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
 export type EnvelopeOptionalFields = {
-  session_id?: string | undefined;
-  job_id?: string | undefined;
-  trace_id?: string | undefined;
-  event_seq?: number | undefined;
+  session_id?: SessionId | undefined;
+  job_id?: JobId | undefined;
+  trace_id?: TraceId | undefined;
+  event_seq?: EventSeq | undefined;
   extensions?: Record<string, unknown> | undefined;
 };
 
@@ -143,7 +153,7 @@ export function messageEnvelope<T extends string, P extends z.ZodTypeAny>(
  * so the result is acceptable under `exactOptionalPropertyTypes`.
  */
 export function buildEnvelope<T extends string, P>(args: {
-  id: string;
+  id: MessageId;
   type: T;
   payload: P;
   optional?: EnvelopeOptionalFields;
