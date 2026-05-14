@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "esModuleInterop": false,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@arcp/core": ["packages/core/src/index.ts"],
+      "@arcp/core/*": [
+        "packages/core/src/*/index.ts",
+        "packages/core/src/*.ts"
+      ],
+      "@arcp/client": ["packages/client/src/index.ts"],
+      "@arcp/runtime": ["packages/runtime/src/index.ts"],
+      "@arcp/sdk": ["packages/sdk/src/index.ts"],
+      "@arcp/node": ["packages/middleware/node/src/index.ts"],
+      "@arcp/express": ["packages/middleware/express/src/index.ts"],
+      "@arcp/hono": ["packages/middleware/hono/src/index.ts"],
+      "@arcp/middleware-otel": ["packages/middleware/otel/src/index.ts"]
+    }
+  }
+}

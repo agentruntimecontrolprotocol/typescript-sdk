@@ -1,0 +1,59 @@
+{
+  "name": "@arcp/node",
+  "version": "0.1.0",
+  "description": "Node.js HTTP server integration for the ARCP WebSocket transport. Wires the WS upgrade handshake onto an existing `http.Server` with Host-header DNS-rebinding protection.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentruntimecontrolprotocol/typescript-sdk.git",
+    "directory": "packages/middleware/node"
+  },
+  "homepage": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/tree/main/packages/middleware/node#readme",
+  "bugs": {
+    "url": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "peerDependencies": {
+    "@arcp/core": "workspace:^",
+    "@arcp/runtime": "workspace:^"
+  },
+  "devDependencies": {
+    "@arcp/core": "workspace:*",
+    "@arcp/runtime": "workspace:*",
+    "@types/node": "^22.7.5",
+    "@types/ws": "^8.5.12",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

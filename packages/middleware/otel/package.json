@@ -1,0 +1,55 @@
+{
+  "name": "@arcp/middleware-otel",
+  "version": "0.1.0",
+  "description": "OpenTelemetry tracing middleware for the Agent Runtime Control Protocol (ARCP). Wraps any @arcp/core Transport so every inbound/outbound envelope produces a span, with trace context propagated through envelope extensions.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentruntimecontrolprotocol/typescript-sdk.git",
+    "directory": "packages/middleware/otel"
+  },
+  "homepage": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/tree/main/packages/middleware/otel#readme",
+  "bugs": {
+    "url": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "peerDependencies": {
+    "@arcp/core": "workspace:^",
+    "@opentelemetry/api": "^1.9.0"
+  },
+  "devDependencies": {
+    "@arcp/core": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
+    "@types/node": "^22.7.5",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

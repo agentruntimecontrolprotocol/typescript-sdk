@@ -1,52 +1,36 @@
 # ARCP TypeScript Examples
 
-Two sets:
+Five end-to-end examples covering ARCP v1.0 §13.1–§13.5. Each runs
+in-process against an `ARCPRuntime` + `ARCPClient` paired over an
+in-memory transport. No external services are required.
 
-- **`01-*` … `06-*`** — runnable in-process demos exercising the SDK
-  end-to-end against a paired memory transport.
-- **Per-primitive directories** — fourteen single-purpose examples,
-  each named for the protocol primitive it demonstrates. These mirror
-  the Python tree under `python-sdk/examples/`. *Illustrative, not
-  runnable* — setup is elided with `null as unknown as ARCPClient`
-  so the protocol code reads cleanly.
-
-## The fourteen
-
-| Directory | Demonstrates | Spec |
+| Example | Demonstrates | Spec |
 |---|---|---|
-| [`subscriptions/`](./subscriptions) | Three Observer clients on one session, three filters, three sinks. | §5, §13 |
-| [`leases/`](./leases) | Lease-gated shell agent. Read leases coarse, write leases scoped. | §15.4–§15.5 |
-| [`lease_revocation/`](./lease_revocation) | Per-table leases with `lease.revoked` / `lease.extended` mid-flight. | §15.5 |
-| [`permission_challenge/`](./permission_challenge) | Two-party permission challenge — generator asks, reviewer holds veto. | §15.4, §6.4 |
-| [`delegation/`](./delegation) | `agent.delegate` fan-out + `JobMux` to demux events by `job_id`. | §14, §6.4 |
-| [`handoff/`](./handoff) | `agent.handoff` with transcript packed as artifact, runtime fingerprint pinned. | §14, §16, §8.3 |
-| [`heartbeats/`](./heartbeats) | Worker federation; heartbeat-loss reroute via `idempotency_key`. | §10.3, §6.4 |
-| [`capability_negotiation/`](./capability_negotiation) | Capability-driven peer routing; standard `cost.usd` rollups. | §7, §17.3.1, §18.3 |
-| [`resumability/`](./resumability) | Crash and resume via `process.exit` + `resume` envelope. | §10, §19, §6.4 |
-| [`reasoning_streams/`](./reasoning_streams) | `kind: thought` stream + a peer that subscribes and delegates critiques back. | §11.4, §13, §14 |
-| [`extensions/`](./extensions) | Custom `arcpx.sdr.*.v1` extension namespace with unknown-message handling. | §21 |
-| [`human_input/`](./human_input) | `human.input.request` fanned across phone/email/Slack; first-wins. | §12 |
-| [`cancellation/`](./cancellation) | Cooperative `cancel` (terminate) vs `interrupt` (pause and ask). | §10.4–§10.5 |
-| [`mcp/`](./mcp) | ARCP runtime fronting an MCP server: `tool.invoke` → MCP `call_tool`. | §20 |
+| [`submit-and-stream.ts`](./submit-and-stream.ts) | One-shot job: hello → welcome → submit → events → result. | §13.1 |
+| [`delegate.ts`](./delegate.ts) | Parent agent delegates a child job via a `delegate` event; child inherits `trace_id`; child lease is a subset of parent. | §13.2, §10 |
+| [`resume.ts`](./resume.ts) | Disconnect mid-stream and resume the same session; replay buffered events, fresh `resume_token`, gap-free `event_seq`. | §13.3, §6.3 |
+| [`idempotent-retry.ts`](./idempotent-retry.ts) | Same `idempotency_key` returns the same `job_id`; conflicting agent/input yields `DUPLICATE_KEY`. | §13.5, §7.2 |
+| [`lease-violation.ts`](./lease-violation.ts) | An out-of-lease tool call surfaces as a `tool_result` carrying `PERMISSION_DENIED`; the job continues. | §13.4, §9.3 |
+
+## Running
+
+```sh
+pnpm tsx examples/submit-and-stream.ts
+pnpm tsx examples/delegate.ts
+pnpm tsx examples/resume.ts
+pnpm tsx examples/idempotent-retry.ts
+pnpm tsx examples/lease-violation.ts
+```
+
+Each example exits 0 on success. Output is written to stdout; failures
+print a stack trace to stderr and exit non-zero.
 
 ## Conventions
 
 - TypeScript with NodeNext module resolution.
-- Each example is one `main.ts` (the protocol code) + 0–2 stub
-  modules named for what they elide (`agents.ts`, `steps.ts`,
-  `synth.ts`, `cheap.ts`, `work.ts`, `channels.ts`, `sql.ts`,
-  `upstream.ts`).
-- `null as unknown as ARCPClient` in place of full transport /
-  identity / auth construction. Setup boilerplate is not the point.
-- Envelopes match RFC-0001 v2 exactly. Custom message types follow
-  §21.1 `arcpx.<domain>.<name>.v<n>` naming.
-- Where a Python helper like `client.request(env, timeout=...)` or
-  `client.events()` doesn't exist on the TS surface, examples use a
-  `declare`d shim of the same shape; the protocol code stays
-  identical to its Python counterpart.
-
-## Reading order
-
-For a brisk tour: `subscriptions`, `leases`, `delegation`,
-`resumability`, `cancellation`, `extensions`, `mcp`. These seven
-exercise the bulk of the protocol.
+- Each example is a single self-contained file (no shared fixtures).
+- The runtime and client run in the same Node process and communicate
+  through paired `MemoryTransport` instances — readable as a tutorial,
+  with no transport wiring to distract from the protocol code.
+- For production deployments, swap `pairMemoryTransports()` for
+  `WebSocketTransport` or `StdioTransport` (see `packages/core/src/transport`).

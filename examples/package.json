@@ -1,0 +1,18 @@
+{
+  "name": "@arcp/examples",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runnable examples for the ARCP TypeScript SDK. Not published.",
+  "type": "module",
+  "dependencies": {
+    "@arcp/sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^11.5.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.7.5",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}

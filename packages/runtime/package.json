@@ -1,0 +1,54 @@
+{
+  "name": "@arcp/runtime",
+  "version": "0.1.0",
+  "description": "Server/runtime implementation of the Agent Runtime Control Protocol (ARCP): session state machine, job manager, lease manager, subscription manager, artifact store, and the event log.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentruntimecontrolprotocol/typescript-sdk.git",
+    "directory": "packages/runtime"
+  },
+  "homepage": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/tree/main/packages/runtime#readme",
+  "bugs": {
+    "url": "https://github.com/agentruntimecontrolprotocol/typescript-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@arcp/core": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "@vitest/coverage-v8": "^2.1.2",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

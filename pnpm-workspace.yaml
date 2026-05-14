@@ -1,0 +1,7 @@
+packages:
+  - "packages/core"
+  - "packages/client"
+  - "packages/runtime"
+  - "packages/sdk"
+  - "packages/middleware/*"
+  - "examples"
