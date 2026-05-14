@@ -7,11 +7,14 @@ import {
 } from "@arcp/core/envelope";
 import {
   AgentNotAvailableError,
+  AgentVersionNotAvailableError,
   ARCPError,
   CancelledError,
   InternalError,
   InvalidRequestError,
+  LeaseExpiredError,
   LeaseSubsetViolationError,
+  PermissionDeniedError,
   ResumeWindowExpiredError,
   UnauthenticatedError,
 } from "@arcp/core/errors";
@@ -22,15 +25,23 @@ import {
   rootLogger,
 } from "@arcp/core/logger";
 import {
+  type AgentInventoryEntry,
   type Capabilities,
   type DelegateBody,
   type Envelope,
   EnvelopeSchema,
+  formatAgentRef,
+  JOB_STATES,
   type JobErrorPayload,
+  type JobListEntry,
   type JobSubmitPayload,
   type Lease,
+  type LeaseConstraints,
+  type MetricBody,
+  parseAgentRef,
   type RuntimeIdentity,
   type SessionHelloPayload,
+  type SessionListJobsPayload,
   type SessionWelcomePayload,
 } from "@arcp/core/messages";
 import {
@@ -41,6 +52,7 @@ import {
 import { EventLog } from "@arcp/core/store";
 import type { Transport, WireFrame } from "@arcp/core/transport";
 import { newJobId, newMessageId, newSessionId } from "@arcp/core/util";
+import { intersectFeatures, V1_1_FEATURES } from "@arcp/core/version";
 import { z } from "zod";
 import {
   type AgentHandler,
@@ -50,13 +62,24 @@ import {
   JobManager,
   makeJobContext,
 } from "./job.js";
-import { assertLeaseSubset, validateLeaseShape } from "./lease.js";
+import {
+  assertLeaseConstraintsSubset,
+  assertLeaseSubset,
+  initialBudgetFromLease,
+  validateLeaseConstraints,
+  validateLeaseShape,
+} from "./lease.js";
 
-// ARCP v1.0 §6-§14 runtime.
+// ARCP v1.1 (additive over v1.0) runtime.
 //
-// Single message dispatch: session.hello → session.welcome | session.error.
+// v1.0 dispatch: session.hello → session.welcome | session.error.
 // Post-welcome: job.submit, job.cancel, session.bye. Outbound: job.accepted,
 // job.event, job.result, job.error, session.welcome, session.bye, session.error.
+//
+// v1.1 adds: session.ping, session.pong, session.ack, session.list_jobs,
+// session.jobs, job.subscribe, job.subscribed, job.unsubscribe. Plus the
+// `progress`/`result_chunk` event kinds, `lease_constraints` (expires_at),
+// `cost.budget`, and agent versioning.
 
 const HANDSHAKE_TYPES = new Set<string>(["session.hello"]);
 
@@ -67,12 +90,24 @@ const DEFAULT_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_BUFFERED_EVENTS = 10_000;
 const DEFAULT_MAX_BUFFERED_BYTES = 16 * 1024 * 1024; // 16 MiB
 const DEFAULT_MAX_CONCURRENT_JOBS = 100;
+const DEFAULT_BACK_PRESSURE_THRESHOLD = 1000;
 
 /** Inbound-message dispatcher signature. */
 export type Handler = (
   env: Envelope,
   ctx: SessionContext,
 ) => Promise<void> | void;
+
+/**
+ * v1.1 §6.6 — authorization hook for `session.list_jobs` and
+ * `job.subscribe`. Returns true if `principal` may observe `job`.
+ *
+ * Default: same-principal-only (`job.submitterPrincipal === principal`).
+ */
+export type JobAuthorizationPolicy = (
+  job: Job,
+  principal: string | undefined,
+) => boolean;
 
 /** Top-level server options. */
 export interface ARCPServerOptions {
@@ -96,6 +131,21 @@ export interface ARCPServerOptions {
   idempotencyTtlMs?: number;
   /** Per-session DoS caps. */
   caps?: SessionCaps;
+  /**
+   * v1.1 §6.2 — feature flags this runtime advertises. Defaults to every
+   * v1.1 feature. Provide a subset to test degraded-feature behavior.
+   */
+  features?: readonly string[];
+  /**
+   * v1.1 §6.6 — authorization hook for cross-session observation
+   * (`session.list_jobs`, `job.subscribe`). Defaults to same-principal-only.
+   */
+  jobAuthorizationPolicy?: JobAuthorizationPolicy;
+  /**
+   * v1.1 §6.5 — threshold (in unacked events) at which the runtime emits a
+   * `back_pressure` status event. Default 1000.
+   */
+  backPressureThreshold?: number;
 }
 
 /**
@@ -135,6 +185,13 @@ function newResumeToken(): string {
   return `rt_${randomBytes(32).toString("hex")}`;
 }
 
+function defaultJobAuthorizationPolicy(
+  job: Job,
+  principal: string | undefined,
+): boolean {
+  return job.submitterPrincipal === principal;
+}
+
 /**
  * Per-transport session context. Drives the handshake and dispatches
  * inbound envelopes.
@@ -150,8 +207,23 @@ export class SessionContext implements EventSeqSource {
   private bufferedEventCount = 0;
   private bufferedBytes = 0;
   private lastMessageAt: number = Date.now();
+  private lastInboundAt: number = Date.now();
   /** Active idempotent keys for jobs that resolved through this session. */
   private readonly localKeys = new Set<string>();
+  /** v1.1 §6.2 — negotiated feature set. */
+  private _negotiatedFeatures: readonly string[] = [];
+  /** v1.1 §6.4 — periodic ping timer. */
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  /** v1.1 §6.4 — pending ping nonce awaiting pong. */
+  private outstandingPingNonce: string | null = null;
+  /** v1.1 §6.5 — highest seq the client has acknowledged. */
+  private lastAckedSeq = 0;
+  private backPressureNotified = false;
+  /**
+   * v1.1 §7.6 — jobs we are observing as a subscriber (not the submitter).
+   * Maps job_id → unsubscribe callback.
+   */
+  public readonly subscriptions = new Map<string, () => void>();
 
   public constructor(
     public readonly transport: Transport,
@@ -187,12 +259,36 @@ export class SessionContext implements EventSeqSource {
     return this.lastMessageAt;
   }
 
+  public get lastInboundActivityAt(): number {
+    return this.lastInboundAt;
+  }
+
   public addLocalIdempotencyKey(key: string): void {
     this.localKeys.add(key);
   }
 
   public hasLocalIdempotencyKey(key: string): boolean {
     return this.localKeys.has(key);
+  }
+
+  public get negotiatedFeatures(): readonly string[] {
+    return this._negotiatedFeatures;
+  }
+
+  public hasFeature(name: string): boolean {
+    return this._negotiatedFeatures.includes(name);
+  }
+
+  public assignNegotiatedFeatures(features: readonly string[]): void {
+    this._negotiatedFeatures = features;
+  }
+
+  public get lastAckedEventSeq(): number {
+    return this.lastAckedSeq;
+  }
+
+  public recordAck(seq: number): void {
+    if (seq > this.lastAckedSeq) this.lastAckedSeq = seq;
   }
 
   /** Send an envelope through the transport. */
@@ -214,6 +310,70 @@ export class SessionContext implements EventSeqSource {
         this.logger.error({ err }, "event log append (outbound) failed");
       }
     }
+    // v1.1 §7.6 — fan-out event-bearing envelopes to subscriber sessions.
+    if (
+      envelope.job_id !== undefined &&
+      (envelope.type === "job.event" ||
+        envelope.type === "job.result" ||
+        envelope.type === "job.error")
+    ) {
+      const subs = this.server.subscribers.get(envelope.job_id);
+      if (subs !== undefined && subs.size > 0) {
+        for (const sub of subs) {
+          if (sub === this) continue;
+          if (sub.state.id === undefined) continue;
+          try {
+            const forwarded = buildEnvelope({
+              id: newMessageId(),
+              type: envelope.type,
+              payload: envelope.payload,
+              optional: {
+                session_id: sub.state.id,
+                job_id: envelope.job_id,
+                ...(envelope.trace_id !== undefined
+                  ? { trace_id: envelope.trace_id }
+                  : {}),
+                ...(envelope.event_seq !== undefined
+                  ? { event_seq: sub.nextEventSeq() }
+                  : {}),
+              },
+            });
+            await sub.transport.send(forwarded);
+          } catch {
+            // best-effort
+          }
+        }
+      }
+    }
+    // v1.1 §6.5 back-pressure heuristic — fire once when crossing threshold.
+    if (this.hasFeature("ack")) {
+      const lag = this.eventSeq - this.lastAckedSeq;
+      const threshold =
+        this.server.options.backPressureThreshold ??
+        DEFAULT_BACK_PRESSURE_THRESHOLD;
+      if (lag > threshold && !this.backPressureNotified) {
+        this.backPressureNotified = true;
+        // Best-effort emit — don't fail the outer send if this errors.
+        void this.emitBackPressureStatus(lag).catch(() => undefined);
+      } else if (lag <= threshold / 2 && this.backPressureNotified) {
+        this.backPressureNotified = false;
+      }
+    }
+  }
+
+  private async emitBackPressureStatus(lag: number): Promise<void> {
+    if (this.closed || this.transport.closed) return;
+    if (this.state.id === undefined) return;
+    // Emit as a job.event with a synthetic, sessionless status body. We
+    // attach it to the most recently created job if any, else skip.
+    const live = this.jobs.list();
+    if (live.length === 0) return;
+    const job = live[live.length - 1];
+    if (job === undefined) return;
+    await job.emitEventKind("status", {
+      phase: "back_pressure",
+      message: `consumer lag ${lag} events`,
+    });
   }
 
   private checkCaps(): void {
@@ -284,6 +444,7 @@ export class SessionContext implements EventSeqSource {
   /** Dispatch an inbound, raw frame. */
   public async dispatchRaw(frame: WireFrame): Promise<void> {
     this.touch();
+    this.lastInboundAt = Date.now();
     let parsed: BaseEnvelope;
     try {
       parsed = RoundTripEnvelopeSchema.parse(frame);
@@ -305,7 +466,18 @@ export class SessionContext implements EventSeqSource {
     }
 
     // Idempotent inbound: dedupe by (session_id, id) once a session exists.
-    if (this.state.id !== undefined && parsed.session_id === this.state.id) {
+    // v1.1: session.ping/pong/ack are session-control (not event-seq-bearing),
+    // so we skip the dedupe-and-log step for them.
+    const SKIP_LOG: ReadonlySet<string> = new Set([
+      "session.ping",
+      "session.pong",
+      "session.ack",
+    ]);
+    if (
+      this.state.id !== undefined &&
+      parsed.session_id === this.state.id &&
+      !SKIP_LOG.has(parsed.type)
+    ) {
       try {
         const inserted = await this.server.eventLog.append(parsed);
         if (!inserted) {
@@ -376,10 +548,85 @@ export class SessionContext implements EventSeqSource {
     }
   }
 
+  /** Start the v1.1 §6.4 heartbeat watchdog when the feature is negotiated. */
+  public startHeartbeat(): void {
+    if (!this.hasFeature("heartbeat")) return;
+    const intervalMs =
+      (this.server.options.heartbeatIntervalSeconds ??
+        DEFAULT_HEARTBEAT_SECONDS) * 1000;
+    this.heartbeatTimer = setInterval(() => {
+      void this.heartbeatTick(intervalMs).catch(() => undefined);
+    }, intervalMs);
+    this.heartbeatTimer.unref();
+  }
+
+  public stopHeartbeat(): void {
+    if (this.heartbeatTimer !== null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  /**
+   * §6.4: if no inbound traffic in the last 2 intervals, treat the peer as
+   * gone and surface HEARTBEAT_LOST. Otherwise, if our outbound side has
+   * been idle for one interval, send a ping.
+   */
+  private async heartbeatTick(intervalMs: number): Promise<void> {
+    if (this.closed) return;
+    const now = Date.now();
+    if (now - this.lastInboundAt > intervalMs * 2) {
+      // Peer silent for two intervals — treat as dead.
+      await this.emitSessionError(
+        new (await import("@arcp/core/errors")).HeartbeatLostError(
+          "Peer silent for 2 heartbeat intervals",
+        ),
+      );
+      return;
+    }
+    // Only ping if we have not sent or received traffic in `intervalMs`.
+    if (now - this.lastMessageAt < intervalMs * 0.9) return;
+    // Outbound idle: send a ping.
+    const sessionId = this.state.id;
+    if (sessionId === undefined) return;
+    const nonce = `p_${randomBytes(8).toString("hex")}`;
+    this.outstandingPingNonce = nonce;
+    const env = buildEnvelope({
+      id: newMessageId(),
+      type: "session.ping" as const,
+      payload: { nonce, sent_at: new Date(now).toISOString() },
+      optional: { session_id: sessionId },
+    });
+    try {
+      // Use transport.send to bypass the per-session event_log append
+      // (heartbeats are NOT counted in event_seq, §6.4).
+      await this.transport.send(env);
+      this.lastMessageAt = now;
+    } catch {
+      // best-effort
+    }
+  }
+
+  public handlePong(pingNonce: string): void {
+    if (this.outstandingPingNonce === pingNonce) {
+      this.outstandingPingNonce = null;
+    }
+  }
+
   /** Tell the runtime this session is finished. Idempotent. */
   public async terminate(reason?: string): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    this.stopHeartbeat();
+    // Unsubscribe from every observed job.
+    for (const fn of this.subscriptions.values()) {
+      try {
+        fn();
+      } catch {
+        // best-effort
+      }
+    }
+    this.subscriptions.clear();
     this.server.dropSession(this);
     await this.transport.close(reason);
   }
@@ -388,29 +635,43 @@ export class SessionContext implements EventSeqSource {
 /**
  * Top-level ARCP runtime/server (§6–§14).
  *
- * Hosts a set of named agents and accepts sessions over any
- * {@link Transport}. Each accepted session drives the §6 handshake,
- * dispatches `job.submit`/`job.cancel`/`session.bye`, and emits
- * `job.event`/`job.result`/`job.error` envelopes back to the client.
+ * Hosts a set of named agents (optionally versioned) and accepts sessions
+ * over any {@link Transport}. Each accepted session drives the §6
+ * handshake, dispatches `job.submit`/`job.cancel`/`session.bye` and (v1.1)
+ * `session.ping`/`session.pong`/`session.ack`/`session.list_jobs`/
+ * `job.subscribe`/`job.unsubscribe`, and emits `job.event`/`job.result`/
+ * `job.error` envelopes back to the client.
  *
  * One server instance can serve many concurrent sessions. The runtime
  * maintains:
  *
- *   - an event log (for §6.3 resume replay),
+ *   - an event log (for §6.3 resume replay and §7.6 history replay),
  *   - an in-process idempotency store (`(principal, idempotency_key) → job_id`),
  *   - a resume-token store with periodic sweep (§14 window expiry),
- *   - per-session DoS caps (§14).
+ *   - per-session DoS caps (§14),
+ *   - a global jobs registry (for §6.6 list and §7.6 subscribe).
  */
 export class ARCPServer {
   public readonly eventLog: EventLog;
   public readonly logger: Logger;
-  private readonly agents = new Map<string, AgentHandler>();
+  /** name → version → handler. The empty-string version slot holds an
+   * un-versioned handler (registered via `registerAgent(name, fn)`). */
+  private readonly agents = new Map<string, Map<string, AgentHandler>>();
+  /** name → default version, when set via `setDefaultAgentVersion`. */
+  private readonly defaultAgentVersions = new Map<string, string>();
   /** principal+key → IdempotencyEntry */
   private readonly idempotencyStore = new Map<string, IdempotencyEntry>();
   /** session_id → ResumeRecord */
   private readonly resumeStore = new Map<string, ResumeRecord>();
   /** Live sessions, indexed by session_id (only those past welcome). */
   private readonly sessions = new Map<string, SessionContext>();
+  /**
+   * Global jobs registry for cross-session features (§6.6 listing,
+   * §7.6 subscription). Indexed by job_id.
+   */
+  public readonly globalJobs = new Map<string, Job>();
+  /** job_id → set of subscriber SessionContexts. */
+  public readonly subscribers = new Map<string, Set<SessionContext>>();
   private resumeSweep: ReturnType<typeof setInterval> | null = null;
 
   public constructor(public readonly options: ARCPServerOptions) {
@@ -420,19 +681,117 @@ export class ARCPServer {
     this.resumeSweep.unref();
   }
 
+  /** v1.1 feature flags this runtime advertises. Defaults to every v1.1 feature. */
+  public get advertisedFeatures(): readonly string[] {
+    return this.options.features ?? V1_1_FEATURES;
+  }
+
   /**
-   * Register an agent handler. Agents are looked up by `agent` name on
-   * `job.submit`. Re-registering overwrites the previous handler.
+   * Register an unversioned agent handler. Submissions with a bare `agent`
+   * name match this. If a versioned handler is also registered, bare-name
+   * submissions resolve to the default version (or the unversioned handler
+   * if no default is set).
    */
   public registerAgent<Input = unknown, Result = unknown>(
     name: string,
     handler: AgentHandler<Input, Result>,
   ): void {
-    this.agents.set(name, handler as AgentHandler);
+    let bucket = this.agents.get(name);
+    if (bucket === undefined) {
+      bucket = new Map<string, AgentHandler>();
+      this.agents.set(name, bucket);
+    }
+    bucket.set("", handler as AgentHandler);
+  }
+
+  /**
+   * v1.1 §7.5 — register a versioned agent handler. The same `name` MAY have
+   * multiple versions; use {@link setDefaultAgentVersion} to choose which one
+   * resolves for bare-name submissions.
+   */
+  public registerAgentVersion<Input = unknown, Result = unknown>(
+    name: string,
+    version: string,
+    handler: AgentHandler<Input, Result>,
+  ): void {
+    let bucket = this.agents.get(name);
+    if (bucket === undefined) {
+      bucket = new Map<string, AgentHandler>();
+      this.agents.set(name, bucket);
+    }
+    bucket.set(version, handler as AgentHandler);
+  }
+
+  /** v1.1 §7.5 — set the default version for bare-name submissions. */
+  public setDefaultAgentVersion(name: string, version: string): void {
+    this.defaultAgentVersions.set(name, version);
   }
 
   public hasAgent(name: string): boolean {
     return this.agents.has(name);
+  }
+
+  /**
+   * Resolve a parsed agent reference to a concrete handler. Returns the
+   * resolved version (may be empty string for unversioned). Throws
+   * `AgentNotAvailableError` / `AgentVersionNotAvailableError` per §7.5.
+   */
+  public resolveAgent(
+    name: string,
+    version: string | null,
+  ): { handler: AgentHandler; version: string } {
+    const bucket = this.agents.get(name);
+    if (bucket === undefined || bucket.size === 0) {
+      throw new AgentNotAvailableError(`Agent "${name}" is not registered`);
+    }
+    if (version !== null) {
+      const handler = bucket.get(version);
+      if (handler === undefined) {
+        throw new AgentVersionNotAvailableError(
+          `Agent "${name}@${version}" is not registered`,
+        );
+      }
+      return { handler, version };
+    }
+    // bare name → prefer the runtime-configured default, else the unversioned
+    // slot, else pick the first registered version.
+    const defaultVersion = this.defaultAgentVersions.get(name);
+    if (defaultVersion !== undefined) {
+      const handler = bucket.get(defaultVersion);
+      if (handler === undefined) {
+        throw new AgentVersionNotAvailableError(
+          `Default agent version "${name}@${defaultVersion}" is not registered`,
+        );
+      }
+      return { handler, version: defaultVersion };
+    }
+    const unversioned = bucket.get("");
+    if (unversioned !== undefined) {
+      return { handler: unversioned, version: "" };
+    }
+    // Pick an arbitrary version. Clients that require stability MUST pin one.
+    const firstEntry = bucket.entries().next().value;
+    if (firstEntry === undefined) {
+      throw new AgentNotAvailableError(`Agent "${name}" is not registered`);
+    }
+    const [v, h] = firstEntry;
+    return { handler: h, version: v };
+  }
+
+  /** Build the rich agent inventory shape (§6.2 / §7.5) for advertisement. */
+  public getAgentInventory(): AgentInventoryEntry[] {
+    const out: AgentInventoryEntry[] = [];
+    for (const [name, bucket] of this.agents.entries()) {
+      const versions = [...bucket.keys()].filter((v) => v !== "");
+      const entry: AgentInventoryEntry = {
+        name,
+        versions,
+      };
+      const def = this.defaultAgentVersions.get(name);
+      if (def !== undefined && versions.includes(def)) entry.default = def;
+      out.push(entry);
+    }
+    return out;
   }
 
   /**
@@ -519,10 +878,7 @@ export class ARCPServer {
     const sessionId = newSessionId();
     ctx.state.assignId(sessionId);
     ctx.state.assignIdentity(identity);
-    const negotiated = negotiateCapabilities(
-      payload.capabilities,
-      this.options.capabilities,
-    );
+    const negotiated = this.makeNegotiatedCapabilities(payload, ctx);
     ctx.state.assignCapabilities(negotiated);
     this.bindLogger(ctx, payload.client.name);
 
@@ -535,10 +891,15 @@ export class ARCPServer {
       expiresAt: Date.now() + resumeWindowSec * 1000,
     });
 
+    const heartbeatSec =
+      this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS;
     const welcome: SessionWelcomePayload = {
       runtime: this.options.runtime,
       resume_token: resumeToken,
       resume_window_sec: resumeWindowSec,
+      ...(ctx.hasFeature("heartbeat")
+        ? { heartbeat_interval_sec: heartbeatSec }
+        : {}),
       capabilities: negotiated,
     };
     const welcomeEnv = buildEnvelope({
@@ -557,6 +918,36 @@ export class ARCPServer {
       "session welcomed",
     );
     this.registerPostHandshakeHandlers(ctx);
+    ctx.startHeartbeat();
+  }
+
+  /**
+   * Build the welcome capabilities: intersect features with the client's
+   * advertised list and store the result on the session context.
+   */
+  private makeNegotiatedCapabilities(
+    payload: SessionHelloPayload,
+    ctx: SessionContext,
+  ): Capabilities {
+    const base: Capabilities = { ...this.options.capabilities };
+    // Advertise the rich agent inventory shape when the agent_versions
+    // feature is negotiated and we have versioned handlers; else fall back to
+    // the v1.0 flat shape (or what the caller supplied).
+    const clientFeatures = payload.capabilities?.features;
+    const features = intersectFeatures(this.advertisedFeatures, clientFeatures);
+    ctx.assignNegotiatedFeatures(features);
+
+    if (features.includes("agent_versions") || base.agents === undefined) {
+      const inventory = this.getAgentInventory();
+      if (inventory.length > 0) {
+        base.agents = inventory;
+      }
+    }
+    if (features.length > 0) {
+      base.features = features;
+    }
+
+    return negotiateCapabilities(payload.capabilities, base);
   }
 
   private async handleResume(
@@ -597,10 +988,7 @@ export class ARCPServer {
 
     ctx.state.assignId(resume.session_id);
     ctx.state.assignIdentity(identity);
-    const negotiated = negotiateCapabilities(
-      payload.capabilities,
-      this.options.capabilities,
-    );
+    const negotiated = this.makeNegotiatedCapabilities(payload, ctx);
     ctx.state.assignCapabilities(negotiated);
     this.bindLogger(ctx, payload.client.name);
 
@@ -614,10 +1002,15 @@ export class ARCPServer {
       expiresAt: Date.now() + resumeWindowSec * 1000,
     });
 
+    const heartbeatSec =
+      this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS;
     const welcome: SessionWelcomePayload = {
       runtime: this.options.runtime,
       resume_token: freshToken,
       resume_window_sec: resumeWindowSec,
+      ...(ctx.hasFeature("heartbeat")
+        ? { heartbeat_interval_sec: heartbeatSec }
+        : {}),
       capabilities: negotiated,
     };
     const welcomeEnv = buildEnvelope({
@@ -655,6 +1048,7 @@ export class ARCPServer {
       "session resumed",
     );
     this.registerPostHandshakeHandlers(ctx);
+    ctx.startHeartbeat();
   }
 
   private bindLogger(ctx: SessionContext, clientName: string): void {
@@ -684,8 +1078,74 @@ export class ARCPServer {
       }
       await ctx.terminate(env.payload.reason);
     });
-    // Allow client to re-send a hello during the same transport (resume in-place).
-    // Not common, but the spec doesn't forbid it.
+
+    // v1.1 §6.4 — heartbeat (handled even if not negotiated; receivers always
+    // respond to ping per §6.4 to support staggered rollouts).
+    ctx.registerHandler("session.ping", async (env) => {
+      if (env.type !== "session.ping") return;
+      const sessionId = ctx.state.id;
+      if (sessionId === undefined) return;
+      const pongEnv = buildEnvelope({
+        id: newMessageId(),
+        type: "session.pong" as const,
+        payload: {
+          ping_nonce: env.payload.nonce,
+          received_at: new Date().toISOString(),
+        },
+        optional: { session_id: sessionId },
+      });
+      // Direct transport.send — heartbeats are NOT counted in event_seq.
+      await ctx.transport.send(pongEnv);
+    });
+    ctx.registerHandler("session.pong", async (env) => {
+      if (env.type !== "session.pong") return;
+      ctx.handlePong(env.payload.ping_nonce);
+    });
+
+    // v1.1 §6.5 — event acknowledgement.
+    ctx.registerHandler("session.ack", async (env) => {
+      if (env.type !== "session.ack") return;
+      if (!ctx.hasFeature("ack")) return;
+      ctx.recordAck(env.payload.last_processed_seq);
+    });
+
+    // v1.1 §6.6 — job listing.
+    ctx.registerHandler("session.list_jobs", async (env) => {
+      if (env.type !== "session.list_jobs") return;
+      if (!ctx.hasFeature("list_jobs")) {
+        await ctx.emitSessionError(
+          new InvalidRequestError(
+            "session.list_jobs requires the 'list_jobs' feature",
+          ),
+        );
+        return;
+      }
+      await this.handleListJobs(ctx, env);
+    });
+
+    // v1.1 §7.6 — subscription.
+    ctx.registerHandler("job.subscribe", async (env) => {
+      if (env.type !== "job.subscribe") return;
+      if (!ctx.hasFeature("subscribe")) {
+        await ctx.emitSessionError(
+          new InvalidRequestError(
+            "job.subscribe requires the 'subscribe' feature",
+          ),
+        );
+        return;
+      }
+      await this.handleJobSubscribe(ctx, env);
+    });
+    ctx.registerHandler("job.unsubscribe", async (env) => {
+      if (env.type !== "job.unsubscribe") return;
+      if (!ctx.hasFeature("subscribe")) return;
+      const jobId = env.payload.job_id;
+      const stop = ctx.subscriptions.get(jobId);
+      if (stop !== undefined) {
+        stop();
+        ctx.subscriptions.delete(jobId);
+      }
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -711,20 +1171,48 @@ export class ARCPServer {
       return;
     }
 
-    // Agent lookup.
-    const handler = this.agents.get(payload.agent);
-    if (handler === undefined) {
-      const jobId = newJobId();
-      await ctx.emitJobError(jobId, {
+    // v1.1 §7.5 — parse agent reference and resolve a handler.
+    let parsedAgent: { name: string; version: string | null };
+    try {
+      parsedAgent = parseAgentRef(payload.agent);
+    } catch (err) {
+      await ctx.emitJobError(newJobId(), {
         final_status: "error",
-        code: "AGENT_NOT_AVAILABLE",
-        message: `Agent "${payload.agent}" is not registered`,
+        code: "INVALID_REQUEST",
+        message: err instanceof Error ? err.message : String(err),
         retryable: false,
       });
       return;
     }
+    let handler: AgentHandler;
+    let resolvedVersion: string;
+    try {
+      const resolved = this.resolveAgent(parsedAgent.name, parsedAgent.version);
+      handler = resolved.handler;
+      resolvedVersion = resolved.version;
+    } catch (err) {
+      // §7.5: version errors emit session.error per spec example (§13.7).
+      if (err instanceof AgentVersionNotAvailableError) {
+        await ctx.emitSessionError(err);
+        return;
+      }
+      const wrapped =
+        err instanceof ARCPError
+          ? err
+          : new AgentNotAvailableError(
+              `Agent "${payload.agent}" is not registered`,
+            );
+      const jobId = newJobId();
+      await ctx.emitJobError(jobId, {
+        final_status: "error",
+        code: wrapped.code,
+        message: wrapped.message,
+        retryable: wrapped.retryable,
+      });
+      return;
+    }
 
-    // Lease validation.
+    // Lease validation (shape + cost.budget patterns).
     const requestedLease: Lease = payload.lease_request ?? {};
     try {
       validateLeaseShape(requestedLease);
@@ -739,6 +1227,26 @@ export class ARCPServer {
       });
       return;
     }
+
+    // v1.1 §9.5 — validate lease_constraints (UTC, future).
+    const leaseConstraints: LeaseConstraints | undefined =
+      payload.lease_constraints;
+    try {
+      validateLeaseConstraints(leaseConstraints);
+    } catch (err) {
+      const wrapped =
+        err instanceof ARCPError ? err : new InvalidRequestError(String(err));
+      await ctx.emitJobError(newJobId(), {
+        final_status: "error",
+        code: wrapped.code,
+        message: wrapped.message,
+        retryable: wrapped.retryable,
+      });
+      return;
+    }
+
+    // v1.1 §9.6 — initial budget counters.
+    const initialBudget = initialBudgetFromLease(requestedLease);
 
     // Idempotency: keyed by (principal, idempotency_key).
     const principal = ctx.state.identity?.principal ?? "<anonymous>";
@@ -774,8 +1282,11 @@ export class ARCPServer {
       {
         ...(idempotencyHit !== null ? { jobId: idempotencyHit.jobId } : {}),
         sessionId,
-        agent: payload.agent,
+        agent: parsedAgent.name,
+        agentVersion: resolvedVersion === "" ? null : resolvedVersion,
         lease: requestedLease,
+        leaseConstraints,
+        initialBudget,
         heartbeatIntervalSeconds:
           this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS,
         ...(traceId !== undefined ? { traceId } : {}),
@@ -784,6 +1295,9 @@ export class ARCPServer {
       ctx,
       ctx.logger.child({ job_id: "<pending>" }),
     );
+    job.submitterPrincipal = principal;
+    job.owningSession = ctx;
+    this.globalJobs.set(job.jobId, job);
     ctx.jobs.register(job);
     Object.assign(job, { logger: ctx.logger.child({ job_id: job.jobId }) });
 
@@ -837,17 +1351,67 @@ export class ARCPServer {
       }, maxRuntimeSec * 1000);
       timeoutTimer.unref();
     }
+
+    // v1.1 §9.5 — lease-expiration watchdog. If expires_at elapses while the
+    // job is still running, surface LEASE_EXPIRED as job.error.
+    let leaseExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+    const expiresAt = job.leaseConstraints?.expires_at;
+    if (expiresAt !== undefined) {
+      const ms = Date.parse(expiresAt) - Date.now();
+      if (Number.isFinite(ms) && ms > 0) {
+        leaseExpiryTimer = setTimeout(() => {
+          if (!job.isTerminal) {
+            void job.emitErrorEnvelope({
+              final_status: "error",
+              code: "LEASE_EXPIRED",
+              message: `Lease expired at ${expiresAt}`,
+              retryable: false,
+            });
+            job.abortController.abort(
+              new LeaseExpiredError(`Lease expired at ${expiresAt}`),
+            );
+          }
+        }, ms);
+        leaseExpiryTimer.unref();
+      } else {
+        // Past or invalid — terminate immediately.
+        void job.emitErrorEnvelope({
+          final_status: "error",
+          code: "LEASE_EXPIRED",
+          message: `Lease expired at ${expiresAt}`,
+          retryable: false,
+        });
+        ctx.jobs.retire(job.jobId);
+        this.globalJobs.delete(job.jobId);
+        return;
+      }
+    }
+
     // Listen for delegate events on this job context — runtime intercepts them.
     const delegateInterceptor = makeDelegateInterceptor(this, ctx, job);
-    const wrapped = wrapJobCtx(jobCtx, delegateInterceptor);
+    const wrapped = wrapJobCtx(
+      jobCtx,
+      delegateInterceptor,
+      this.metricInterceptor(job),
+      this.subscriberBroadcaster(job),
+    );
 
     try {
       const result = await handler(input, wrapped);
       if (!job.isTerminal) {
-        await job.emitResult({
-          final_status: "success",
-          result,
-        });
+        if (job.chunkedResultStarted) {
+          // The agent should have called `finalize` on its ResultStream.
+          // If not, emit a terminal result_chunk{more:false}+job.result.
+          await job.emitResult({
+            final_status: "success",
+            result_id: `res_${job.jobId.replace(/^job_/, "")}_auto`,
+          });
+        } else {
+          await job.emitResult({
+            final_status: "success",
+            result,
+          });
+        }
       }
     } catch (err) {
       if (job.isTerminal) return;
@@ -876,8 +1440,78 @@ export class ARCPServer {
       });
     } finally {
       if (timeoutTimer !== null) clearTimeout(timeoutTimer);
+      if (leaseExpiryTimer !== null) clearTimeout(leaseExpiryTimer);
       ctx.jobs.retire(job.jobId);
+      this.globalJobs.delete(job.jobId);
+      // Drop any active subscriptions for this job.
+      this.subscribers.delete(job.jobId);
     }
+  }
+
+  /**
+   * Intercept `metric` events to apply v1.1 §9.6 budget decrements.
+   */
+  private metricInterceptor(job: Job): (body: MetricBody) => Promise<void> {
+    return async (body: MetricBody) => {
+      // Decrement the matching budget counter (if any).
+      const remaining = job.applyCostMetric(body.name, body.value, body.unit);
+      if (remaining !== null && body.unit !== undefined) {
+        // Debounced budget.remaining metric (best-effort).
+        if (job.shouldEmitBudgetRemaining(body.unit)) {
+          // Emit *after* the original metric — but we need to do that from
+          // the wrapper. Schedule via microtask so the original event has
+          // flushed.
+          queueMicrotask(() => {
+            if (job.isTerminal) return;
+            void job
+              .emitEventKind("metric", {
+                name: "cost.budget.remaining",
+                value: remaining,
+                unit: body.unit,
+              })
+              .catch(() => undefined);
+          });
+        }
+      }
+    };
+  }
+
+  /**
+   * Build a hook that re-broadcasts the job's events to every subscriber
+   * session (other than the submitting session).
+   */
+  private subscriberBroadcaster(job: Job): (env: BaseEnvelope) => void {
+    return (env: BaseEnvelope) => {
+      const subs = this.subscribers.get(job.jobId);
+      if (subs === undefined || subs.size === 0) return;
+      for (const sub of subs) {
+        // Re-emit with the subscriber's session-scoped event_seq.
+        void this.forwardEventToSubscriber(sub, env).catch(() => undefined);
+      }
+    };
+  }
+
+  private async forwardEventToSubscriber(
+    sub: SessionContext,
+    src: BaseEnvelope,
+  ): Promise<void> {
+    if (sub.state.id === undefined) return;
+    // Build a fresh envelope: same payload/type/job_id but new id and a new
+    // session-scoped event_seq. Preserve trace_id when present.
+    const env = buildEnvelope({
+      id: newMessageId(),
+      type: src.type,
+      payload: src.payload,
+      optional: {
+        session_id: sub.state.id,
+        ...(src.job_id !== undefined ? { job_id: src.job_id } : {}),
+        ...(src.trace_id !== undefined ? { trace_id: src.trace_id } : {}),
+        ...(src.event_seq !== undefined
+          ? { event_seq: sub.nextEventSeq() }
+          : {}),
+      },
+    });
+    await sub.send(env);
   }
 
   private async handleJobCancel(
@@ -894,6 +1528,19 @@ export class ARCPServer {
     }
     const job = ctx.jobs.get(jobId);
     if (job === undefined) {
+      // v1.1 §7.6 — subscription does NOT grant cancel authority. If the
+      // job exists but this session is only a subscriber, refuse with
+      // PERMISSION_DENIED rather than masquerading as JOB_NOT_FOUND.
+      const global = this.globalJobs.get(jobId);
+      if (global !== undefined) {
+        await ctx.emitJobError(jobId, {
+          final_status: "error",
+          code: "PERMISSION_DENIED",
+          message: "Subscription does not confer cancel authority",
+          retryable: false,
+        });
+        return;
+      }
       await ctx.emitJobError(jobId, {
         final_status: "error",
         code: "JOB_NOT_FOUND",
@@ -921,6 +1568,203 @@ export class ARCPServer {
   }
 
   // ---------------------------------------------------------------------
+  // v1.1 §6.6 — session.list_jobs
+  // ---------------------------------------------------------------------
+
+  private async handleListJobs(
+    ctx: SessionContext,
+    env: Envelope,
+  ): Promise<void> {
+    if (env.type !== "session.list_jobs") return;
+    const sessionId = ctx.state.id;
+    if (sessionId === undefined) return;
+    const principal = ctx.state.identity?.principal;
+    const policy =
+      this.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
+    const payload = env.payload as SessionListJobsPayload;
+    const filter = payload.filter ?? {};
+    const limit = payload.limit ?? 100;
+
+    const allowedStatuses = new Set<string>(filter.status ?? JOB_STATES);
+    const createdAfter = filter.created_after
+      ? Date.parse(filter.created_after)
+      : null;
+    const createdBefore = filter.created_before
+      ? Date.parse(filter.created_before)
+      : null;
+
+    // Build candidate list across global jobs and apply filter+auth.
+    const candidates: JobListEntry[] = [];
+    for (const job of this.globalJobs.values()) {
+      if (!policy(job, principal)) continue;
+      if (!allowedStatuses.has(job.state)) continue;
+      if (filter.agent !== undefined) {
+        const parsed = parseAgentRef(filter.agent);
+        if (parsed.version === null) {
+          if (job.agent !== parsed.name) continue;
+        } else {
+          if (job.agent !== parsed.name || job.agentVersion !== parsed.version)
+            continue;
+        }
+      }
+      if (createdAfter !== null) {
+        const t = Date.parse(job.createdAt);
+        if (!Number.isFinite(t) || t <= createdAfter) continue;
+      }
+      if (createdBefore !== null) {
+        const t = Date.parse(job.createdAt);
+        if (!Number.isFinite(t) || t >= createdBefore) continue;
+      }
+      candidates.push({
+        job_id: job.jobId,
+        agent: job.agentRef,
+        status: job.state,
+        lease: job.lease,
+        parent_job_id: job.parentJobId ?? null,
+        created_at: job.createdAt,
+        ...(job.traceId !== undefined ? { trace_id: job.traceId } : {}),
+        last_event_seq: ctx.latestEventSeq,
+      });
+    }
+    // Sort by created_at ascending, then by job_id for determinism.
+    candidates.sort((a, b) => {
+      const ta = Date.parse(a.created_at);
+      const tb = Date.parse(b.created_at);
+      if (ta !== tb) return ta - tb;
+      return a.job_id.localeCompare(b.job_id);
+    });
+
+    // Cursor: opaque ULID of the last-emitted job_id in the previous page.
+    const cursor = payload.cursor ?? null;
+    let startIdx = 0;
+    if (cursor !== null && cursor !== "") {
+      const idx = candidates.findIndex((c) => c.job_id === cursor);
+      if (idx >= 0) startIdx = idx + 1;
+    }
+    const page = candidates.slice(startIdx, startIdx + limit);
+    const lastEntry = page.length > 0 ? page[page.length - 1] : undefined;
+    const nextCursor =
+      startIdx + limit < candidates.length && lastEntry !== undefined
+        ? lastEntry.job_id
+        : null;
+
+    const responseEnv = buildEnvelope({
+      id: newMessageId(),
+      type: "session.jobs" as const,
+      payload: {
+        request_id: env.id,
+        jobs: page,
+        next_cursor: nextCursor,
+      },
+      optional: { session_id: sessionId },
+    });
+    await ctx.send(responseEnv);
+  }
+
+  // ---------------------------------------------------------------------
+  // v1.1 §7.6 — job.subscribe
+  // ---------------------------------------------------------------------
+
+  private async handleJobSubscribe(
+    ctx: SessionContext,
+    env: Envelope,
+  ): Promise<void> {
+    if (env.type !== "job.subscribe") return;
+    const sessionId = ctx.state.id;
+    if (sessionId === undefined) return;
+    const jobId = env.payload.job_id;
+    const job = this.globalJobs.get(jobId);
+    if (job === undefined) {
+      await ctx.emitJobError(jobId, {
+        final_status: "error",
+        code: "JOB_NOT_FOUND",
+        message: `Job "${jobId}" not found`,
+        retryable: false,
+      });
+      return;
+    }
+    const principal = ctx.state.identity?.principal;
+    const policy =
+      this.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
+    if (!policy(job, principal)) {
+      await ctx.emitSessionError(
+        new PermissionDeniedError(
+          "Subscriber's principal is not authorized to observe this job",
+        ),
+      );
+      return;
+    }
+
+    // Register subscriber.
+    let set = this.subscribers.get(jobId);
+    if (set === undefined) {
+      set = new Set<SessionContext>();
+      this.subscribers.set(jobId, set);
+    }
+    set.add(ctx);
+    ctx.subscriptions.set(jobId, () => {
+      const s = this.subscribers.get(jobId);
+      if (s !== undefined) {
+        s.delete(ctx);
+        if (s.size === 0) this.subscribers.delete(jobId);
+      }
+    });
+
+    // Replay history if requested.
+    const wantHistory = env.payload.history === true;
+    const fromSeq = env.payload.from_event_seq;
+    let replayed = false;
+    if (wantHistory && job.owningSession !== undefined) {
+      const owner = job.owningSession;
+      if (owner.state.id !== undefined) {
+        try {
+          const events = await this.eventLog.readSinceSeq(
+            owner.state.id,
+            fromSeq ?? 0,
+            10_000,
+          );
+          for (const e of events) {
+            if (e.job_id !== jobId) continue;
+            // Only forward event-bearing types.
+            if (
+              e.type !== "job.event" &&
+              e.type !== "job.result" &&
+              e.type !== "job.error"
+            ) {
+              continue;
+            }
+            await this.forwardEventToSubscriber(ctx, e);
+          }
+          replayed = events.some((e) => e.job_id === jobId);
+        } catch (err) {
+          ctx.logger.warn({ err }, "subscribe history replay failed");
+        }
+      }
+    }
+
+    const subscribedFrom = ctx.latestEventSeq;
+    const respEnv = buildEnvelope({
+      id: newMessageId(),
+      type: "job.subscribed" as const,
+      payload: {
+        job_id: jobId,
+        current_status: job.state,
+        agent: job.agentRef,
+        lease: job.lease,
+        ...(job.leaseConstraints !== undefined
+          ? { lease_constraints: job.leaseConstraints }
+          : {}),
+        parent_job_id: job.parentJobId ?? null,
+        ...(job.traceId !== undefined ? { trace_id: job.traceId } : {}),
+        subscribed_from: subscribedFrom,
+        replayed,
+      },
+      optional: { session_id: sessionId, job_id: jobId },
+    });
+    await ctx.send(respEnv);
+  }
+
+  // ---------------------------------------------------------------------
   // Auth
   // ---------------------------------------------------------------------
 
@@ -939,9 +1783,7 @@ export class ARCPServer {
       }
       return verifier.verify(auth.token);
     }
-    throw new InvalidRequestError(
-      `Auth scheme "${auth.scheme}" not supported in v1.0`,
-    );
+    throw new InvalidRequestError(`Auth scheme "${auth.scheme}" not supported`);
   }
 
   // ---------------------------------------------------------------------
@@ -982,19 +1824,48 @@ export class ARCPServer {
     parent: Job,
     body: DelegateBody,
   ): Promise<{ ok: true; jobId: string } | { ok: false; error: ARCPError }> {
-    const handler = this.agents.get(body.agent);
-    if (handler === undefined) {
+    const requested: Lease = body.lease_request ?? {};
+    let parsedAgent: { name: string; version: string | null };
+    try {
+      parsedAgent = parseAgentRef(body.agent);
+    } catch (err) {
       return {
         ok: false,
-        error: new AgentNotAvailableError(
-          `Agent "${body.agent}" is not registered`,
-        ),
+        error:
+          err instanceof ARCPError
+            ? err
+            : new InvalidRequestError(
+                err instanceof Error ? err.message : String(err),
+              ),
       };
     }
-    const requested: Lease = body.lease_request ?? {};
+    let handler: AgentHandler;
+    let resolvedVersion: string;
+    try {
+      const r = this.resolveAgent(parsedAgent.name, parsedAgent.version);
+      handler = r.handler;
+      resolvedVersion = r.version;
+    } catch (err) {
+      return {
+        ok: false,
+        error:
+          err instanceof ARCPError
+            ? err
+            : new AgentNotAvailableError(
+                `Agent "${body.agent}" is not registered`,
+              ),
+      };
+    }
     try {
       validateLeaseShape(requested);
-      assertLeaseSubset(requested, parent.lease);
+      // Pass parent's REMAINING budget for §9.4 enforcement.
+      assertLeaseSubset(requested, parent.lease, parent.budget);
+      assertLeaseConstraintsSubset(
+        body.lease_constraints,
+        parent.leaseConstraints,
+      );
+      // Child inherits parent expiry implicitly if absent.
+      validateLeaseConstraints(body.lease_constraints);
     } catch (err) {
       const wrapped =
         err instanceof LeaseSubsetViolationError
@@ -1008,11 +1879,18 @@ export class ARCPServer {
     if (sessionId === undefined) {
       return { ok: false, error: new InternalError("session has no id") };
     }
+    // Effective child constraints: child explicit OR inherited from parent.
+    const effectiveConstraints: LeaseConstraints | undefined =
+      body.lease_constraints ?? parent.leaseConstraints;
+    const childBudget = initialBudgetFromLease(requested);
     const child = new Job(
       {
         sessionId,
-        agent: body.agent,
+        agent: parsedAgent.name,
+        agentVersion: resolvedVersion === "" ? null : resolvedVersion,
         lease: requested,
+        leaseConstraints: effectiveConstraints,
+        initialBudget: childBudget,
         parentJobId: parent.jobId,
         delegateId: body.delegate_id,
         heartbeatIntervalSeconds:
@@ -1023,6 +1901,9 @@ export class ARCPServer {
       ctx,
       ctx.logger.child({ job_id: "<pending>", parent_job_id: parent.jobId }),
     );
+    child.submitterPrincipal = parent.submitterPrincipal;
+    child.owningSession = ctx;
+    this.globalJobs.set(child.jobId, child);
     ctx.jobs.register(child);
     Object.assign(child, { logger: ctx.logger.child({ job_id: child.jobId }) });
     await child.emitAccepted();
@@ -1034,10 +1915,12 @@ export class ARCPServer {
 }
 
 // ---------------------------------------------------------------------
-// Delegation interception
+// Delegation + metric + subscriber interception
 // ---------------------------------------------------------------------
 
 type DelegateInterceptor = (body: DelegateBody) => Promise<void>;
+type MetricInterceptor = (body: MetricBody) => Promise<void>;
+type SubscriberBroadcaster = (env: BaseEnvelope) => void;
 
 function makeDelegateInterceptor(
   server: ARCPServer,
@@ -1061,11 +1944,26 @@ function makeDelegateInterceptor(
 function wrapJobCtx(
   ctx: JobContext,
   interceptor: DelegateInterceptor,
+  metricInterceptor: MetricInterceptor,
+  // subscriberBroadcaster is invoked at the Job-emit-level via a Job wrapper;
+  // event broadcasting actually hooks via the SessionContext.send pipeline,
+  // not here. The argument is retained for future expansion.
+  _broadcaster: SubscriberBroadcaster,
 ): JobContext {
   return {
     ...ctx,
     async delegate(body: DelegateBody) {
       await interceptor(body);
     },
+    async metric(body) {
+      await ctx.metric(body);
+      await metricInterceptor(body);
+    },
   };
 }
+
+// Job's `submitterPrincipal` and `owningSession` fields are declared in
+// `./job.ts` (Job class definition) for §6.6/§7.6 cross-session features.
+
+// formatAgentRef is referenced for potential future use.
+void formatAgentRef;

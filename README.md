@@ -309,9 +309,11 @@ Spec sections implemented:
 
 ## Examples
 
-Eight end-to-end examples, each a `server.ts` + `client.ts` pair that
-talks over a real `Transport`. See
+Seventeen end-to-end examples, each a `server.ts` + `client.ts` pair
+that talks over a real `Transport`. See
 [`examples/README.md`](./examples/README.md):
+
+v1.0 core:
 
 | Example | Spec |
 |---|---|
@@ -323,6 +325,20 @@ talks over a real `Transport`. See
 | `cancel/` | §7.4 |
 | `stdio/` | §4.2 / §22 |
 | `vendor-extensions/` | §8.2 / §9.2 / §15 |
+
+v1.1 features:
+
+| Example | Spec |
+|---|---|
+| `heartbeat/` | §6.4 |
+| `ack-backpressure/` | §6.5 / §8.2 |
+| `list-jobs/` | §6.6 |
+| `subscribe/` | §7.6 / §6.6 |
+| `agent-versions/` | §7.5 / §12 |
+| `lease-expires-at/` | §9.5 / §12 |
+| `cost-budget/` | §9.6 / §12 |
+| `progress/` | §8.2.1 |
+| `result-chunk/` | §8.4 |
 
 ## Repository layout
 
@@ -337,7 +353,7 @@ packages/
     express/           # @arcp/express
     hono/              # @arcp/hono
     otel/              # @arcp/middleware-otel
-examples/              # Eight runnable two-process demos (§13 + §4.2 + §7.4 + §15)
+examples/              # Seventeen runnable two-process demos (§13 + §4.2 + §7.4 + §15 + all v1.1)
 ```
 
 ## Development

@@ -1,5 +1,7 @@
 import {
+  BudgetExhaustedError,
   InvalidRequestError,
+  LeaseExpiredError,
   LeaseSubsetViolationError,
   PermissionDeniedError,
 } from "@arcp/core/errors";
@@ -7,6 +9,8 @@ import {
   isReservedCapabilityName,
   isValidCapabilityName,
   type Lease,
+  type LeaseConstraints,
+  parseBudgetAmount,
 } from "@arcp/core/messages";
 
 // ARCP v1.0 §9 — leases.
@@ -119,15 +123,67 @@ export function canonicalizeTarget(target: string): string {
 }
 
 /**
+ * Optional extra context surfaced to {@link validateLeaseOp} for v1.1
+ * enforcement: lease expiration and per-currency budget counters.
+ *
+ * Both `constraints` and `budgetRemaining` are evaluated before the
+ * glob/pattern check. Either failing produces a v1.1 error
+ * ({@link LeaseExpiredError} or {@link BudgetExhaustedError}); these MUST
+ * NOT be silently downgraded to `PERMISSION_DENIED`.
+ */
+export interface LeaseOpContext {
+  constraints?: LeaseConstraints | undefined;
+  budgetRemaining?: ReadonlyMap<string, number> | undefined;
+  /** Clock override for tests; defaults to `Date.now()`. */
+  now?: number;
+}
+
+/**
  * Validate that `lease` permits an `operation` with `capability` on `target`.
  *
  * Throws {@link PermissionDeniedError} if no matching pattern exists.
+ *
+ * When v1.1 `ctx.constraints.expires_at` is set and elapsed, throws
+ * {@link LeaseExpiredError}. When v1.1 `ctx.budgetRemaining` is set and any
+ * currency counter has dropped to zero or below, throws
+ * {@link BudgetExhaustedError}. Both checks fire BEFORE the pattern match
+ * — they bound the lease as a whole, not any single capability.
  */
 export function validateLeaseOp(
   lease: Lease,
   capability: string,
   target: string,
+  ctx: LeaseOpContext = {},
 ): void {
+  // v1.1 §9.5: lease expiration check (applies to every operation).
+  if (ctx.constraints?.expires_at !== undefined) {
+    const now = ctx.now ?? Date.now();
+    const expiresMs = Date.parse(ctx.constraints.expires_at);
+    if (Number.isFinite(expiresMs) && now >= expiresMs) {
+      throw new LeaseExpiredError(
+        `Lease expired at ${ctx.constraints.expires_at}`,
+        {
+          details: {
+            capability,
+            target,
+            expires_at: ctx.constraints.expires_at,
+          },
+        },
+      );
+    }
+  }
+
+  // v1.1 §9.6: budget exhaustion (across all currencies).
+  if (ctx.budgetRemaining !== undefined && capability !== "cost.budget") {
+    for (const [currency, remaining] of ctx.budgetRemaining.entries()) {
+      if (remaining <= 0) {
+        throw new BudgetExhaustedError(`${currency} budget exhausted`, {
+          details: { capability, target, currency, remaining },
+        });
+      }
+    }
+  }
+
   const patterns = lease[capability];
   if (patterns === undefined || patterns.length === 0) {
     throw new PermissionDeniedError(
@@ -148,6 +204,22 @@ export function validateLeaseOp(
 }
 
 /**
+ * Compute the initial per-currency budget counters from a lease's
+ * `cost.budget` patterns. Each pattern MUST parse as `currency:decimal`
+ * (v1.1 §9.6); when multiple entries share a currency, the values sum.
+ */
+export function initialBudgetFromLease(lease: Lease): Map<string, number> {
+  const out = new Map<string, number>();
+  const patterns = lease["cost.budget"];
+  if (patterns === undefined) return out;
+  for (const p of patterns) {
+    const { currency, amount } = parseBudgetAmount(p);
+    out.set(currency, (out.get(currency) ?? 0) + amount);
+  }
+  return out;
+}
+
+/**
  * Verify that `child` is a subset of `parent` (§9.4).
  *
  * Conservative semantics: returns true iff every pattern in every capability
@@ -165,10 +237,55 @@ export function validateLeaseOp(
  * subset-conforming under parent pattern `p1` iff `p1` matches every prefix
  * of `p2`'s segment specification. Implementations MAY validate more strictly;
  * we err on rejecting ambiguous cases.
+ *
+ * v1.1 §9.4: `cost.budget` is compared as numeric per-currency totals (not
+ * patterns); a child's total per currency MUST NOT exceed the parent's. If
+ * `parentBudgetRemaining` is supplied, that "remaining" total is used
+ * instead of the parent's original budget — for delegation that occurs
+ * mid-execution.
  */
-export function isLeaseSubset(child: Lease, parent: Lease): boolean {
+export function isLeaseSubset(
+  child: Lease,
+  parent: Lease,
+  parentBudgetRemaining?: ReadonlyMap<string, number>,
+): boolean {
   for (const cap of Object.keys(child)) {
     const childPatterns = child[cap] ?? [];
+    if (cap === "cost.budget") {
+      // Numeric per-currency comparison instead of glob subsumption.
+      const childTotals = new Map<string, number>();
+      for (const p of childPatterns) {
+        try {
+          const { currency, amount } = parseBudgetAmount(p);
+          childTotals.set(currency, (childTotals.get(currency) ?? 0) + amount);
+        } catch {
+          return false;
+        }
+      }
+      // Use parent remaining if provided; else fall back to parent's lease budget.
+      const parentTotals =
+        parentBudgetRemaining !== undefined
+          ? parentBudgetRemaining
+          : (() => {
+              const m = new Map<string, number>();
+              const parentPatterns = parent[cap] ?? [];
+              for (const p of parentPatterns) {
+                try {
+                  const { currency, amount } = parseBudgetAmount(p);
+                  m.set(currency, (m.get(currency) ?? 0) + amount);
+                } catch {
+                  return null;
+                }
+              }
+              return m;
+            })();
+      if (parentTotals === null) return false;
+      for (const [currency, total] of childTotals.entries()) {
+        const allowed = parentTotals.get(currency);
+        if (allowed === undefined || total > allowed) return false;
+      }
+      continue;
+    }
     const parentPatterns = parent[cap];
     if (parentPatterns === undefined || parentPatterns.length === 0)
       return false;
@@ -204,7 +321,7 @@ export function validateLeaseShape(lease: Lease): void {
   for (const cap of Object.keys(lease)) {
     if (!isValidCapabilityName(cap)) {
       throw new InvalidRequestError(
-        `Invalid capability name "${cap}"; must be one of the v1.0 reserved namespaces or "x-vendor.<vendor>.<cap>"`,
+        `Invalid capability name "${cap}"; must be one of the reserved namespaces or "x-vendor.<vendor>.<cap>"`,
         { details: { capability: cap } },
       );
     }
@@ -220,6 +337,17 @@ export function validateLeaseShape(lease: Lease): void {
           `Lease capability "${cap}" contains an empty or non-string pattern`,
         );
       }
+      // v1.1 §9.6: cost.budget patterns are amount strings, not globs.
+      if (cap === "cost.budget") {
+        try {
+          parseBudgetAmount(pattern);
+        } catch (err) {
+          throw new InvalidRequestError(
+            err instanceof Error ? err.message : String(err),
+            { details: { capability: cap, pattern } },
+          );
+        }
+      }
     }
   }
 }
@@ -227,9 +355,16 @@ export function validateLeaseShape(lease: Lease): void {
 /**
  * Assert that `child` is a subset of `parent`, raising
  * {@link LeaseSubsetViolationError} otherwise.
+ *
+ * v1.1: `parentBudgetRemaining` enforces §9.4 — at delegation time, the
+ * child's `cost.budget` MUST NOT exceed the parent's REMAINING budget.
  */
-export function assertLeaseSubset(child: Lease, parent: Lease): void {
-  if (!isLeaseSubset(child, parent)) {
+export function assertLeaseSubset(
+  child: Lease,
+  parent: Lease,
+  parentBudgetRemaining?: ReadonlyMap<string, number>,
+): void {
+  if (!isLeaseSubset(child, parent, parentBudgetRemaining)) {
     throw new LeaseSubsetViolationError(
       "Child lease is not a subset of parent lease",
       {
@@ -237,6 +372,72 @@ export function assertLeaseSubset(child: Lease, parent: Lease): void {
       },
     );
   }
+}
+
+/**
+ * v1.1 §9.4 / §9.5: assert child's `lease_constraints.expires_at` is at or
+ * before the parent's. A child with no `expires_at` inherits the parent's
+ * implicitly (the caller is responsible for that inheritance); this check
+ * only validates the explicit case.
+ */
+export function assertLeaseConstraintsSubset(
+  childConstraints: LeaseConstraints | undefined,
+  parentConstraints: LeaseConstraints | undefined,
+): void {
+  const childExpiry = childConstraints?.expires_at;
+  const parentExpiry = parentConstraints?.expires_at;
+  if (childExpiry === undefined) return;
+  if (parentExpiry === undefined) return;
+  const c = Date.parse(childExpiry);
+  const p = Date.parse(parentExpiry);
+  if (!Number.isFinite(c) || !Number.isFinite(p)) return;
+  if (c > p) {
+    throw new LeaseSubsetViolationError(
+      "Child lease_constraints.expires_at exceeds parent's expires_at",
+      {
+        details: {
+          child_expires_at: childExpiry,
+          parent_expires_at: parentExpiry,
+        },
+      },
+    );
+  }
+}
+
+/**
+ * v1.1 §9.5: validate a submitted `lease_constraints.expires_at` value.
+ * MUST be ISO 8601 UTC (`Z` suffix) and MUST be in the future.
+ *
+ * Returns the parsed millisecond timestamp; throws {@link InvalidRequestError}
+ * on malformed/past values.
+ */
+export function validateLeaseConstraints(
+  constraints: LeaseConstraints | undefined,
+  now: number = Date.now(),
+): number | null {
+  if (constraints === undefined) return null;
+  const expiresAt = constraints.expires_at;
+  if (expiresAt === undefined) return null;
+  if (!expiresAt.endsWith("Z")) {
+    throw new InvalidRequestError(
+      `lease_constraints.expires_at MUST be UTC (suffix "Z")`,
+      { details: { expires_at: expiresAt } },
+    );
+  }
+  const ms = Date.parse(expiresAt);
+  if (!Number.isFinite(ms)) {
+    throw new InvalidRequestError(
+      `lease_constraints.expires_at is not a valid ISO 8601 timestamp`,
+      { details: { expires_at: expiresAt } },
+    );
+  }
+  if (ms <= now) {
+    throw new InvalidRequestError(
+      `lease_constraints.expires_at MUST be in the future`,
+      { details: { expires_at: expiresAt, now } },
+    );
+  }
+  return ms;
 }
 
 export type { Lease };

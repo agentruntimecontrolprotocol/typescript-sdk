@@ -13,16 +13,21 @@ export {
   type JobContext,
   JobManager,
   makeJobContext,
+  type ResultStream,
 } from "./job.js";
 export {
+  assertLeaseConstraintsSubset,
   assertLeaseSubset,
   canonicalizeTarget,
   compileGlob,
+  initialBudgetFromLease,
   isLeaseSubset,
   isReservedCapabilityName,
   isValidCapabilityName,
   type Lease,
+  type LeaseOpContext,
   matchGlob,
+  validateLeaseConstraints,
   validateLeaseOp,
   validateLeaseShape,
 } from "./lease.js";

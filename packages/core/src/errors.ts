@@ -1,9 +1,13 @@
 import { z } from "zod";
 
 /**
- * Canonical ARCP v1.0 error codes (§12). Exactly these 12 — no more.
+ * Canonical ARCP error codes.
  *
- * @see ARCP v1.0 §12.
+ * v1.0 §12 specified 12 codes. v1.1 §12 adds three more
+ * (`AGENT_VERSION_NOT_AVAILABLE`, `LEASE_EXPIRED`, `BUDGET_EXHAUSTED`) for
+ * a total of 15.
+ *
+ * @see ARCP v1.1 §12.
  */
 export const ERROR_CODES = [
   "PERMISSION_DENIED",
@@ -11,10 +15,13 @@ export const ERROR_CODES = [
   "JOB_NOT_FOUND",
   "DUPLICATE_KEY",
   "AGENT_NOT_AVAILABLE",
+  "AGENT_VERSION_NOT_AVAILABLE",
   "CANCELLED",
   "TIMEOUT",
   "RESUME_WINDOW_EXPIRED",
   "HEARTBEAT_LOST",
+  "LEASE_EXPIRED",
+  "BUDGET_EXHAUSTED",
   "INVALID_REQUEST",
   "UNAUTHENTICATED",
   "INTERNAL_ERROR",
@@ -248,5 +255,52 @@ export class InternalError extends ARCPError {
   ) {
     super({ ...opts, code: "INTERNAL_ERROR", message });
     this.name = "InternalError";
+  }
+}
+
+/**
+ * v1.1 §12 `LEASE_EXPIRED`. The lease's `expires_at` was reached during
+ * execution. Always non-retryable — naive retry will fail identically.
+ */
+export class LeaseExpiredError extends ARCPError {
+  constructor(
+    message: string,
+    opts: Omit<ARCPErrorOptions, "message" | "code"> = {},
+  ) {
+    super({ retryable: false, ...opts, code: "LEASE_EXPIRED", message });
+    this.name = "LeaseExpiredError";
+  }
+}
+
+/**
+ * v1.1 §12 `BUDGET_EXHAUSTED`. A `cost.budget` counter reached zero or below.
+ * Always non-retryable — naive retry will fail identically.
+ */
+export class BudgetExhaustedError extends ARCPError {
+  constructor(
+    message: string,
+    opts: Omit<ARCPErrorOptions, "message" | "code"> = {},
+  ) {
+    super({ retryable: false, ...opts, code: "BUDGET_EXHAUSTED", message });
+    this.name = "BudgetExhaustedError";
+  }
+}
+
+/**
+ * v1.1 §12 `AGENT_VERSION_NOT_AVAILABLE`. The agent name resolved but the
+ * requested version is not registered. Always non-retryable.
+ */
+export class AgentVersionNotAvailableError extends ARCPError {
+  constructor(
+    message: string,
+    opts: Omit<ARCPErrorOptions, "message" | "code"> = {},
+  ) {
+    super({
+      retryable: false,
+      ...opts,
+      code: "AGENT_VERSION_NOT_AVAILABLE",
+      message,
+    });
+    this.name = "AgentVersionNotAvailableError";
   }
 }

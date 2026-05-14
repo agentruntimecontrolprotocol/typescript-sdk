@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   type BaseEnvelope,
   buildEnvelope,
@@ -19,23 +20,45 @@ import {
   type JobAcceptedPayload,
   type JobErrorPayload,
   type JobEventPayload,
+  type JobListEntry,
   type JobResultPayload,
+  type JobSubscribedPayload,
   jobErrorToErrorPayload,
   type Lease,
+  type LeaseConstraints,
+  type ResultChunkBody,
+  type SessionJobsPayload,
+  type SessionListJobsFilter,
   type SessionResume,
   type SessionWelcomePayload,
 } from "@arcp/core/messages";
 import { PendingRegistry, SessionState } from "@arcp/core/state";
 import type { Transport, WireFrame } from "@arcp/core/transport";
 import { Deferred, newMessageId } from "@arcp/core/util";
+import { intersectFeatures, V1_1_FEATURES } from "@arcp/core/version";
 
-// ARCP v1.0 client.
+// ARCP v1.1 client (additive over v1.0).
 //
 // Surface:
-//   - `connect(transport)`           → handshake, returns SessionWelcomePayload.
+//   - `connect(transport)`            → handshake, returns SessionWelcomePayload.
 //   - `submit({ agent, input, ... })` → sends job.submit, awaits job.accepted.
 //   - `cancelJob(jobId, { reason? })` → sends job.cancel.
-//   - `close(reason?)`               → sends session.bye then closes transport.
+//   - `close(reason?)`                → sends session.bye then closes transport.
+//   - v1.1: `ack(seq)`, `listJobs(filter, opts)`, `subscribe(jobId, opts)`.
+
+/**
+ * v1.1 §6.5 — automatic event acknowledgement options. When `true` or set,
+ * the client periodically emits `session.ack` with the highest observed
+ * `event_seq` to allow the runtime to free buffered events earlier than
+ * the time-based window.
+ *
+ * Coalescing: an ack is emitted at most every `intervalMs` (default 250)
+ * or after `minSeqDelta` new events (default 32), whichever comes first.
+ */
+export interface ClientAutoAckOptions {
+  intervalMs?: number;
+  minSeqDelta?: number;
+}
 
 export interface ARCPClientOptions {
   /** Client identity broadcast in `session.hello`. */
@@ -50,6 +73,17 @@ export interface ARCPClientOptions {
   logger?: Logger;
   /** Handshake timeout in milliseconds. Default 5000. */
   handshakeTimeoutMs?: number;
+  /**
+   * v1.1 §6.2 — feature flags this client advertises. Defaults to every v1.1
+   * feature. Provide a subset to negotiate a degraded set for testing.
+   */
+  features?: readonly string[];
+  /**
+   * v1.1 §6.5 — automatic `session.ack` emission. `true` enables defaults
+   * (250ms, 32 events). `false` disables auto-ack entirely. Default `false`
+   * (manual via {@link ARCPClient.ack}).
+   */
+  autoAck?: boolean | ClientAutoAckOptions;
 }
 
 /** Inbound-message handler on the client side. */
@@ -61,6 +95,10 @@ export type ClientHandler = (env: Envelope) => Promise<void> | void;
  * Resolve `done` to obtain the terminal `job.result.payload`; the promise
  * rejects with an {@link ARCPError} if the runtime emitted `job.error`
  * instead.
+ *
+ * v1.1: when the runtime streams the result via `result_chunk` events, the
+ * `done` payload carries `result_id` instead of an inline `result`. Use
+ * {@link JobHandle.collectChunks} to assemble the chunks.
  */
 export interface JobHandle {
   /** Server-assigned `job.accepted.payload.job_id`. */
@@ -69,8 +107,33 @@ export interface JobHandle {
   readonly lease: Lease;
   /** Trace id echoed by the runtime, if any. */
   readonly traceId: string | undefined;
+  /**
+   * Resolved agent identifier echoed by the runtime
+   * (v1.1 `name@version` form when versioning is in play).
+   */
+  readonly agent: string | undefined;
+  /** v1.1 — lease constraints echoed by the runtime. */
+  readonly leaseConstraints: LeaseConstraints | undefined;
+  /** v1.1 — initial budget echoed by the runtime. */
+  readonly budget: Readonly<Record<string, number>> | undefined;
   /** Promise that resolves to the final `job.result` payload. */
   readonly done: Promise<JobResultPayload>;
+  /**
+   * v1.1 §8.4 — assemble streamed chunks into a single buffer. Resolves
+   * after `done`. Throws if the job did not stream a chunked result.
+   */
+  collectChunks(): Promise<Buffer | string>;
+}
+
+/**
+ * v1.1 §7.6 — handle returned by {@link ARCPClient.subscribe}. Use
+ * {@link JobSubscription.unsubscribe} to release the subscription.
+ */
+export interface JobSubscription {
+  readonly jobId: string;
+  readonly subscribedFrom: number;
+  readonly replayed: boolean;
+  unsubscribe(): Promise<void>;
 }
 
 /**
@@ -78,7 +141,7 @@ export interface JobHandle {
  * plus client-side conveniences (`traceId`, `signal`).
  */
 export interface SubmitOptions {
-  /** Registered agent name on the runtime. */
+  /** Registered agent name (optionally `name@version`) on the runtime. */
   agent: string;
   /** Arbitrary JSON-serializable input forwarded to the agent. */
   input?: unknown;
@@ -87,6 +150,8 @@ export interface SubmitOptions {
    * Capability namespace → list of glob patterns.
    */
   lease?: Lease;
+  /** v1.1 §9.5 — lease constraints (currently `expires_at`). */
+  leaseConstraints?: LeaseConstraints;
   /**
    * Logical idempotency key (§7.2). Same `(principal, idempotencyKey)`
    * within the runtime's TTL returns the same `job_id`.
@@ -103,14 +168,19 @@ export interface SubmitOptions {
 interface InvocationState {
   jobId: string | null;
   lease: Lease | null;
+  agent: string | undefined;
+  leaseConstraints: LeaseConstraints | undefined;
+  budget: Record<string, number> | undefined;
   traceId: string | undefined;
   events: JobEventPayload[];
   acceptance: Deferred<JobAcceptedPayload>;
   completion: Deferred<JobResultPayload>;
+  /** v1.1 §8.4 — accumulated result chunks, keyed by result_id. */
+  chunks: Map<string, ResultChunkBody[]>;
 }
 
 /**
- * Client-side driver for an ARCP v1.0 session (§6).
+ * Client-side driver for an ARCP v1.1 session (§6).
  *
  * One client instance owns one transport and one session. After
  * {@link ARCPClient.connect} resolves, the session is in the `accepted`
@@ -136,11 +206,35 @@ export class ARCPClient {
   private readonly invocationsByJobId = new Map<string, InvocationState>();
   /** FIFO of in-flight submissions awaiting job.accepted (ordered binding). */
   private readonly pendingAccepts: InvocationState[] = [];
+  /** v1.1 §6.2 — negotiated feature set (intersection with runtime). */
+  private _negotiatedFeatures: readonly string[] = [];
+  /** v1.1 §6.6 — pending list_jobs requests keyed by envelope id. */
+  private readonly pendingLists = new Map<
+    string,
+    Deferred<SessionJobsPayload>
+  >();
+  /** v1.1 §7.6 — pending subscribe requests keyed by job_id. */
+  private readonly pendingSubscribes = new Map<
+    string,
+    Deferred<JobSubscribedPayload>
+  >();
+  /** v1.1 §6.5 — auto-ack scheduler state. */
+  private autoAckOpts: { intervalMs: number; minSeqDelta: number } | null =
+    null;
+  private autoAckTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastAckedSeq = 0;
 
   public constructor(public readonly options: ARCPClientOptions) {
     this.logger =
       options.logger ?? rootLogger.child({ component: "arcp-client" });
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 5000;
+    if (options.autoAck !== undefined && options.autoAck !== false) {
+      const o = options.autoAck === true ? {} : options.autoAck;
+      this.autoAckOpts = {
+        intervalMs: o.intervalMs ?? 250,
+        minSeqDelta: o.minSeqDelta ?? 32,
+      };
+    }
   }
 
   public get lastEventSeqObserved(): number {
@@ -149,6 +243,16 @@ export class ARCPClient {
 
   public get welcomePayload(): SessionWelcomePayload | null {
     return this.welcome;
+  }
+
+  /** v1.1 — features negotiated with the runtime (intersection). */
+  public get negotiatedFeatures(): readonly string[] {
+    return this._negotiatedFeatures;
+  }
+
+  /** v1.1 — check whether a feature is in the negotiated set. */
+  public hasFeature(name: string): boolean {
+    return this._negotiatedFeatures.includes(name);
   }
 
   /**
@@ -196,6 +300,18 @@ export class ARCPClient {
       }
     });
 
+    // v1.1 §6.2 — advertise features. If the consumer didn't supply a
+    // `capabilities` block, build one with our default features. If they
+    // did, augment with `features` (unless they explicitly set it).
+    const advertisedFeatures = this.options.features ?? V1_1_FEATURES;
+    const baseCaps: Capabilities = { ...(this.options.capabilities ?? {}) };
+    if (baseCaps.features === undefined && advertisedFeatures.length > 0) {
+      baseCaps.features = [...advertisedFeatures];
+    }
+    if (baseCaps.encodings === undefined) {
+      baseCaps.encodings = ["json"];
+    }
+
     const helloId = newMessageId();
     const helloEnv = buildEnvelope({
       id: helloId,
@@ -208,9 +324,7 @@ export class ARCPClient {
             ? { token: this.options.token }
             : {}),
         },
-        ...(this.options.capabilities !== undefined
-          ? { capabilities: this.options.capabilities }
-          : {}),
+        capabilities: baseCaps,
         ...(resume !== undefined ? { resume } : {}),
       },
     });
@@ -227,6 +341,11 @@ export class ARCPClient {
       this.welcome = welcome;
       this.state.assignCapabilities(welcome.capabilities);
       this.state.transition("accepted");
+      // v1.1 — store the negotiated feature set (intersection).
+      this._negotiatedFeatures = intersectFeatures(
+        advertisedFeatures,
+        welcome.capabilities.features,
+      );
       return welcome;
     } finally {
       clearTimeout(timeout);
@@ -258,6 +377,18 @@ export class ARCPClient {
     this.invocationsByOriginId.clear();
     this.invocationsByJobId.clear();
     this.pendingAccepts.length = 0;
+    for (const d of this.pendingLists.values()) {
+      d.reject(new CancelledError("Client closing"));
+    }
+    this.pendingLists.clear();
+    for (const d of this.pendingSubscribes.values()) {
+      d.reject(new CancelledError("Client closing"));
+    }
+    this.pendingSubscribes.clear();
+    if (this.autoAckTimer !== null) {
+      clearTimeout(this.autoAckTimer);
+      this.autoAckTimer = null;
+    }
     if (this.transport === null) return;
     const sessionId = this.state.id;
     if (sessionId !== undefined && this.state.isAccepted) {
@@ -299,6 +430,9 @@ export class ARCPClient {
         agent: opts.agent,
         input: opts.input,
         ...(opts.lease !== undefined ? { lease_request: opts.lease } : {}),
+        ...(opts.leaseConstraints !== undefined
+          ? { lease_constraints: opts.leaseConstraints }
+          : {}),
         ...(opts.idempotencyKey !== undefined
           ? { idempotency_key: opts.idempotencyKey }
           : {}),
@@ -315,10 +449,14 @@ export class ARCPClient {
     const invocation: InvocationState = {
       jobId: null,
       lease: null,
+      agent: undefined,
+      leaseConstraints: undefined,
+      budget: undefined,
       traceId: opts.traceId,
       events: [],
       acceptance: new Deferred<JobAcceptedPayload>(),
       completion: new Deferred<JobResultPayload>(),
+      chunks: new Map(),
     };
     // Mute unhandled-rejection on `completion` — callers consume it via
     // `handle.done`. If the submit rejects pre-handle (e.g. AGENT_NOT_AVAILABLE
@@ -374,6 +512,128 @@ export class ARCPClient {
     await this.transport.send(env);
   }
 
+  /**
+   * v1.1 §6.5 — manually acknowledge that events with `event_seq ≤ seq` have
+   * been processed. The runtime MAY free buffered events earlier than the
+   * resume window. This is purely advisory and does not affect resume
+   * semantics.
+   */
+  public async ack(seq: number): Promise<void> {
+    if (!this.hasFeature("ack")) {
+      throw new InvalidRequestError(
+        "session.ack requires the 'ack' feature to be negotiated",
+      );
+    }
+    if (this.transport === null)
+      throw new InvalidRequestError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined)
+      throw new InvalidRequestError("session has no id");
+    const env = buildEnvelope({
+      id: newMessageId(),
+      type: "session.ack" as const,
+      payload: { last_processed_seq: seq },
+      optional: { session_id: sessionId },
+    });
+    await this.transport.send(env);
+    if (seq > this.lastAckedSeq) this.lastAckedSeq = seq;
+  }
+
+  /**
+   * v1.1 §6.6 — request a read-only inventory of jobs accessible in this
+   * session. Returns a single page; pass `cursor: result.nextCursor` to
+   * fetch additional pages.
+   */
+  public async listJobs(
+    filter?: SessionListJobsFilter,
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<{ jobs: JobListEntry[]; nextCursor: string | null }> {
+    if (!this.hasFeature("list_jobs")) {
+      throw new InvalidRequestError(
+        "session.list_jobs requires the 'list_jobs' feature to be negotiated",
+      );
+    }
+    if (this.transport === null)
+      throw new InvalidRequestError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined)
+      throw new InvalidRequestError("session has no id");
+    const id = newMessageId();
+    const deferred = new Deferred<SessionJobsPayload>();
+    this.pendingLists.set(id, deferred);
+    const env = buildEnvelope({
+      id,
+      type: "session.list_jobs" as const,
+      payload: {
+        ...(filter !== undefined ? { filter } : {}),
+        ...(opts.limit !== undefined ? { limit: opts.limit } : {}),
+        ...(opts.cursor !== undefined ? { cursor: opts.cursor } : {}),
+      },
+      optional: { session_id: sessionId },
+    });
+    await this.transport.send(env);
+    const resp = await deferred.promise;
+    return { jobs: resp.jobs, nextCursor: resp.next_cursor };
+  }
+
+  /**
+   * v1.1 §7.6 — subscribe to a job by id, optionally replaying buffered
+   * history. The returned {@link JobSubscription} exposes `unsubscribe()`;
+   * events for the subscribed job arrive via the usual handlers
+   * (`client.on("job.event", ...)`) as they would for any in-session job.
+   */
+  public async subscribe(
+    jobId: string,
+    opts: { history?: boolean; fromEventSeq?: number } = {},
+  ): Promise<JobSubscription> {
+    if (!this.hasFeature("subscribe")) {
+      throw new InvalidRequestError(
+        "job.subscribe requires the 'subscribe' feature to be negotiated",
+      );
+    }
+    if (this.transport === null)
+      throw new InvalidRequestError("Client not connected");
+    const sessionId = this.state.id;
+    if (sessionId === undefined)
+      throw new InvalidRequestError("session has no id");
+    const deferred = new Deferred<JobSubscribedPayload>();
+    this.pendingSubscribes.set(jobId, deferred);
+    const id = newMessageId();
+    const env = buildEnvelope({
+      id,
+      type: "job.subscribe" as const,
+      payload: {
+        job_id: jobId,
+        ...(opts.history !== undefined ? { history: opts.history } : {}),
+        ...(opts.fromEventSeq !== undefined
+          ? { from_event_seq: opts.fromEventSeq }
+          : {}),
+      },
+      optional: { session_id: sessionId },
+    });
+    await this.transport.send(env);
+    const ack = await deferred.promise;
+    return {
+      jobId,
+      subscribedFrom: ack.subscribed_from,
+      replayed: ack.replayed,
+      unsubscribe: async () => {
+        if (this.transport === null) return;
+        const env = buildEnvelope({
+          id: newMessageId(),
+          type: "job.unsubscribe" as const,
+          payload: { job_id: jobId },
+          optional: { session_id: sessionId },
+        });
+        try {
+          await this.transport.send(env);
+        } catch {
+          // best-effort
+        }
+      },
+    };
+  }
+
   // -------------------------------------------------------------------
 
   private async dispatchRaw(frame: WireFrame): Promise<void> {
@@ -413,7 +673,42 @@ export class ARCPClient {
           if (!inv.acceptance.settled) inv.acceptance.reject(err);
           if (!inv.completion.settled) inv.completion.reject(err);
         }
+        for (const d of this.pendingLists.values()) {
+          if (!d.settled) d.reject(err);
+        }
+        for (const d of this.pendingSubscribes.values()) {
+          if (!d.settled) d.reject(err);
+        }
       }
+      return;
+    }
+
+    // v1.1 §6.4 — respond to inbound session.ping with session.pong.
+    if (parsed.type === "session.ping") {
+      const result = EnvelopeSchema.safeParse(parsed);
+      if (result.success && result.data.type === "session.ping") {
+        const sessionId = this.state.id;
+        if (sessionId !== undefined && this.transport !== null) {
+          const pongEnv = buildEnvelope({
+            id: newMessageId(),
+            type: "session.pong" as const,
+            payload: {
+              ping_nonce: result.data.payload.nonce,
+              received_at: new Date().toISOString(),
+            },
+            optional: { session_id: sessionId },
+          });
+          try {
+            await this.transport.send(pongEnv);
+          } catch {
+            // best-effort
+          }
+        }
+      }
+      return;
+    }
+    if (parsed.type === "session.pong") {
+      // No-op on the client side beyond updating activity.
       return;
     }
 
@@ -431,7 +726,28 @@ export class ARCPClient {
     // Track event_seq for resume.
     if (env.event_seq !== undefined && env.event_seq > this.lastEventSeq) {
       this.lastEventSeq = env.event_seq;
+      this.scheduleAutoAck();
     }
+    // v1.1 §6.6 — session.jobs (response to list_jobs).
+    if (env.type === "session.jobs") {
+      const reqId = env.payload.request_id;
+      const deferred = this.pendingLists.get(reqId);
+      if (deferred !== undefined) {
+        this.pendingLists.delete(reqId);
+        deferred.resolve(env.payload);
+        return;
+      }
+    }
+    // v1.1 §7.6 — job.subscribed (response to subscribe).
+    if (env.type === "job.subscribed" && env.job_id !== undefined) {
+      const d = this.pendingSubscribes.get(env.job_id);
+      if (d !== undefined) {
+        this.pendingSubscribes.delete(env.job_id);
+        d.resolve(env.payload);
+        return;
+      }
+    }
+
     this.routeJobEvent(env);
     const handler = this.handlers.get(env.type);
     if (handler !== undefined) {
@@ -448,6 +764,34 @@ export class ARCPClient {
     );
   }
 
+  private scheduleAutoAck(): void {
+    if (this.autoAckOpts === null) return;
+    if (!this.hasFeature("ack")) return;
+    const { intervalMs, minSeqDelta } = this.autoAckOpts;
+    const delta = this.lastEventSeq - this.lastAckedSeq;
+    if (delta >= minSeqDelta) {
+      // Fire immediately (still async-safe).
+      void this.flushAutoAck().catch(() => undefined);
+      return;
+    }
+    if (this.autoAckTimer !== null) return;
+    this.autoAckTimer = setTimeout(() => {
+      this.autoAckTimer = null;
+      void this.flushAutoAck().catch(() => undefined);
+    }, intervalMs);
+    this.autoAckTimer.unref();
+  }
+
+  private async flushAutoAck(): Promise<void> {
+    if (this.lastEventSeq <= this.lastAckedSeq) return;
+    if (!this.hasFeature("ack")) return;
+    try {
+      await this.ack(this.lastEventSeq);
+    } catch {
+      // best-effort
+    }
+  }
+
   private routeJobEvent(env: Envelope): void {
     if (env.type === "job.accepted") {
       // Bind to the oldest still-pending submit. Register the invocation in
@@ -459,6 +803,9 @@ export class ARCPClient {
         const payload = env.payload as JobAcceptedPayload;
         inv.jobId = payload.job_id;
         inv.lease = payload.lease;
+        inv.agent = payload.agent;
+        inv.leaseConstraints = payload.lease_constraints;
+        inv.budget = payload.budget;
         inv.traceId = payload.trace_id ?? inv.traceId;
         this.invocationsByJobId.set(payload.job_id, inv);
         inv.acceptance.resolve(payload);
@@ -467,7 +814,20 @@ export class ARCPClient {
     }
     if (env.type === "job.event" && env.job_id !== undefined) {
       const inv = this.invocationsByJobId.get(env.job_id);
-      if (inv !== undefined) inv.events.push(env.payload as JobEventPayload);
+      if (inv !== undefined) {
+        const ep = env.payload as JobEventPayload;
+        inv.events.push(ep);
+        // v1.1 §8.4 — accumulate result_chunk bodies for later assembly.
+        if (ep.kind === "result_chunk") {
+          const body = ep.body as ResultChunkBody;
+          let bucket = inv.chunks.get(body.result_id);
+          if (bucket === undefined) {
+            bucket = [];
+            inv.chunks.set(body.result_id, bucket);
+          }
+          bucket.push(body);
+        }
+      }
       return;
     }
     if (env.type === "job.result" && env.job_id !== undefined) {
@@ -510,10 +870,39 @@ function makeHandleFromInvocation(inv: InvocationState): JobHandle {
     get lease() {
       return inv.lease ?? {};
     },
+    get agent() {
+      return inv.agent;
+    },
+    get leaseConstraints() {
+      return inv.leaseConstraints;
+    },
+    get budget() {
+      return inv.budget;
+    },
     get traceId() {
       return inv.traceId;
     },
     done: inv.completion.promise,
+    async collectChunks(): Promise<Buffer | string> {
+      const result = await inv.completion.promise;
+      const resultId = result.result_id;
+      if (resultId === undefined) {
+        throw new InvalidRequestError(
+          "job.result has no result_id; no chunks to collect",
+        );
+      }
+      const chunks = inv.chunks.get(resultId);
+      if (chunks === undefined || chunks.length === 0) {
+        return "";
+      }
+      const sorted = [...chunks].sort((a, b) => a.chunk_seq - b.chunk_seq);
+      const encoding = sorted[0]?.encoding ?? "utf8";
+      if (encoding === "base64") {
+        const buffers = sorted.map((c) => Buffer.from(c.data, "base64"));
+        return Buffer.concat(buffers);
+      }
+      return sorted.map((c) => c.data).join("");
+    },
   };
 }
 
@@ -527,3 +916,6 @@ export function asEnvelopeOfType<T extends Envelope["type"]>(
 ): Extract<Envelope, { type: T }> | null {
   return env.type === type ? (env as Extract<Envelope, { type: T }>) : null;
 }
+
+// Silence unused — re-exported for future timers.
+void randomBytes;

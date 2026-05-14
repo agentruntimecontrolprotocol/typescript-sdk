@@ -178,6 +178,22 @@ function extractAttributes(
       const caps = Object.keys(lease as Record<string, unknown>);
       if (caps.length > 0) attrs["arcp.lease.capabilities"] = caps.join(",");
     }
+    // v1.1 §11 — surface lease expiration when present.
+    const constraints = p["lease_constraints"];
+    if (typeof constraints === "object" && constraints !== null) {
+      const ea = (constraints as Record<string, unknown>)["expires_at"];
+      if (typeof ea === "string") attrs["arcp.lease.expires_at"] = ea;
+    }
+    // v1.1 §11 — surface the initial / declared budget as a JSON-string
+    // record so per-currency totals are preserved.
+    const budget = p["budget"];
+    if (typeof budget === "object" && budget !== null) {
+      try {
+        attrs["arcp.budget.remaining"] = JSON.stringify(budget);
+      } catch {
+        // best-effort
+      }
+    }
   }
   return attrs;
 }

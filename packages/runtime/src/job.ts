@@ -16,8 +16,11 @@ import type {
   JobResultPayload,
   JobStateName,
   Lease,
+  LeaseConstraints,
   LogPayload,
   MetricPayload,
+  ProgressBody,
+  ResultChunkBody,
   StatusBody,
   ThoughtBody,
   ToolCallBody,
@@ -74,8 +77,14 @@ export interface JobOptions {
   sessionId: string;
   /** Agent name handling the job. */
   agent: string;
+  /** v1.1 §7.5 — resolved agent version. May be null when no version is registered. */
+  agentVersion?: string | null;
   /** Immutable effective lease (§9.1) — already a subset of the request. */
   lease: Lease;
+  /** v1.1 §9.5 — lease constraints (currently `expires_at`). */
+  leaseConstraints?: LeaseConstraints | undefined;
+  /** v1.1 §9.6 — initial per-currency budget counters. */
+  initialBudget?: ReadonlyMap<string, number> | undefined;
   /** Parent job id when this is a delegated child (§10). */
   parentJobId?: string;
   /** Delegate id assigned by the parent in its `delegate` event (§10). */
@@ -100,12 +109,39 @@ export class Job {
   public readonly jobId: string;
   public readonly sessionId: string;
   public readonly agent: string;
+  /** v1.1 §7.5 — resolved version, or null if none was advertised. */
+  public readonly agentVersion: string | null;
   public readonly lease: Lease;
+  public readonly leaseConstraints: LeaseConstraints | undefined;
+  /** v1.1 §9.6 — mutable per-currency budget counters. */
+  public readonly budget: Map<string, number>;
+  /** v1.1 §9.6 — initial budget for inclusion in `job.accepted`. */
+  public readonly initialBudget: Map<string, number>;
   public readonly parentJobId: string | undefined;
   public readonly delegateId: string | undefined;
   public readonly traceId: string | undefined;
+  /** Timestamp at which the job was constructed (for §6.6 listing). */
+  public readonly createdAt: string = nowTimestamp();
+  /**
+   * v1.1 §6.6 / §7.6 — the principal that submitted this job. Used to scope
+   * cross-session observation (`session.list_jobs`, `job.subscribe`). Set by
+   * the runtime on job creation.
+   */
+  public submitterPrincipal: string | undefined = undefined;
+  /**
+   * v1.1 §7.6 — the session that owns the job's event stream (i.e., the
+   * submitter's session). Subscribers tap this session's event log for
+   * history replay. Set by the runtime on job creation; typed as `unknown`
+   * to avoid an import cycle, but in practice is a `SessionContext`.
+   */
+  public owningSession: { state: { id: string | undefined } } | undefined =
+    undefined;
   public state: JobStateName = "pending";
   public readonly abortController = new AbortController();
+  /** v1.1 §8.4 — set true after the first `result_chunk` event is emitted. */
+  public chunkedResultStarted = false;
+  /** Track last-emitted remaining per currency for chatty-emit debounce. */
+  private readonly lastEmittedRemaining = new Map<string, number>();
 
   private missedHeartbeats = 0;
   private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
@@ -121,12 +157,67 @@ export class Job {
     this.jobId = options.jobId ?? newJobId();
     this.sessionId = options.sessionId;
     this.agent = options.agent;
+    this.agentVersion = options.agentVersion ?? null;
     this.lease = options.lease;
+    this.leaseConstraints = options.leaseConstraints;
+    this.initialBudget = new Map(options.initialBudget ?? []);
+    this.budget = new Map(options.initialBudget ?? []);
     this.parentJobId = options.parentJobId;
     this.delegateId = options.delegateId;
     this.traceId = options.traceId;
     this.heartbeatIntervalMs = options.heartbeatIntervalSeconds * 1000;
     this.missesAllowed = options.missedHeartbeatsAllowed ?? 2;
+  }
+
+  /** Wire-form `agent` string: `name@version` if a version is set, else bare name. */
+  public get agentRef(): string {
+    return this.agentVersion === null
+      ? this.agent
+      : `${this.agent}@${this.agentVersion}`;
+  }
+
+  /**
+   * v1.1 §9.6: decrement the matching budget counter from a `metric` event
+   * whose name begins with `cost.` and whose unit matches a budgeted
+   * currency. Returns the new remaining value, or `null` if no counter is
+   * affected. Negative values are ignored.
+   */
+  public applyCostMetric(
+    name: string,
+    value: number,
+    unit: string | undefined,
+  ): number | null {
+    if (!name.startsWith("cost.")) return null;
+    if (name === "cost.budget.remaining") return null;
+    if (unit === undefined) return null;
+    if (!Number.isFinite(value) || value < 0) return null;
+    const current = this.budget.get(unit);
+    if (current === undefined) return null;
+    const next = current - value;
+    this.budget.set(unit, next);
+    return next;
+  }
+
+  /**
+   * Whether to emit a debounced `cost.budget.remaining` metric for `currency`.
+   * Only emits when the remaining has changed by ≥5% of the initial budget
+   * since the last emit (or on first emission).
+   */
+  public shouldEmitBudgetRemaining(currency: string): boolean {
+    const remaining = this.budget.get(currency);
+    if (remaining === undefined) return false;
+    const initial = this.initialBudget.get(currency) ?? 0;
+    const last = this.lastEmittedRemaining.get(currency);
+    if (last === undefined) {
+      this.lastEmittedRemaining.set(currency, remaining);
+      return true;
+    }
+    const threshold = initial * 0.05;
+    if (Math.abs(last - remaining) >= threshold || remaining <= 0) {
+      this.lastEmittedRemaining.set(currency, remaining);
+      return true;
+    }
+    return false;
   }
 
   public get signal(): AbortSignal {
@@ -185,13 +276,24 @@ export class Job {
 
   /** Emit `job.accepted`. Does NOT carry `event_seq`. */
   public async emitAccepted(): Promise<void> {
+    const budgetObj: Record<string, number> = {};
+    let hasBudget = false;
+    for (const [k, v] of this.initialBudget.entries()) {
+      budgetObj[k] = v;
+      hasBudget = true;
+    }
     const env = buildEnvelope({
       id: newMessageId(),
       type: "job.accepted" as const,
       payload: {
         job_id: this.jobId,
+        agent: this.agentRef,
         lease: this.lease,
-        accepted_at: nowTimestamp(),
+        ...(this.leaseConstraints !== undefined
+          ? { lease_constraints: this.leaseConstraints }
+          : {}),
+        ...(hasBudget ? { budget: budgetObj } : {}),
+        accepted_at: this.createdAt,
         ...(this.parentJobId !== undefined
           ? { parent_job_id: this.parentJobId }
           : {}),
@@ -218,10 +320,15 @@ export class Job {
 
   /**
    * Emit a `job.event` with a specific kind and body. Stamps `event_seq`.
+   *
+   * v1.1: tracks `chunkedResultStarted` when a `result_chunk` body is
+   * emitted, so the terminal `job.result` enforcement can reject mixing
+   * inline result with chunks (§8.4).
    */
   public async emitEventKind(kind: string, body: unknown): Promise<void> {
     if (this.isTerminal) return;
     this.markHeartbeat();
+    if (kind === "result_chunk") this.chunkedResultStarted = true;
     const env = buildEnvelope({
       id: newMessageId(),
       type: "job.event" as const,
@@ -236,9 +343,27 @@ export class Job {
     await this.send(env);
   }
 
-  /** Emit `job.result` (success terminal). Stamps `event_seq`. */
+  /**
+   * Emit `job.result` (success terminal). Stamps `event_seq`.
+   *
+   * v1.1 §8.4: if `result_chunk` events have been emitted on this job, the
+   * terminating `job.result` MUST carry `result_id` and MUST NOT carry an
+   * inline `result` value.
+   */
   public async emitResult(result: JobResultPayload): Promise<void> {
     if (this.isTerminal) return;
+    if (this.chunkedResultStarted) {
+      if (result.result_id === undefined) {
+        throw new InvalidRequestError(
+          "job.result MUST carry result_id when result_chunk events were emitted",
+        );
+      }
+      if (result.result !== undefined) {
+        throw new InvalidRequestError(
+          "job.result MUST NOT carry inline `result` when result_chunk events were emitted",
+        );
+      }
+    }
     this.transition("success");
     this.disarmWatchdog();
     const env = buildEnvelope({
@@ -376,15 +501,50 @@ export class JobManager {
  * (§8.2), plus {@link JobContext.emitEvent} for `x-vendor.*` kinds.
  * All emit methods stamp the session-scoped `event_seq` automatically.
  */
+/**
+ * v1.1 streamed-result writer (§8.4). Push chunks with {@link write}; call
+ * {@link finalize} to emit the terminating `job.result` payload. The runtime
+ * generates `result_id`/`chunk_seq` automatically.
+ */
+export interface ResultStream {
+  /** Stable identifier for the assembled result. */
+  readonly resultId: string;
+  /** Push one chunk. `more: false` is set by {@link finalize}. */
+  write(data: string, opts?: { encoding?: "utf8" | "base64" }): Promise<void>;
+  /**
+   * Emit the final chunk (if `data` is provided) and the terminating
+   * `job.result` carrying `result_id`. Returns the assembled byte count.
+   */
+  finalize(
+    data?: string,
+    opts?: {
+      encoding?: "utf8" | "base64";
+      summary?: string;
+      resultSize?: number;
+    },
+  ): Promise<void>;
+}
+
 export interface JobContext {
   /** Server-assigned job id. */
   readonly jobId: string;
   /** Owning session id. */
   readonly sessionId: string;
-  /** Agent name handling this job. */
+  /** Agent name handling this job (bare name). */
   readonly agent: string;
+  /** v1.1 §7.5 — resolved agent version, or null when unversioned. */
+  readonly agentVersion: string | null;
+  /** Wire-form agent reference (`name@version` or bare `name`). */
+  readonly agentRef: string;
   /** Immutable effective lease (§9.1). */
   readonly lease: Lease;
+  /** v1.1 §9.5 — lease constraints (currently `expires_at`). */
+  readonly leaseConstraints: LeaseConstraints | undefined;
+  /**
+   * v1.1 §9.6 — read-only snapshot of remaining per-currency budget. Re-read
+   * after `cost.*` metrics fire to observe decrements.
+   */
+  readonly budget: ReadonlyMap<string, number>;
   /** W3C trace id (§11). */
   readonly traceId: string | undefined;
   /** Abort signal — fires on `job.cancel` or grace-expired termination. */
@@ -413,6 +573,28 @@ export interface JobContext {
   /** Emit a `delegate` job event (§10). Runtime intercepts and spawns the child. */
   delegate(body: DelegateBody): Promise<void>;
 
+  /**
+   * v1.1 §8.2.1: emit a `progress` event. Advisory — the protocol does not
+   * act on progress events.
+   */
+  progress(
+    current: number,
+    opts?: { total?: number; units?: string; message?: string },
+  ): Promise<void>;
+
+  /**
+   * v1.1 §8.4: emit a single `result_chunk` event. Prefer
+   * {@link streamResult} which manages `result_id`/`chunk_seq` for you.
+   */
+  resultChunk(body: ResultChunkBody): Promise<void>;
+
+  /**
+   * v1.1 §8.4: open a chunked-result writer. The agent pushes chunks via
+   * {@link ResultStream.write} and emits the terminal `job.result` via
+   * {@link ResultStream.finalize}.
+   */
+  streamResult(opts?: { resultId?: string }): ResultStream;
+
   /** Emit any other event kind (including `x-vendor.*`) with a raw body. */
   emitEvent(kind: string, body: unknown): Promise<void>;
 }
@@ -423,7 +605,11 @@ export function makeJobContext(job: Job): JobContext {
     jobId: job.jobId,
     sessionId: job.sessionId,
     agent: job.agent,
+    agentVersion: job.agentVersion,
+    agentRef: job.agentRef,
     lease: job.lease,
+    leaseConstraints: job.leaseConstraints,
+    budget: job.budget,
     traceId: job.traceId,
     signal: job.signal,
     logger: job.logger,
@@ -459,8 +645,78 @@ export function makeJobContext(job: Job): JobContext {
     async delegate(body) {
       await job.emitEventKind("delegate", body);
     },
+    async progress(current, opts) {
+      const body: ProgressBody = {
+        current,
+        ...(opts?.total !== undefined ? { total: opts.total } : {}),
+        ...(opts?.units !== undefined ? { units: opts.units } : {}),
+        ...(opts?.message !== undefined ? { message: opts.message } : {}),
+      };
+      await job.emitEventKind("progress", body);
+    },
+    async resultChunk(body) {
+      await job.emitEventKind("result_chunk", body);
+    },
+    streamResult(opts) {
+      return makeResultStream(job, opts?.resultId);
+    },
     async emitEvent(kind, body) {
       await job.emitEventKind(kind, body);
+    },
+  };
+}
+
+function makeResultStream(job: Job, resultIdIn?: string): ResultStream {
+  const resultId = resultIdIn ?? `res_${newJobId().replace(/^job_/, "")}`;
+  let chunkSeq = 0;
+  let finalized = false;
+  return {
+    resultId,
+    async write(data, opts) {
+      if (finalized) {
+        throw new InvalidRequestError(
+          "ResultStream: cannot write after finalize",
+        );
+      }
+      await job.emitEventKind("result_chunk", {
+        result_id: resultId,
+        chunk_seq: chunkSeq++,
+        data,
+        encoding: opts?.encoding ?? "utf8",
+        more: true,
+      } satisfies ResultChunkBody);
+    },
+    async finalize(data, opts) {
+      if (finalized) {
+        throw new InvalidRequestError("ResultStream: already finalized");
+      }
+      finalized = true;
+      if (data !== undefined) {
+        await job.emitEventKind("result_chunk", {
+          result_id: resultId,
+          chunk_seq: chunkSeq++,
+          data,
+          encoding: opts?.encoding ?? "utf8",
+          more: false,
+        } satisfies ResultChunkBody);
+      } else if (chunkSeq > 0) {
+        // Emit a terminal empty chunk to mark `more: false`.
+        await job.emitEventKind("result_chunk", {
+          result_id: resultId,
+          chunk_seq: chunkSeq++,
+          data: "",
+          encoding: opts?.encoding ?? "utf8",
+          more: false,
+        } satisfies ResultChunkBody);
+      }
+      await job.emitResult({
+        final_status: "success",
+        result_id: resultId,
+        ...(opts?.summary !== undefined ? { summary: opts.summary } : {}),
+        ...(opts?.resultSize !== undefined
+          ? { result_size: opts.resultSize }
+          : {}),
+      });
     },
   };
 }

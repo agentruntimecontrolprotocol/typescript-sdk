@@ -17,8 +17,10 @@ export {
 } from "./envelope.js";
 export {
   AgentNotAvailableError,
+  AgentVersionNotAvailableError,
   ARCPError,
   type ARCPErrorOptions,
+  BudgetExhaustedError,
   CancelledError,
   DuplicateKeyError,
   ERROR_CODES,
@@ -31,6 +33,7 @@ export {
   isErrorCode,
   isRetryableByDefault,
   JobNotFoundError,
+  LeaseExpiredError,
   LeaseSubsetViolationError,
   PermissionDeniedError,
   ResumeWindowExpiredError,
@@ -60,6 +63,9 @@ export * from "./transport/index.js";
 export * from "./util/index.js";
 export {
   IMPL_VERSION,
+  intersectFeatures,
   isCompatibleVersion,
   PROTOCOL_VERSION,
+  V1_1_FEATURES,
+  type V1_1_Feature,
 } from "./version.js";

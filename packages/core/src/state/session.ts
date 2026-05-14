@@ -132,11 +132,22 @@ export function negotiateCapabilities(
   } else if (runtimeEncodings !== undefined) {
     out.encodings = runtimeEncodings;
   }
-  if (Array.isArray(runtime.agents)) {
-    out.agents = runtime.agents;
+  if (Array.isArray(runtime.agents) || Array.isArray(c.agents)) {
+    // Runtime owns the agent inventory; client never advertises agents.
+    if (Array.isArray(runtime.agents)) {
+      out.agents = runtime.agents;
+    }
+  }
+  // v1.1 §6.2 — `features` is the negotiated intersection. The runtime is
+  // authoritative for what *it* supports; the welcome MUST advertise only
+  // what is in both lists. Use the runtime side as the truth.
+  if (Array.isArray(runtime.features)) {
+    out.features = runtime.features;
+  } else if (Array.isArray(c.features)) {
+    out.features = c.features;
   }
   // Round-trip vendor-prefixed keys from either side.
-  const known = new Set(["encodings", "agents"]);
+  const known = new Set(["encodings", "agents", "features"]);
   for (const k of Object.keys(c)) {
     if (known.has(k)) continue;
     (out as Record<string, unknown>)[k] = (c as Record<string, unknown>)[k];
