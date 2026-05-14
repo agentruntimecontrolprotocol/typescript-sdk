@@ -21,6 +21,20 @@ packages, all ESM, all strictly typed against TypeScript 5.6 with
   <img alt="ARCP TypeScript SDK architecture" src="./diagrams/architecture-light.svg">
 </picture>
 
+## Documentation
+
+Full docs live in [`docs/`](./docs/). Start with
+[getting-started](./docs/getting-started.md) or jump to a guide:
+
+| Guide | Spec | | Guide | Spec |
+| --- | --- | --- | --- | --- |
+| [Sessions](./docs/guides/sessions.md) | §6 | | [Delegation](./docs/guides/delegation.md) | §10 |
+| [Resume](./docs/guides/resume.md) | §6.3 | | [Observability](./docs/guides/observability.md) | §11 |
+| [Authentication](./docs/guides/auth.md) | §6.1 | | [Errors](./docs/guides/errors.md) | §12 |
+| [Jobs](./docs/guides/jobs.md) | §7 | | [Vendor extensions](./docs/guides/vendor-extensions.md) | §15 |
+| [Job events](./docs/guides/job-events.md) | §8 | | [Recipes](./docs/recipes.md) | — |
+| [Leases](./docs/guides/leases.md) | §9 | | [Troubleshooting](./docs/troubleshooting.md) | — |
+
 ## Install
 
 | Install         | When to use                                                                                       |
