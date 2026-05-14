@@ -30,6 +30,9 @@ export class StaticBearerVerifier implements BearerVerifier {
     private readonly tokens: ReadonlyMap<string, BearerIdentity>,
   ) {}
 
+  // Synchronous lookup, but `BearerVerifier.verify` is contractually async so
+  // alternative implementations can be backed by JWKS/HTTP.
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async verify(token: string): Promise<BearerIdentity> {
     const identity = this.tokens.get(token);
     if (identity === undefined) {

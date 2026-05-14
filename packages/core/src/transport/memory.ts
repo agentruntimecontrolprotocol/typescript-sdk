@@ -1,10 +1,6 @@
 import { InvalidRequestError } from "../errors.js";
-import type {
-  FrameHandler,
-  SendableFrame,
-  Transport,
-  WireFrame,
-} from "./base.js";
+
+import type { FrameHandler, SendableFrame, Transport } from "./base.js";
 
 /**
  * Two transports sharing a Promise-coupled queue. Used by tests to drive a
@@ -65,7 +61,7 @@ export class MemoryTransport implements Transport {
     if (this.isClosed) return;
     this.isClosed = true;
     const peer = this.peer;
-    this.closeHandler?.(reason !== undefined ? new Error(reason) : undefined);
+    this.closeHandler?.(reason === undefined ? undefined : new Error(reason));
     if (peer !== undefined && !peer.isClosed) {
       await peer.close(reason);
     }
@@ -78,7 +74,7 @@ export class MemoryTransport implements Transport {
       this.buffer.push(frame);
       return;
     }
-    await handler(frame as WireFrame);
+    await handler(frame);
   }
 }
 
@@ -87,7 +83,7 @@ async function drainBuffered(
   handler: FrameHandler,
 ): Promise<void> {
   for (const frame of buffered) {
-    await handler(frame as WireFrame);
+    await handler(frame);
   }
 }
 

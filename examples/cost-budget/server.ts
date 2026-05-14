@@ -57,6 +57,7 @@ async function main(): Promise<void> {
         await ctx.toolResult({
           call_id: callId,
           error: {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             code: (e.code as never) ?? "INTERNAL_ERROR",
             message: e.message ?? "lease check failed",
             retryable: false,

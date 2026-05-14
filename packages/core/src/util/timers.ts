@@ -8,7 +8,9 @@ export function safeSetTimeout(
 ): () => void {
   const timer = setTimeout(handler, delayMs);
   timer.unref();
-  return () => clearTimeout(timer);
+  return () => {
+    clearTimeout(timer);
+  };
 }
 
 /**
@@ -20,5 +22,7 @@ export function safeSetInterval(
 ): () => void {
   const timer = setInterval(handler, periodMs);
   timer.unref();
-  return () => clearInterval(timer);
+  return () => {
+    clearInterval(timer);
+  };
 }

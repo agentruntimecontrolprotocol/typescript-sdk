@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   const transport = await WebSocketTransport.connect(URL);
   await client.connect(transport);
 
-  const observed: Array<{ kind: string; body: unknown }> = [];
+  const observed: { kind: string; body: unknown }[] = [];
   client.on("job.event", (env) => {
     if (env.type !== "job.event") return;
     observed.push({ kind: env.payload.kind, body: env.payload.body });

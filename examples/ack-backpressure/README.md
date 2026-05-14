@@ -34,8 +34,8 @@ observes the lag.
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT`  | `7886` | server |
-| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7886/arcp` | client |
-| `ARCP_DEMO_TOKEN` | `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7886`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7886/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

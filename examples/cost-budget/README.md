@@ -32,8 +32,8 @@ pnpm tsx examples/cost-budget/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT`  | `7891` | server |
-| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7891/arcp` | client |
-| `ARCP_DEMO_TOKEN` | `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7891`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7891/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

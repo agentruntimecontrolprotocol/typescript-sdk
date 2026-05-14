@@ -1,13 +1,18 @@
+// EventLog wraps better-sqlite3 (sync) but exposes an async API so consumers
+// can swap in a network-backed event log without changing call sites.
+/* eslint-disable @typescript-eslint/require-await */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
 import Database from "better-sqlite3";
 import type { z } from "zod";
+
 import { type BaseEnvelope, BaseEnvelopeSchema } from "../envelope.js";
 import { InvalidRequestError } from "../errors.js";
 
 type DatabaseInstance = InstanceType<typeof Database>;
 
-const SCHEMA_PATH = fileURLToPath(new URL("./schema.sql", import.meta.url));
+const SCHEMA_PATH = fileURLToPath(new URL("schema.sql", import.meta.url));
 const SCHEMA_SQL = readFileSync(SCHEMA_PATH, "utf8");
 
 // ARCP v1.0 event-log indexed columns: session_id, id, type, trace_id,
@@ -164,7 +169,7 @@ export class EventLog {
    */
   public async readSince(
     sessionId: string,
-    afterId: string = "",
+    afterId = "",
     limit = 1000,
   ): Promise<BaseEnvelope[]> {
     if (this.closed) throw new InvalidRequestError("EventLog is closed");
@@ -255,10 +260,10 @@ function rowToEnvelope(row: EventRow): BaseEnvelope {
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.raw);
-  } catch (cause) {
+  } catch (error) {
     throw new InvalidRequestError("EventLog row contains invalid JSON", {
       details: { id: row.id, session_id: row.session_id },
-      cause: cause instanceof Error ? cause : new Error(String(cause)),
+      cause: error instanceof Error ? error : new Error(String(error)),
     });
   }
   const result = ParseEnvelopeFromRow.safeParse(parsed);
@@ -297,9 +302,9 @@ function buildQuery(filter: EventLogFilter): BuiltQuery {
   if (filter.types !== undefined && filter.types.length > 0) {
     const placeholders = filter.types.map((_, i) => `@type_${i}`).join(",");
     where.push(`type IN (${placeholders})`);
-    filter.types.forEach((t, i) => {
+    for (const [i, t] of filter.types.entries()) {
       params[`type_${i}`] = t;
-    });
+    }
   }
   if (filter.after_event_seq !== undefined) {
     where.push("event_seq > @after_event_seq");
@@ -309,7 +314,7 @@ function buildQuery(filter: EventLogFilter): BuiltQuery {
     params["after_id"] = filter.after_id;
   }
   const orderBy =
-    filter.after_event_seq !== undefined ? "event_seq ASC" : "id ASC";
+    filter.after_event_seq === undefined ? "id ASC" : "event_seq ASC";
   const sql = `
     SELECT * FROM events
     ${where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`}

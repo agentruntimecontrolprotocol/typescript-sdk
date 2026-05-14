@@ -1,5 +1,6 @@
-import { combineSignals, safeSetInterval, safeSetTimeout } from "@arcp/core";
 import { describe, expect, it } from "vitest";
+
+import { combineSignals, safeSetInterval, safeSetTimeout } from "@arcp/core";
 
 describe("combineSignals", () => {
   it("returns a fresh signal when given no inputs", () => {

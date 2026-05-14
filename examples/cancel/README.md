@@ -6,7 +6,7 @@ runtime aborts the agent's `ctx.signal`; the agent observes the signal
 between ticks, throws `CancelledError`, and the runtime emits a
 terminal `job.error` with `final_status: "cancelled"`.
 
-Cancellation is *cooperative* in v1.0 — the runtime cannot force-kill
+Cancellation is _cooperative_ in v1.0 — the runtime cannot force-kill
 the agent function. Instead it gives the agent a 30 s grace period
 (§7.4) to observe the signal and bail. If the grace expires, the
 runtime emits the cancelled error anyway. The agent here checks
@@ -38,8 +38,8 @@ pnpm tsx examples/cancel/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT` | `7883` | server |
-| `ARCP_DEMO_URL`  | `ws://127.0.0.1:7883/arcp` | client |
-| `ARCP_DEMO_TOKEN`| `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7883`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7883/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   AgentVersionNotAvailableError,
   ARCPError,
@@ -15,7 +17,7 @@ import {
   validateLeaseConstraints,
   validateLeaseOp,
 } from "@arcp/sdk";
-import { describe, expect, it } from "vitest";
+
 import { makePairedHarness, waitFor } from "../helpers/fixtures.js";
 
 // ARCP v1.1 (additive over v1.0) feature tests.
@@ -156,7 +158,7 @@ describe("v1.1 §6.5 event acknowledgement", () => {
         (h.server as unknown as { sessions?: Map<string, unknown> }).sessions ??
         new Map()
       ).values(),
-    ] as Array<{ lastAckedEventSeq: number }>;
+    ] as { lastAckedEventSeq: number }[];
     await waitFor(
       () =>
         sessions.length > 0 &&
@@ -188,7 +190,7 @@ describe("v1.1 §6.5 event acknowledgement", () => {
             (h.server as unknown as { sessions?: Map<string, unknown> })
               .sessions ?? new Map()
           ).values(),
-        ] as Array<{ lastAckedEventSeq: number }>;
+        ] as { lastAckedEventSeq: number }[];
         return (
           sessions.length > 0 && (sessions[0]?.lastAckedEventSeq ?? -1) >= 4
         );
@@ -364,11 +366,11 @@ describe("v1.1 §9.5 lease expiration", () => {
 
   it("validateLeaseOp rejects expired lease with LeaseExpiredError", () => {
     const past = new Date(Date.now() - 1000).toISOString();
-    expect(() =>
+    expect(() => {
       validateLeaseOp({ "fs.read": ["/a"] }, "fs.read", "/a", {
         constraints: { expires_at: past },
-      }),
-    ).toThrow(LeaseExpiredError);
+      });
+    }).toThrow(LeaseExpiredError);
   });
 });
 
@@ -391,13 +393,13 @@ describe("v1.1 §9.6 cost.budget", () => {
       "cost.budget": ["USD:5.00", "USD:2.50", "EUR:1.00"],
     });
     expect(m.get("USD")).toBeCloseTo(7.5);
-    expect(m.get("EUR")).toBeCloseTo(1.0);
+    expect(m.get("EUR")).toBeCloseTo(1);
   });
 
   it("decrements counters from cost metrics", async () => {
     const h = makePairedHarness();
     h.server.registerAgent("spender", async (_i, ctx) => {
-      expect(ctx.budget.get("USD")).toBeCloseTo(1.0);
+      expect(ctx.budget.get("USD")).toBeCloseTo(1);
       await ctx.metric({ name: "cost.inference", value: 0.3, unit: "USD" });
       await ctx.metric({ name: "cost.fetch", value: 0.2, unit: "USD" });
       // The metric interceptor runs as a side-effect on Job.budget.
@@ -416,17 +418,17 @@ describe("v1.1 §9.6 cost.budget", () => {
 
   it("validateLeaseOp throws BUDGET_EXHAUSTED when counter ≤ 0", () => {
     const budget = new Map<string, number>([["USD", 0]]);
-    expect(() =>
+    expect(() => {
       validateLeaseOp({ "fs.read": ["/a"] }, "fs.read", "/a", {
         budgetRemaining: budget,
-      }),
-    ).toThrow(BudgetExhaustedError);
+      });
+    }).toThrow(BudgetExhaustedError);
   });
 
   it("delegation: child cost.budget cannot exceed parent's remaining", () => {
     // Parent budgeted USD:5.00, has spent 4.00 → remaining 1.00.
     const parent = { "cost.budget": ["USD:5.00"] };
-    const remaining = new Map([["USD", 1.0]]);
+    const remaining = new Map([["USD", 1]]);
     expect(
       isLeaseSubset({ "cost.budget": ["USD:0.50"] }, parent, remaining),
     ).toBe(true);

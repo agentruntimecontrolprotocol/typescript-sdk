@@ -1,6 +1,8 @@
 import { createInterface, type Interface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
+
 import { InvalidRequestError } from "../errors.js";
+
 import type {
   FrameHandler,
   SendableFrame,
@@ -94,7 +96,7 @@ export class StdioTransport implements Transport {
         return;
       const frame = parsed as WireFrame;
       this.inboundChain = this.inboundChain
-        .then(() => Promise.resolve(handler(frame)))
+        .then(() => handler(frame))
         .catch((): void => {
           /* Keep the queue alive on handler failure. */
         });
@@ -111,6 +113,8 @@ export class StdioTransport implements Transport {
     this.closeHandler = handler;
   }
 
+  // Transport.close is async-by-contract; the stdio impl finishes synchronously.
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async close(_reason?: string): Promise<void> {
     if (this.isClosed) return;
     this.isClosed = true;

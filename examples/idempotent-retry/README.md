@@ -28,8 +28,8 @@ pnpm tsx examples/idempotent-retry/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT` | `7881` | server |
-| `ARCP_DEMO_URL`  | `ws://127.0.0.1:7881/arcp` | client |
-| `ARCP_DEMO_TOKEN`| `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7881`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7881/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

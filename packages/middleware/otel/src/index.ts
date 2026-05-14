@@ -99,9 +99,9 @@ export function withTracing(
         await context.with(trace.setSpan(context.active(), span), () =>
           inner.send(enriched),
         );
-      } catch (err) {
-        recordError(span, err);
-        throw err;
+      } catch (error) {
+        recordError(span, error);
+        throw error;
       } finally {
         span.end();
       }
@@ -111,14 +111,12 @@ export function withTracing(
       inner.onFrame(async (frame) => {
         const carrier = extractExtension(frame);
         const parent =
-          carrier !== undefined
-            ? propagation.extract(context.active(), carrier)
-            : context.active();
+          carrier === undefined
+            ? context.active()
+            : propagation.extract(context.active(), carrier);
 
         const type =
-          typeof frame["type"] === "string"
-            ? (frame["type"] as string)
-            : "unknown";
+          typeof frame["type"] === "string" ? frame["type"] : "unknown";
         const spanName = options.recvSpanName?.(frame) ?? `arcp.recv ${type}`;
 
         const span = tracer.startSpan(
@@ -132,9 +130,9 @@ export function withTracing(
 
         try {
           await context.with(trace.setSpan(parent, span), () => handler(frame));
-        } catch (err) {
-          recordError(span, err);
-          throw err;
+        } catch (error) {
+          recordError(span, error);
+          throw error;
         } finally {
           span.end();
         }
@@ -175,7 +173,7 @@ function extractAttributes(
     if (typeof p["agent"] === "string") attrs["arcp.agent"] = p["agent"];
     const lease = p["lease"] ?? p["lease_request"];
     if (typeof lease === "object" && lease !== null) {
-      const caps = Object.keys(lease as Record<string, unknown>);
+      const caps = Object.keys(lease);
       if (caps.length > 0) attrs["arcp.lease.capabilities"] = caps.join(",");
     }
     // v1.1 §11 — surface lease expiration when present.
@@ -208,7 +206,7 @@ function injectExtension(
   return {
     ...frame,
     extensions: { ...existing, [OTEL_EXTENSION_NAME]: carrier },
-  } as SendableFrame;
+  };
 }
 
 function extractExtension(

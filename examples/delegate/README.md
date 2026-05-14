@@ -16,7 +16,7 @@ pnpm tsx examples/delegate/server.ts
 It listens on `ws://127.0.0.1:7878/arcp` and registers two agents:
 
 - `build` (parent): runs a fake build, then delegates the test suite.
-- `test`  (child):  runs a fake test suite.
+- `test` (child): runs a fake test suite.
 
 In a second terminal:
 
@@ -39,8 +39,8 @@ the child inherited the parent's `trace_id`. Stop the server with
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT` | `7878` | server |
-| `ARCP_DEMO_URL`  | `ws://127.0.0.1:7878/arcp` | client |
-| `ARCP_DEMO_TOKEN`| `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7878`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7878/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

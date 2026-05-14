@@ -1,5 +1,7 @@
-import type { Envelope, JobEventPayload } from "@arcp/sdk";
 import { describe, expect, it } from "vitest";
+
+import type { Envelope, JobEventPayload } from "@arcp/sdk";
+
 import { makePairedHarness } from "../helpers/fixtures.js";
 
 describe("§10 delegation", () => {
@@ -39,7 +41,7 @@ describe("§10 delegation", () => {
         (env.payload as { parent_job_id?: string }).parent_job_id !== undefined,
     );
     expect(child).toBeDefined();
-    if (child !== undefined && child.type === "job.accepted") {
+    if (child?.type === "job.accepted") {
       expect(child.payload.delegate_id).toBe("del_1");
     }
 

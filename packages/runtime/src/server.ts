@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+
 import type { BearerIdentity, BearerVerifier } from "@arcp/core/auth";
 import {
   type BaseEnvelope,
@@ -10,6 +11,7 @@ import {
   AgentVersionNotAvailableError,
   ARCPError,
   CancelledError,
+  HeartbeatLostError,
   InternalError,
   InvalidRequestError,
   LeaseExpiredError,
@@ -34,14 +36,12 @@ import {
   JOB_STATES,
   type JobErrorPayload,
   type JobListEntry,
-  type JobSubmitPayload,
   type Lease,
   type LeaseConstraints,
   type MetricBody,
   parseAgentRef,
   type RuntimeIdentity,
   type SessionHelloPayload,
-  type SessionListJobsPayload,
   type SessionWelcomePayload,
 } from "@arcp/core/messages";
 import {
@@ -54,6 +54,7 @@ import type { Transport, WireFrame } from "@arcp/core/transport";
 import { newJobId, newMessageId, newSessionId } from "@arcp/core/util";
 import { intersectFeatures, V1_1_FEATURES } from "@arcp/core/version";
 import { z } from "zod";
+
 import {
   type AgentHandler,
   type EventSeqSource,
@@ -306,8 +307,8 @@ export class SessionContext implements EventSeqSource {
         this.bufferedEventCount += 1;
         this.bufferedBytes += size;
         this.checkCaps();
-      } catch (err) {
-        this.logger.error({ err }, "event log append (outbound) failed");
+      } catch (error) {
+        this.logger.error({ err: error }, "event log append (outbound) failed");
       }
     }
     // v1.1 §7.6 — fan-out event-bearing envelopes to subscriber sessions.
@@ -330,12 +331,12 @@ export class SessionContext implements EventSeqSource {
               optional: {
                 session_id: sub.state.id,
                 job_id: envelope.job_id,
-                ...(envelope.trace_id !== undefined
-                  ? { trace_id: envelope.trace_id }
-                  : {}),
-                ...(envelope.event_seq !== undefined
-                  ? { event_seq: sub.nextEventSeq() }
-                  : {}),
+                ...(envelope.trace_id === undefined
+                  ? {}
+                  : { trace_id: envelope.trace_id }),
+                ...(envelope.event_seq === undefined
+                  ? {}
+                  : { event_seq: sub.nextEventSeq() }),
               },
             });
             await sub.transport.send(forwarded);
@@ -368,7 +369,7 @@ export class SessionContext implements EventSeqSource {
     // attach it to the most recently created job if any, else skip.
     const live = this.jobs.list();
     if (live.length === 0) return;
-    const job = live[live.length - 1];
+    const job = live.at(-1);
     if (job === undefined) return;
     await job.emitEventKind("status", {
       phase: "back_pressure",
@@ -405,7 +406,7 @@ export class SessionContext implements EventSeqSource {
       if (!this.transport.closed) {
         await this.transport.send(env);
       }
-    } catch (_e) {
+    } catch {
       // best-effort
     }
     try {
@@ -448,9 +449,9 @@ export class SessionContext implements EventSeqSource {
     let parsed: BaseEnvelope;
     try {
       parsed = RoundTripEnvelopeSchema.parse(frame);
-    } catch (err) {
+    } catch (error) {
       this.logger.warn(
-        { err },
+        { err: error },
         "inbound envelope failed base-shape validation",
       );
       return;
@@ -487,8 +488,8 @@ export class SessionContext implements EventSeqSource {
           );
           return;
         }
-      } catch (err) {
-        this.logger.error({ err }, "event log append (inbound) failed");
+      } catch (error) {
+        this.logger.error({ err: error }, "event log append (inbound) failed");
       }
     }
 
@@ -532,15 +533,15 @@ export class SessionContext implements EventSeqSource {
 
     try {
       await handler(envelope, this);
-    } catch (err) {
-      this.logger.error({ err, type: envelope.type }, "handler threw");
+    } catch (error) {
+      this.logger.error({ err: error, type: envelope.type }, "handler threw");
       const wrapped =
-        err instanceof ARCPError
-          ? err
+        error instanceof ARCPError
+          ? error
           : new InternalError(
-              err instanceof Error ? err.message : String(err),
+              error instanceof Error ? error.message : String(error),
               {
-                cause: err instanceof Error ? err : undefined,
+                cause: error instanceof Error ? error : undefined,
               },
             );
       // Best effort: route through session.error for now.
@@ -578,9 +579,7 @@ export class SessionContext implements EventSeqSource {
     if (now - this.lastInboundAt > intervalMs * 2) {
       // Peer silent for two intervals — treat as dead.
       await this.emitSessionError(
-        new (await import("@arcp/core/errors")).HeartbeatLostError(
-          "Peer silent for 2 heartbeat intervals",
-        ),
+        new HeartbeatLostError("Peer silent for 2 heartbeat intervals"),
       );
       return;
     }
@@ -677,7 +676,9 @@ export class ARCPServer {
   public constructor(public readonly options: ARCPServerOptions) {
     this.eventLog = options.eventLog ?? new EventLog();
     this.logger = options.logger ?? rootLogger;
-    this.resumeSweep = setInterval(() => this.sweepResume(), 60_000);
+    this.resumeSweep = setInterval(() => {
+      this.sweepResume();
+    }, 60_000);
     this.resumeSweep.unref();
   }
 
@@ -850,15 +851,15 @@ export class ARCPServer {
       );
       return;
     }
-    const payload = env.payload as SessionHelloPayload;
+    const payload = env.payload;
 
     let identity: BearerIdentity;
     try {
       identity = await this.authenticate(payload.auth);
-    } catch (err) {
+    } catch (error) {
       const wrapped =
-        err instanceof ARCPError
-          ? err
+        error instanceof ARCPError
+          ? error
           : new UnauthenticatedError("Auth failed");
       ctx.logger.info(
         { scheme: payload.auth.scheme },
@@ -966,7 +967,7 @@ export class ARCPServer {
     // envelope still carries session_id per §5.1.
     if (ctx.state.id === undefined) ctx.state.assignId(resume.session_id);
     const record = this.resumeStore.get(resume.session_id);
-    if (record === undefined || record.resumeToken !== resume.resume_token) {
+    if (record?.resumeToken !== resume.resume_token) {
       await ctx.emitSessionError(
         new ResumeWindowExpiredError("Invalid or unknown resume_token"),
       );
@@ -1039,8 +1040,8 @@ export class ARCPServer {
         await ctx.transport.send(env);
       }
       ctx.setEventSeq(highest);
-    } catch (err) {
-      ctx.logger.warn({ err }, "resume replay failed");
+    } catch (error) {
+      ctx.logger.warn({ err: error }, "resume replay failed");
     }
 
     ctx.logger.info(
@@ -1097,13 +1098,13 @@ export class ARCPServer {
       // Direct transport.send — heartbeats are NOT counted in event_seq.
       await ctx.transport.send(pongEnv);
     });
-    ctx.registerHandler("session.pong", async (env) => {
+    ctx.registerHandler("session.pong", (env) => {
       if (env.type !== "session.pong") return;
       ctx.handlePong(env.payload.ping_nonce);
     });
 
     // v1.1 §6.5 — event acknowledgement.
-    ctx.registerHandler("session.ack", async (env) => {
+    ctx.registerHandler("session.ack", (env) => {
       if (env.type !== "session.ack") return;
       if (!ctx.hasFeature("ack")) return;
       ctx.recordAck(env.payload.last_processed_seq);
@@ -1136,7 +1137,7 @@ export class ARCPServer {
       }
       await this.handleJobSubscribe(ctx, env);
     });
-    ctx.registerHandler("job.unsubscribe", async (env) => {
+    ctx.registerHandler("job.unsubscribe", (env) => {
       if (env.type !== "job.unsubscribe") return;
       if (!ctx.hasFeature("subscribe")) return;
       const jobId = env.payload.job_id;
@@ -1159,7 +1160,7 @@ export class ARCPServer {
     if (env.type !== "job.submit") return;
     const sessionId = ctx.state.id;
     if (sessionId === undefined) return;
-    const payload = env.payload as JobSubmitPayload;
+    const payload = env.payload;
 
     // Per-session max concurrent jobs cap (§14).
     const caps = this.options.caps ?? {};
@@ -1175,11 +1176,11 @@ export class ARCPServer {
     let parsedAgent: { name: string; version: string | null };
     try {
       parsedAgent = parseAgentRef(payload.agent);
-    } catch (err) {
+    } catch (error) {
       await ctx.emitJobError(newJobId(), {
         final_status: "error",
         code: "INVALID_REQUEST",
-        message: err instanceof Error ? err.message : String(err),
+        message: error instanceof Error ? error.message : String(error),
         retryable: false,
       });
       return;
@@ -1190,15 +1191,15 @@ export class ARCPServer {
       const resolved = this.resolveAgent(parsedAgent.name, parsedAgent.version);
       handler = resolved.handler;
       resolvedVersion = resolved.version;
-    } catch (err) {
+    } catch (error) {
       // §7.5: version errors emit session.error per spec example (§13.7).
-      if (err instanceof AgentVersionNotAvailableError) {
-        await ctx.emitSessionError(err);
+      if (error instanceof AgentVersionNotAvailableError) {
+        await ctx.emitSessionError(error);
         return;
       }
       const wrapped =
-        err instanceof ARCPError
-          ? err
+        error instanceof ARCPError
+          ? error
           : new AgentNotAvailableError(
               `Agent "${payload.agent}" is not registered`,
             );
@@ -1216,9 +1217,11 @@ export class ARCPServer {
     const requestedLease: Lease = payload.lease_request ?? {};
     try {
       validateLeaseShape(requestedLease);
-    } catch (err) {
+    } catch (error) {
       const wrapped =
-        err instanceof ARCPError ? err : new InvalidRequestError(String(err));
+        error instanceof ARCPError
+          ? error
+          : new InvalidRequestError(String(error));
       await ctx.emitJobError(newJobId(), {
         final_status: "error",
         code: wrapped.code,
@@ -1233,9 +1236,11 @@ export class ARCPServer {
       payload.lease_constraints;
     try {
       validateLeaseConstraints(leaseConstraints);
-    } catch (err) {
+    } catch (error) {
       const wrapped =
-        err instanceof ARCPError ? err : new InvalidRequestError(String(err));
+        error instanceof ARCPError
+          ? error
+          : new InvalidRequestError(String(error));
       await ctx.emitJobError(newJobId(), {
         final_status: "error",
         code: wrapped.code,
@@ -1280,7 +1285,7 @@ export class ARCPServer {
 
     const job = new Job(
       {
-        ...(idempotencyHit !== null ? { jobId: idempotencyHit.jobId } : {}),
+        ...(idempotencyHit === null ? {} : { jobId: idempotencyHit.jobId }),
         sessionId,
         agent: parsedAgent.name,
         agentVersion: resolvedVersion === "" ? null : resolvedVersion,
@@ -1289,7 +1294,9 @@ export class ARCPServer {
         initialBudget,
         heartbeatIntervalSeconds:
           this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS,
-        ...(traceId !== undefined ? { traceId } : {}),
+        // exactOptionalPropertyTypes: spread the key only when defined.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        ...(traceId === undefined ? {} : { traceId }),
       },
       (out) => ctx.send(out),
       ctx,
@@ -1399,31 +1406,29 @@ export class ARCPServer {
     try {
       const result = await handler(input, wrapped);
       if (!job.isTerminal) {
-        if (job.chunkedResultStarted) {
-          // The agent should have called `finalize` on its ResultStream.
-          // If not, emit a terminal result_chunk{more:false}+job.result.
-          await job.emitResult({
-            final_status: "success",
-            result_id: `res_${job.jobId.replace(/^job_/, "")}_auto`,
-          });
-        } else {
-          await job.emitResult({
-            final_status: "success",
-            result,
-          });
-        }
+        await (job.chunkedResultStarted
+          ? // The agent should have called `finalize` on its ResultStream.
+            // If not, emit a terminal result_chunk{more:false}+job.result.
+            job.emitResult({
+              final_status: "success",
+              result_id: `res_${job.jobId.replace(/^job_/, "")}_auto`,
+            })
+          : job.emitResult({
+              final_status: "success",
+              result,
+            }));
       }
-    } catch (err) {
+    } catch (error) {
       if (job.isTerminal) return;
       const wrappedErr =
-        err instanceof ARCPError
-          ? err
-          : err instanceof Error && err.name === "CancelledError"
-            ? new CancelledError(err.message)
+        error instanceof ARCPError
+          ? error
+          : error instanceof Error && error.name === "CancelledError"
+            ? new CancelledError(error.message)
             : new InternalError(
-                err instanceof Error ? err.message : String(err),
+                error instanceof Error ? error.message : String(error),
                 {
-                  cause: err instanceof Error ? err : undefined,
+                  cause: error instanceof Error ? error : undefined,
                 },
               );
       const finalStatus =
@@ -1452,26 +1457,28 @@ export class ARCPServer {
    * Intercept `metric` events to apply v1.1 §9.6 budget decrements.
    */
   private metricInterceptor(job: Job): (body: MetricBody) => Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/require-await
     return async (body: MetricBody) => {
       // Decrement the matching budget counter (if any).
       const remaining = job.applyCostMetric(body.name, body.value, body.unit);
-      if (remaining !== null && body.unit !== undefined) {
-        // Debounced budget.remaining metric (best-effort).
-        if (job.shouldEmitBudgetRemaining(body.unit)) {
-          // Emit *after* the original metric — but we need to do that from
-          // the wrapper. Schedule via microtask so the original event has
-          // flushed.
-          queueMicrotask(() => {
-            if (job.isTerminal) return;
-            void job
-              .emitEventKind("metric", {
-                name: "cost.budget.remaining",
-                value: remaining,
-                unit: body.unit,
-              })
-              .catch(() => undefined);
-          });
-        }
+      if (
+        remaining !== null &&
+        body.unit !== undefined && // Debounced budget.remaining metric (best-effort).
+        job.shouldEmitBudgetRemaining(body.unit)
+      ) {
+        // Emit *after* the original metric — but we need to do that from
+        // the wrapper. Schedule via microtask so the original event has
+        // flushed.
+        queueMicrotask(() => {
+          if (job.isTerminal) return;
+          void job
+            .emitEventKind("metric", {
+              name: "cost.budget.remaining",
+              value: remaining,
+              unit: body.unit,
+            })
+            .catch(() => undefined);
+        });
       }
     };
   }
@@ -1504,11 +1511,11 @@ export class ARCPServer {
       payload: src.payload,
       optional: {
         session_id: sub.state.id,
-        ...(src.job_id !== undefined ? { job_id: src.job_id } : {}),
-        ...(src.trace_id !== undefined ? { trace_id: src.trace_id } : {}),
-        ...(src.event_seq !== undefined
-          ? { event_seq: sub.nextEventSeq() }
-          : {}),
+        ...(src.job_id === undefined ? {} : { job_id: src.job_id }),
+        ...(src.trace_id === undefined ? {} : { trace_id: src.trace_id }),
+        ...(src.event_seq === undefined
+          ? {}
+          : { event_seq: sub.nextEventSeq() }),
       },
     });
     await sub.send(env);
@@ -1520,6 +1527,8 @@ export class ARCPServer {
   ): Promise<void> {
     if (env.type !== "job.cancel") return;
     const jobId = env.job_id;
+    // job_id is required by the job.cancel schema, but we keep the runtime check.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (jobId === undefined) {
       await ctx.emitSessionError(
         new InvalidRequestError("job.cancel requires job_id"),
@@ -1581,7 +1590,7 @@ export class ARCPServer {
     const principal = ctx.state.identity?.principal;
     const policy =
       this.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
-    const payload = env.payload as SessionListJobsPayload;
+    const payload = env.payload;
     const filter = payload.filter ?? {};
     const limit = payload.limit ?? 100;
 
@@ -1622,7 +1631,7 @@ export class ARCPServer {
         lease: job.lease,
         parent_job_id: job.parentJobId ?? null,
         created_at: job.createdAt,
-        ...(job.traceId !== undefined ? { trace_id: job.traceId } : {}),
+        ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
         last_event_seq: ctx.latestEventSeq,
       });
     }
@@ -1639,10 +1648,10 @@ export class ARCPServer {
     let startIdx = 0;
     if (cursor !== null && cursor !== "") {
       const idx = candidates.findIndex((c) => c.job_id === cursor);
-      if (idx >= 0) startIdx = idx + 1;
+      if (idx !== -1) startIdx = idx + 1;
     }
     const page = candidates.slice(startIdx, startIdx + limit);
-    const lastEntry = page.length > 0 ? page[page.length - 1] : undefined;
+    const lastEntry = page.length > 0 ? page.at(-1) : undefined;
     const nextCursor =
       startIdx + limit < candidates.length && lastEntry !== undefined
         ? lastEntry.job_id
@@ -1736,8 +1745,8 @@ export class ARCPServer {
             await this.forwardEventToSubscriber(ctx, e);
           }
           replayed = events.some((e) => e.job_id === jobId);
-        } catch (err) {
-          ctx.logger.warn({ err }, "subscribe history replay failed");
+        } catch (error) {
+          ctx.logger.warn({ err: error }, "subscribe history replay failed");
         }
       }
     }
@@ -1751,11 +1760,11 @@ export class ARCPServer {
         current_status: job.state,
         agent: job.agentRef,
         lease: job.lease,
-        ...(job.leaseConstraints !== undefined
-          ? { lease_constraints: job.leaseConstraints }
-          : {}),
+        ...(job.leaseConstraints === undefined
+          ? {}
+          : { lease_constraints: job.leaseConstraints }),
         parent_job_id: job.parentJobId ?? null,
-        ...(job.traceId !== undefined ? { trace_id: job.traceId } : {}),
+        ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
         subscribed_from: subscribedFrom,
         replayed,
       },
@@ -1771,6 +1780,8 @@ export class ARCPServer {
   private async authenticate(
     auth: SessionHelloPayload["auth"],
   ): Promise<BearerIdentity> {
+    // Bearer is the only scheme today; future schemes will widen this union.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (auth.scheme === "bearer") {
       const verifier = this.options.bearer;
       if (verifier === undefined) {
@@ -1783,7 +1794,10 @@ export class ARCPServer {
       }
       return verifier.verify(auth.token);
     }
-    throw new InvalidRequestError(`Auth scheme "${auth.scheme}" not supported`);
+    throw new InvalidRequestError(
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      `Auth scheme "${auth.scheme}" not supported`,
+    );
   }
 
   // ---------------------------------------------------------------------
@@ -1828,14 +1842,14 @@ export class ARCPServer {
     let parsedAgent: { name: string; version: string | null };
     try {
       parsedAgent = parseAgentRef(body.agent);
-    } catch (err) {
+    } catch (error) {
       return {
         ok: false,
         error:
-          err instanceof ARCPError
-            ? err
+          error instanceof ARCPError
+            ? error
             : new InvalidRequestError(
-                err instanceof Error ? err.message : String(err),
+                error instanceof Error ? error.message : String(error),
               ),
       };
     }
@@ -1845,12 +1859,12 @@ export class ARCPServer {
       const r = this.resolveAgent(parsedAgent.name, parsedAgent.version);
       handler = r.handler;
       resolvedVersion = r.version;
-    } catch (err) {
+    } catch (error) {
       return {
         ok: false,
         error:
-          err instanceof ARCPError
-            ? err
+          error instanceof ARCPError
+            ? error
             : new AgentNotAvailableError(
                 `Agent "${body.agent}" is not registered`,
               ),
@@ -1866,13 +1880,13 @@ export class ARCPServer {
       );
       // Child inherits parent expiry implicitly if absent.
       validateLeaseConstraints(body.lease_constraints);
-    } catch (err) {
+    } catch (error) {
       const wrapped =
-        err instanceof LeaseSubsetViolationError
-          ? err
-          : err instanceof ARCPError
-            ? err
-            : new InvalidRequestError(String(err));
+        error instanceof LeaseSubsetViolationError
+          ? error
+          : error instanceof ARCPError
+            ? error
+            : new InvalidRequestError(String(error));
       return { ok: false, error: wrapped };
     }
     const sessionId = ctx.state.id;
@@ -1895,7 +1909,7 @@ export class ARCPServer {
         delegateId: body.delegate_id,
         heartbeatIntervalSeconds:
           this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS,
-        ...(parent.traceId !== undefined ? { traceId: parent.traceId } : {}),
+        ...(parent.traceId === undefined ? {} : { traceId: parent.traceId }),
       },
       (out) => ctx.send(out),
       ctx,

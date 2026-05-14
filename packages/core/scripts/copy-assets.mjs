@@ -2,12 +2,12 @@
 // Copy non-TS assets (e.g. SQL schemas) from src/ to dist/ after tsc.
 // Cross-platform replacement for `cp`.
 import { copyFile, mkdir, readdir } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const srcRoot = join(here, "..", "src");
-const dstRoot = join(here, "..", "dist");
+const here = path.dirname(fileURLToPath(import.meta.url));
+const srcRoot = path.join(here, "..", "src");
+const dstRoot = path.join(here, "..", "dist");
 
 const ASSET_EXTS = new Set([".sql"]);
 
@@ -15,7 +15,7 @@ async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    const full = join(dir, entry.name);
+    const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       files.push(...(await walk(full)));
     } else if (entry.isFile()) {
@@ -30,9 +30,9 @@ async function walk(dir) {
 
 const files = await walk(srcRoot);
 for (const file of files) {
-  const rel = relative(srcRoot, file);
-  const dst = join(dstRoot, rel);
-  await mkdir(dirname(dst), { recursive: true });
+  const rel = path.relative(srcRoot, file);
+  const dst = path.join(dstRoot, rel);
+  await mkdir(path.dirname(dst), { recursive: true });
   await copyFile(file, dst);
   process.stdout.write(`copied ${rel}\n`);
 }

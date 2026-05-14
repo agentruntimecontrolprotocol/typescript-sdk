@@ -10,6 +10,7 @@
  *   tsx test/helpers/stdio-runtime.ts <event-log-path>
  */
 import process from "node:process";
+
 import {
   ARCPServer,
   EventLog,
@@ -40,7 +41,7 @@ server.registerAgent("count", async (input: unknown, ctx) => {
   const obj = (
     typeof input === "object" && input !== null ? input : {}
   ) as Record<string, unknown>;
-  const n = typeof obj["n"] === "number" ? (obj["n"] as number) : 1;
+  const n = typeof obj["n"] === "number" ? obj["n"] : 1;
   for (let i = 0; i < n; i++) {
     await ctx.metric({
       name: "progress",

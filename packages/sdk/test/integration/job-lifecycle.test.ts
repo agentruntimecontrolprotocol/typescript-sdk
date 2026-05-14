@@ -1,5 +1,7 @@
-import { ARCPError, type Envelope, type JobEventPayload } from "@arcp/sdk";
 import { describe, expect, it } from "vitest";
+
+import { ARCPError, type Envelope, type JobEventPayload } from "@arcp/sdk";
+
 import { makePairedHarness } from "../helpers/fixtures.js";
 
 describe("§7 job lifecycle", () => {

@@ -33,8 +33,8 @@ ping count. Two pings are expected.
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT`  | `7885` | server |
-| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7885/arcp` | client |
-| `ARCP_DEMO_TOKEN` | `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7885`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7885/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

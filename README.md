@@ -18,12 +18,12 @@ packages, all ESM, all strictly typed against TypeScript 5.6 with
 
 ## Install
 
-| Install | When to use |
-|---|---|
-| `@arcp/sdk` | "Give me everything." Re-exports core + client + runtime, ships the `arcp` CLI. |
-| `@arcp/core` | Shared primitives only — envelopes, errors, messages, transports, event log, auth, session state. |
-| `@arcp/client` | Build a client that talks to an ARCP runtime. Depends on `@arcp/core`. |
-| `@arcp/runtime` | Build a runtime/server that hosts agents. Depends on `@arcp/core`. |
+| Install         | When to use                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| `@arcp/sdk`     | "Give me everything." Re-exports core + client + runtime, ships the `arcp` CLI.                   |
+| `@arcp/core`    | Shared primitives only — envelopes, errors, messages, transports, event log, auth, session state. |
+| `@arcp/client`  | Build a client that talks to an ARCP runtime. Depends on `@arcp/core`.                            |
+| `@arcp/runtime` | Build a runtime/server that hosts agents. Depends on `@arcp/core`.                                |
 
 ```sh
 pnpm add @arcp/sdk
@@ -33,12 +33,12 @@ pnpm add @arcp/client @arcp/runtime @arcp/core
 
 Optional middleware:
 
-| Package | What it does |
-|---|---|
-| `@arcp/node` | Attach the ARCP WebSocket upgrade to an existing Node `http.Server`. |
-| `@arcp/express` | Express app helper + WS upgrade attachment, with Host-header DNS-rebind protection. |
-| `@arcp/hono` | Hono app helper + WS upgrade attachment for `@hono/node-server`. |
-| `@arcp/middleware-otel` | Emit OpenTelemetry spans and propagate W3C trace context per §11. |
+| Package                 | What it does                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `@arcp/node`            | Attach the ARCP WebSocket upgrade to an existing Node `http.Server`.                |
+| `@arcp/express`         | Express app helper + WS upgrade attachment, with Host-header DNS-rebind protection. |
+| `@arcp/hono`            | Hono app helper + WS upgrade attachment for `@hono/node-server`.                    |
+| `@arcp/middleware-otel` | Emit OpenTelemetry spans and propagate W3C trace context per §11.                   |
 
 ## Quickstart
 
@@ -92,17 +92,17 @@ await server.close();
 
 Every message on the wire is a JSON object with these required fields:
 
-| Field | Meaning |
-|---|---|
-| `arcp` | Protocol version. v1.0 is the literal string `"1"`. |
-| `id` | Unique message id (ULID/UUIDv7). |
-| `type` | Message type discriminator (e.g., `"job.submit"`). |
-| `session_id` | REQUIRED on every envelope after `session.welcome`. |
-| `payload` | Type-specific body. |
-| `event_seq` | REQUIRED on `job.event`/`job.result`/`job.error` — strictly monotonic per session. |
-| `job_id` | REQUIRED on every job-scoped envelope. |
-| `trace_id` | OPTIONAL W3C 32-hex trace id for OTel propagation. |
-| `extensions` | OPTIONAL `x-vendor.*`-namespaced extension object. |
+| Field        | Meaning                                                                            |
+| ------------ | ---------------------------------------------------------------------------------- |
+| `arcp`       | Protocol version. v1.0 is the literal string `"1"`.                                |
+| `id`         | Unique message id (ULID/UUIDv7).                                                   |
+| `type`       | Message type discriminator (e.g., `"job.submit"`).                                 |
+| `session_id` | REQUIRED on every envelope after `session.welcome`.                                |
+| `payload`    | Type-specific body.                                                                |
+| `event_seq`  | REQUIRED on `job.event`/`job.result`/`job.error` — strictly monotonic per session. |
+| `job_id`     | REQUIRED on every job-scoped envelope.                                             |
+| `trace_id`   | OPTIONAL W3C 32-hex trace id for OTel propagation.                                 |
+| `extensions` | OPTIONAL `x-vendor.*`-namespaced extension object.                                 |
 
 Anything else on the wire is ignored. Unknown `x-vendor.*` types are
 round-tripped per §15.
@@ -149,16 +149,16 @@ Every event the runtime emits to the client is one `job.event` envelope
 whose `payload.kind` is one of eight reserved values or a vendor
 `x-vendor.*` extension:
 
-| Kind | Body shape | Purpose |
-|---|---|---|
-| `log` | `{ level, message, attributes? }` | Plain log line. |
-| `thought` | `{ text }` | Model reasoning / internal monologue. |
-| `tool_call` | `{ tool, args, call_id }` | Agent invoked a tool. |
-| `tool_result` | `{ call_id, result? | error? }` | Result for a `tool_call`. |
-| `status` | `{ phase, message? }` | Lifecycle hint (e.g., `running`, `fetching`). |
-| `metric` | `{ name, value, unit?, attributes? }` | Numeric measurement. |
-| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }` | Reference to an artifact (storage is out of scope). |
-| `delegate` | `{ delegate_id, agent, input, lease_request? }` | Initiate a child job. |
+| Kind           | Body shape                                      | Purpose                                             |
+| -------------- | ----------------------------------------------- | --------------------------------------------------- | ------------------------- |
+| `log`          | `{ level, message, attributes? }`               | Plain log line.                                     |
+| `thought`      | `{ text }`                                      | Model reasoning / internal monologue.               |
+| `tool_call`    | `{ tool, args, call_id }`                       | Agent invoked a tool.                               |
+| `tool_result`  | `{ call_id, result?                             | error? }`                                           | Result for a `tool_call`. |
+| `status`       | `{ phase, message? }`                           | Lifecycle hint (e.g., `running`, `fetching`).       |
+| `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                                |
+| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact (storage is out of scope). |
+| `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Initiate a child job.                               |
 
 Sequence numbers are session-scoped (§8.3): one counter across all
 concurrent jobs in the session. Replay across a resume preserves
@@ -185,7 +185,7 @@ A parent agent can spawn a child by emitting a `job.event` of kind
 `lease_request` is a subset of the parent's effective lease, and
 issues a fresh `job.accepted` for the child with `parent_job_id` and
 `delegate_id` set. The child inherits the parent's `trace_id`. Subset
-violation surfaces as a `tool_result` event on the *parent* with code
+violation surfaces as a `tool_result` event on the _parent_ with code
 `LEASE_SUBSET_VIOLATION` (not a session-level error).
 
 ### Resume (§6.3)
@@ -195,7 +195,11 @@ The runtime advertises `resume_token` and `resume_window_sec` on every
 client re-issues `session.hello` carrying:
 
 ```ts
-{ resume: { session_id, resume_token, last_event_seq } }
+{
+  resume: {
+    (session_id, resume_token, last_event_seq);
+  }
+}
 ```
 
 The runtime validates the token, rotates it, replays buffered events
@@ -266,7 +270,9 @@ const client = new ARCPClient({
   token: process.env.TOKEN,
 });
 
-const transport = await WebSocketTransport.connect("wss://runtime.example.com/arcp");
+const transport = await WebSocketTransport.connect(
+  "wss://runtime.example.com/arcp",
+);
 const welcome = await client.connect(transport);
 console.log("resume_token =", welcome.resume_token);
 
@@ -315,30 +321,30 @@ that talks over a real `Transport`. See
 
 v1.0 core:
 
-| Example | Spec |
-|---|---|
-| `submit-and-stream/` | §13.1 / §8.2 |
-| `delegate/` | §13.2 / §10 |
-| `resume/` | §13.3 / §6.3 |
-| `idempotent-retry/` | §13.5 / §7.2 |
-| `lease-violation/` | §13.4 / §9.3 |
-| `cancel/` | §7.4 |
-| `stdio/` | §4.2 / §22 |
+| Example              | Spec              |
+| -------------------- | ----------------- |
+| `submit-and-stream/` | §13.1 / §8.2      |
+| `delegate/`          | §13.2 / §10       |
+| `resume/`            | §13.3 / §6.3      |
+| `idempotent-retry/`  | §13.5 / §7.2      |
+| `lease-violation/`   | §13.4 / §9.3      |
+| `cancel/`            | §7.4              |
+| `stdio/`             | §4.2 / §22        |
 | `vendor-extensions/` | §8.2 / §9.2 / §15 |
 
 v1.1 features:
 
-| Example | Spec |
-|---|---|
-| `heartbeat/` | §6.4 |
+| Example             | Spec        |
+| ------------------- | ----------- |
+| `heartbeat/`        | §6.4        |
 | `ack-backpressure/` | §6.5 / §8.2 |
-| `list-jobs/` | §6.6 |
-| `subscribe/` | §7.6 / §6.6 |
-| `agent-versions/` | §7.5 / §12 |
-| `lease-expires-at/` | §9.5 / §12 |
-| `cost-budget/` | §9.6 / §12 |
-| `progress/` | §8.2.1 |
-| `result-chunk/` | §8.4 |
+| `list-jobs/`        | §6.6        |
+| `subscribe/`        | §7.6 / §6.6 |
+| `agent-versions/`   | §7.5 / §12  |
+| `lease-expires-at/` | §9.5 / §12  |
+| `cost-budget/`      | §9.6 / §12  |
+| `progress/`         | §8.2.1      |
+| `result-chunk/`     | §8.4        |
 
 ## Repository layout
 

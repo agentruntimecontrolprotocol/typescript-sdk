@@ -31,24 +31,26 @@ type SchemaNode = Record<string, unknown> | undefined;
 export function validateAgainstSchema(
   value: unknown,
   schema: SchemaNode,
-  path: string = "",
+  path = "",
 ): ValidationError[] {
+  // Defensive: schema can be null/undefined at runtime even though the type
+  // says `SchemaNode` — callers may pass parsed JSON.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (schema === undefined || schema === null) return [];
   const errors: ValidationError[] = [];
 
   const enumValues = schema["enum"];
-  if (Array.isArray(enumValues)) {
-    if (!enumValues.some((opt) => deepEqual(opt, value))) {
-      errors.push({ path, message: "value is not in enum" });
-    }
+  if (
+    Array.isArray(enumValues) &&
+    !enumValues.some((opt) => deepEqual(opt, value))
+  ) {
+    errors.push({ path, message: "value is not in enum" });
   }
 
   const type = schema["type"];
-  if (typeof type === "string") {
-    if (!matchesType(value, type)) {
-      errors.push({ path, message: `expected type "${type}"` });
-      return errors; // further checks would not be meaningful
-    }
+  if (typeof type === "string" && !matchesType(value, type)) {
+    errors.push({ path, message: `expected type "${type}"` });
+    return errors; // further checks would not be meaningful
   }
 
   if (type === "string" && typeof value === "string") {
@@ -76,7 +78,7 @@ export function validateAgainstSchema(
   if (type === "array" && Array.isArray(value)) {
     const items = schema["items"];
     if (items !== undefined && typeof items === "object" && items !== null) {
-      value.forEach((item, idx) => {
+      for (const [idx, item] of value.entries()) {
         errors.push(
           ...validateAgainstSchema(
             item,
@@ -84,7 +86,7 @@ export function validateAgainstSchema(
             `${path}[${idx}]`,
           ),
         );
-      });
+      }
     }
   }
 
@@ -106,7 +108,7 @@ export function validateAgainstSchema(
         if (key in value) {
           errors.push(
             ...validateAgainstSchema(
-              (value as Record<string, unknown>)[key],
+              value[key],
               propSchema as Record<string, unknown>,
               joinPath(path, key),
             ),
@@ -121,22 +123,30 @@ export function validateAgainstSchema(
 
 function matchesType(value: unknown, type: string): boolean {
   switch (type) {
-    case "string":
+    case "string": {
       return typeof value === "string";
-    case "number":
+    }
+    case "number": {
       return typeof value === "number" && Number.isFinite(value);
-    case "integer":
+    }
+    case "integer": {
       return typeof value === "number" && Number.isInteger(value);
-    case "boolean":
+    }
+    case "boolean": {
       return typeof value === "boolean";
-    case "array":
+    }
+    case "array": {
       return Array.isArray(value);
-    case "object":
+    }
+    case "object": {
       return isPlainObject(value);
-    case "null":
+    }
+    case "null": {
       return value === null;
-    default:
-      return true; // unknown types are permissive
+    }
+    default: {
+      return true;
+    } // unknown types are permissive
   }
 }
 
@@ -156,8 +166,8 @@ function deepEqual(a: unknown, b: unknown): boolean {
     return a.every((v, i) => deepEqual(v, b[i]));
   }
   if (isPlainObject(a) && isPlainObject(b)) {
-    const ak = Object.keys(a).sort();
-    const bk = Object.keys(b).sort();
+    const ak = Object.keys(a).toSorted();
+    const bk = Object.keys(b).toSorted();
     if (ak.length !== bk.length) return false;
     return ak.every((k, i) => k === bk[i] && deepEqual(a[k], b[k]));
   }

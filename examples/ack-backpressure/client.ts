@@ -60,6 +60,7 @@ async function main(): Promise<void> {
     `result: ${JSON.stringify(result.result)} metrics-observed=${metricCount} back_pressure=${backPressure}\n`,
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!backPressure) {
     throw new Error("expected a back_pressure status event");
   }

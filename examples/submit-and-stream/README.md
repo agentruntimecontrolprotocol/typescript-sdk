@@ -31,8 +31,8 @@ pnpm tsx examples/submit-and-stream/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT` | `7879` | server |
-| `ARCP_DEMO_URL`  | `ws://127.0.0.1:7879/arcp` | client |
-| `ARCP_DEMO_TOKEN`| `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7879`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7879/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

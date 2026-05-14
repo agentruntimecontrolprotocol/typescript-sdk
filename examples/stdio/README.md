@@ -41,6 +41,6 @@ Logs from the server go to **stderr** because stdout is the wire.
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_TOKEN`| `demo-token` | both |
+| Env var           | Default      | Used by |
+| ----------------- | ------------ | ------- |
+| `ARCP_DEMO_TOKEN` | `demo-token` | both    |

@@ -21,8 +21,8 @@ export type SessionPhase = "opening" | "accepted" | "closing" | "rejected";
 const VALID_TRANSITIONS: Record<SessionPhase, ReadonlySet<SessionPhase>> = {
   opening: new Set<SessionPhase>(["accepted", "rejected"]),
   accepted: new Set<SessionPhase>(["closing"]),
-  closing: new Set<SessionPhase>([]),
-  rejected: new Set<SessionPhase>([]),
+  closing: new Set<SessionPhase>(),
+  rejected: new Set<SessionPhase>(),
 };
 
 /** Snapshot of session state shared between server-side and client-side. */
@@ -132,11 +132,11 @@ export function negotiateCapabilities(
   } else if (runtimeEncodings !== undefined) {
     out.encodings = runtimeEncodings;
   }
-  if (Array.isArray(runtime.agents) || Array.isArray(c.agents)) {
-    // Runtime owns the agent inventory; client never advertises agents.
-    if (Array.isArray(runtime.agents)) {
-      out.agents = runtime.agents;
-    }
+  if (
+    (Array.isArray(runtime.agents) || Array.isArray(c.agents)) && // Runtime owns the agent inventory; client never advertises agents.
+    Array.isArray(runtime.agents)
+  ) {
+    out.agents = runtime.agents;
   }
   // v1.1 §6.2 — `features` is the negotiated intersection. The runtime is
   // authoritative for what *it* supports; the welcome MUST advertise only

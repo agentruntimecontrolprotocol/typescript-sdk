@@ -21,6 +21,8 @@ export class Deferred<T> {
       this.reject = (reason) => {
         if (this.settled) return;
         this.settled = true;
+        // Pass-through reject — callers control whether `reason` is an Error.
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         reject(reason);
       };
     });

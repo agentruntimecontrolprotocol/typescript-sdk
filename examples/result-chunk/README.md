@@ -28,8 +28,8 @@ pnpm tsx examples/result-chunk/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT`  | `7893` | server |
-| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7893/arcp` | client |
-| `ARCP_DEMO_TOKEN` | `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7893`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7893/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

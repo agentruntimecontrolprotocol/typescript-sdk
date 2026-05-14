@@ -1,5 +1,6 @@
-import { validateAgainstSchema } from "@arcp/core/util";
 import { describe, expect, it } from "vitest";
+
+import { validateAgainstSchema } from "@arcp/core/util";
 
 describe("validateAgainstSchema (JSON-Schema subset)", () => {
   it("returns no errors for an empty schema", () => {

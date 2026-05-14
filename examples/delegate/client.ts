@@ -81,7 +81,7 @@ async function main(): Promise<void> {
     (env) =>
       env.type === "job.accepted" && env.payload.parent_job_id !== undefined,
   );
-  if (child !== undefined && child.type === "job.accepted") {
+  if (child?.type === "job.accepted") {
     const childTrace = child.payload.trace_id;
     process.stdout.write(
       `trace inheritance: parent=${parentTraceId} child=${childTrace} ` +

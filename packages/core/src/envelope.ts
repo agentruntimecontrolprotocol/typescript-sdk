@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { validateExtensionsObject } from "./extensions.js";
 import { PROTOCOL_VERSION } from "./version.js";
 
@@ -25,10 +26,10 @@ export const EnvelopeExtensionsSchema = z
   .superRefine((obj, ctx) => {
     try {
       validateExtensionsObject(obj);
-    } catch (err) {
+    } catch (error) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: err instanceof Error ? err.message : String(err),
+        message: error instanceof Error ? error.message : String(error),
       });
     }
   });
@@ -92,6 +93,9 @@ export type BaseEnvelope = z.infer<typeof BaseEnvelopeSchema>;
  * where `x` may be undefined (zod's `.optional()` output type) and rely on
  * {@link pickDefined} or {@link buildEnvelope} to strip undefined keys.
  */
+// Kept as a type alias (not interface) so it remains assignable to
+// `Record<string, unknown>` when spread through `pickDefined`.
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
 export type EnvelopeOptionalFields = {
   session_id?: string | undefined;
   job_id?: string | undefined;
@@ -108,7 +112,7 @@ export function pickDefined<T extends Record<string, unknown>>(
   obj: T,
 ): Partial<T> {
   const out: Partial<T> = {};
-  for (const key of Object.keys(obj) as Array<keyof T>) {
+  for (const key of Object.keys(obj) as (keyof T)[]) {
     const v = obj[key];
     if (v !== undefined) {
       out[key] = v;
@@ -120,7 +124,10 @@ export function pickDefined<T extends Record<string, unknown>>(
 /**
  * Build a per-type envelope schema. The result is a zod object schema with
  * `type` constrained to the literal `T` and `payload` constrained to `P`.
+ *
+ * Inference handles the (complex) ZodObject shape better than writing it out.
  */
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function messageEnvelope<T extends string, P extends z.ZodTypeAny>(
   type: T,
   payload: P,
@@ -145,10 +152,10 @@ export function buildEnvelope<T extends string, P>(args: {
     arcp: PROTOCOL_VERSION,
     id: args.id,
     type: args.type,
-    ...(args.optional !== undefined ? pickDefined(args.optional) : {}),
+    ...(args.optional === undefined ? {} : pickDefined(args.optional)),
     payload: args.payload,
   };
-  return env as BaseEnvelope & { type: T; payload: P };
+  return env;
 }
 
 /**

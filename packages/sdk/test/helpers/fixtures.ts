@@ -4,10 +4,11 @@ import {
   ARCPServer,
   type ARCPServerOptions,
   type ClientIdentity,
+  type MemoryTransport,
   pairMemoryTransports,
   type RuntimeIdentity,
-  StaticBearerVerifier,
   silentLogger,
+  StaticBearerVerifier,
 } from "@arcp/sdk";
 
 export const TEST_CLIENT: ClientIdentity = {
@@ -40,7 +41,7 @@ export interface PairedHarness {
   server: ARCPServer;
   client: ARCPClient;
   /** Direct access to the client-side memory transport, for raw-frame tests. */
-  clientTransport: import("../../src/index.js").MemoryTransport;
+  clientTransport: MemoryTransport;
   /** Drives the handshake and returns when the client has been accepted. */
   connect(): Promise<void>;
   close(): Promise<void>;

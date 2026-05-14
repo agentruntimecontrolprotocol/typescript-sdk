@@ -1,5 +1,6 @@
-import { pairMemoryTransports } from "@arcp/core";
 import { describe, expect, it } from "vitest";
+
+import { pairMemoryTransports } from "@arcp/core";
 
 describe("pairMemoryTransports", () => {
   it("delivers frames in FIFO order from a to b", async () => {

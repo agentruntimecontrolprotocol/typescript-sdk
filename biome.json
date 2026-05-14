@@ -1,35 +1,25 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
-  "vcs": {
-    "enabled": true,
-    "clientKind": "git",
-    "useIgnoreFile": true
-  },
   "files": {
     "ignoreUnknown": true,
     "includes": [
-      "**",
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.mjs",
+      "**/*.cjs",
+      "**/*.json",
       "!**/dist",
       "!**/node_modules",
-      "!**/coverage",
-      "!**/*.sql",
-      "!**/*.md"
+      "!**/.tsbuildinfo",
+      "!pnpm-lock.yaml"
     ]
   },
   "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 80,
-    "lineEnding": "lf"
+    "enabled": false
   },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "double",
-      "semicolons": "always",
-      "trailingCommas": "all",
-      "arrowParentheses": "always"
-    }
+  "assist": {
+    "enabled": false
   },
   "linter": {
     "enabled": true,
@@ -38,39 +28,75 @@
       "suspicious": {
         "noExplicitAny": "error",
         "noConsole": {
-          "level": "error",
-          "options": {
-            "allow": ["error"]
-          }
+          "level": "warn",
+          "options": { "allow": ["warn", "error"] }
         }
       },
       "style": {
         "noNonNullAssertion": "error",
-        "useImportType": "error",
-        "useExportType": "error",
-        "useNodejsImportProtocol": "error"
+        "useNamingConvention": "off",
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": { "filenameCases": ["kebab-case"], "strictCase": false }
+        }
+      },
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error"
       },
       "complexity": {
         "noForEach": "off",
         "useLiteralKeys": "off"
       },
-      "correctness": {
-        "noUnusedImports": "error",
-        "noUnusedVariables": "error"
-      }
-    }
-  },
-  "assist": {
-    "enabled": true,
-    "actions": {
-      "source": {
-        "organizeImports": "on"
+      "performance": {
+        "noAccumulatingSpread": "warn"
       }
     }
   },
   "overrides": [
     {
-      "includes": ["**/src/cli.ts", "**/examples/**"],
+      "includes": ["examples/**/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off",
+            "noExplicitAny": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/test/**/*.ts", "**/tests/**/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noConsole": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          },
+          "correctness": {
+            "useHookAtTopLevel": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/vitest.config.ts", "**/*.config.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/sdk/src/cli.ts"],
       "linter": {
         "rules": {
           "suspicious": {

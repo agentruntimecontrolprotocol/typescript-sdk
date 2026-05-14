@@ -6,10 +6,10 @@ and requests a custom `x-vendor.acme.metrics` lease namespace.
 
 The client demonstrates the two valid receiver behaviours:
 
-- A *naïve* receiver only understands the 8 reserved event kinds and
+- A _naïve_ receiver only understands the 8 reserved event kinds and
   MUST ignore everything else gracefully. The client tracks how many
   events the naïve path skipped.
-- A *vendor-aware* receiver recognises `x-vendor.acme.progress` and renders a
+- A _vendor-aware_ receiver recognises `x-vendor.acme.progress` and renders a
   live percent bar for each one.
 
 Both run as separate handlers against the same envelope stream.
@@ -39,8 +39,8 @@ pnpm tsx examples/vendor-extensions/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT` | `7884` | server |
-| `ARCP_DEMO_URL`  | `ws://127.0.0.1:7884/arcp` | client |
-| `ARCP_DEMO_TOKEN`| `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7884`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7884/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

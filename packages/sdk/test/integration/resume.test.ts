@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   ARCPClient,
   ARCPServer,
@@ -7,7 +9,7 @@ import {
   StaticBearerVerifier,
   silentLogger,
 } from "@arcp/sdk";
-import { describe, expect, it } from "vitest";
+
 import { TEST_CLIENT, TEST_RUNTIME, TEST_TOKEN } from "../helpers/fixtures.js";
 
 describe("§6.3 resumability (in-memory)", () => {

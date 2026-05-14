@@ -6,7 +6,6 @@ import {
   PermissionDeniedError,
 } from "@arcp/core/errors";
 import {
-  isReservedCapabilityName,
   isValidCapabilityName,
   type Lease,
   type LeaseConstraints,
@@ -39,7 +38,8 @@ function patternToRegExp(pattern: string): string {
   let out = "";
   let i = 0;
   while (i < pattern.length) {
-    const ch = pattern[i] as string;
+    const ch = pattern[i];
+    if (ch === undefined) break;
     if (ch === "*") {
       if (pattern[i + 1] === "*") {
         const isPrefixSlash = out.endsWith("/");
@@ -71,11 +71,7 @@ function patternToRegExp(pattern: string): string {
       continue;
     }
     // Escape regex metacharacters.
-    if (/[\\^$.|?+()[\]{}]/.test(ch)) {
-      out += `\\${ch}`;
-    } else {
-      out += ch;
-    }
+    out += /[\\^$.|?+()[\]{}]/.test(ch) ? `\\${ch}` : ch;
     i += 1;
   }
   return out;
@@ -264,21 +260,20 @@ export function isLeaseSubset(
       }
       // Use parent remaining if provided; else fall back to parent's lease budget.
       const parentTotals =
-        parentBudgetRemaining !== undefined
-          ? parentBudgetRemaining
-          : (() => {
-              const m = new Map<string, number>();
-              const parentPatterns = parent[cap] ?? [];
-              for (const p of parentPatterns) {
-                try {
-                  const { currency, amount } = parseBudgetAmount(p);
-                  m.set(currency, (m.get(currency) ?? 0) + amount);
-                } catch {
-                  return null;
-                }
-              }
-              return m;
-            })();
+        parentBudgetRemaining ??
+        (() => {
+          const m = new Map<string, number>();
+          const parentPatterns = parent[cap] ?? [];
+          for (const p of parentPatterns) {
+            try {
+              const { currency, amount } = parseBudgetAmount(p);
+              m.set(currency, (m.get(currency) ?? 0) + amount);
+            } catch {
+              return null;
+            }
+          }
+          return m;
+        })();
       if (parentTotals === null) return false;
       for (const [currency, total] of childTotals.entries()) {
         const allowed = parentTotals.get(currency);
@@ -341,9 +336,9 @@ export function validateLeaseShape(lease: Lease): void {
       if (cap === "cost.budget") {
         try {
           parseBudgetAmount(pattern);
-        } catch (err) {
+        } catch (error) {
           throw new InvalidRequestError(
-            err instanceof Error ? err.message : String(err),
+            error instanceof Error ? error.message : String(error),
             { details: { capability: cap, pattern } },
           );
         }
@@ -440,6 +435,10 @@ export function validateLeaseConstraints(
   return ms;
 }
 
-export type { Lease };
 // Re-export helpers that callers may want.
-export { isReservedCapabilityName, isValidCapabilityName };
+
+export {
+  isReservedCapabilityName,
+  type Lease,
+  isValidCapabilityName,
+} from "@arcp/core/messages";

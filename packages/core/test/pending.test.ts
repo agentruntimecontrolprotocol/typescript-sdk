@@ -1,5 +1,6 @@
-import { CancelledError, PendingRegistry, TimeoutError } from "@arcp/core";
 import { describe, expect, it } from "vitest";
+
+import { CancelledError, PendingRegistry, TimeoutError } from "@arcp/core";
 
 describe("PendingRegistry", () => {
   it("starts empty", () => {
@@ -33,7 +34,7 @@ describe("PendingRegistry", () => {
   it("resolve/reject return false on missing entries", () => {
     const r = new PendingRegistry();
     expect(r.resolve("nope", 1)).toBe(false);
-    expect(r.reject("nope", new Error())).toBe(false);
+    expect(r.reject("nope", new Error("test"))).toBe(false);
     expect(r.cancel("nope")).toBe(false);
   });
 

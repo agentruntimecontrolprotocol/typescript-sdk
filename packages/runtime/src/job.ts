@@ -1,12 +1,10 @@
 import type { BaseEnvelope } from "@arcp/core/envelope";
 import { buildEnvelope } from "@arcp/core/envelope";
 import {
-  type ARCPError,
   CancelledError,
   HeartbeatLostError,
   InternalError,
   InvalidRequestError,
-  TimeoutError,
 } from "@arcp/core/errors";
 import type { Logger } from "@arcp/core/logger";
 import type {
@@ -47,10 +45,10 @@ const JOB_TRANSITIONS: Record<JobStateName, ReadonlySet<JobStateName>> = {
     "cancelled",
     "timed_out",
   ]),
-  success: new Set<JobStateName>([]),
-  error: new Set<JobStateName>([]),
-  cancelled: new Set<JobStateName>([]),
-  timed_out: new Set<JobStateName>([]),
+  success: new Set<JobStateName>(),
+  error: new Set<JobStateName>(),
+  cancelled: new Set<JobStateName>(),
+  timed_out: new Set<JobStateName>(),
 };
 
 const TERMINAL: ReadonlySet<JobStateName> = new Set<JobStateName>([
@@ -160,8 +158,8 @@ export class Job {
     this.agentVersion = options.agentVersion ?? null;
     this.lease = options.lease;
     this.leaseConstraints = options.leaseConstraints;
-    this.initialBudget = new Map(options.initialBudget ?? []);
-    this.budget = new Map(options.initialBudget ?? []);
+    this.initialBudget = new Map(options.initialBudget);
+    this.budget = new Map(options.initialBudget);
     this.parentJobId = options.parentJobId;
     this.delegateId = options.delegateId;
     this.traceId = options.traceId;
@@ -289,23 +287,23 @@ export class Job {
         job_id: this.jobId,
         agent: this.agentRef,
         lease: this.lease,
-        ...(this.leaseConstraints !== undefined
-          ? { lease_constraints: this.leaseConstraints }
-          : {}),
+        ...(this.leaseConstraints === undefined
+          ? {}
+          : { lease_constraints: this.leaseConstraints }),
         ...(hasBudget ? { budget: budgetObj } : {}),
         accepted_at: this.createdAt,
-        ...(this.parentJobId !== undefined
-          ? { parent_job_id: this.parentJobId }
-          : {}),
-        ...(this.delegateId !== undefined
-          ? { delegate_id: this.delegateId }
-          : {}),
-        ...(this.traceId !== undefined ? { trace_id: this.traceId } : {}),
+        ...(this.parentJobId === undefined
+          ? {}
+          : { parent_job_id: this.parentJobId }),
+        ...(this.delegateId === undefined
+          ? {}
+          : { delegate_id: this.delegateId }),
+        ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
       optional: {
         session_id: this.sessionId,
         job_id: this.jobId,
-        ...(this.traceId !== undefined ? { trace_id: this.traceId } : {}),
+        ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
     });
     await this.send(env);
@@ -337,7 +335,7 @@ export class Job {
         session_id: this.sessionId,
         job_id: this.jobId,
         event_seq: this.seq.nextEventSeq(),
-        ...(this.traceId !== undefined ? { trace_id: this.traceId } : {}),
+        ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
     });
     await this.send(env);
@@ -374,7 +372,7 @@ export class Job {
         session_id: this.sessionId,
         job_id: this.jobId,
         event_seq: this.seq.nextEventSeq(),
-        ...(this.traceId !== undefined ? { trace_id: this.traceId } : {}),
+        ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
     });
     await this.send(env);
@@ -394,14 +392,14 @@ export class Job {
         session_id: this.sessionId,
         job_id: this.jobId,
         event_seq: this.seq.nextEventSeq(),
-        ...(this.traceId !== undefined ? { trace_id: this.traceId } : {}),
+        ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
     });
     try {
       await this.send(env);
-    } catch (err) {
+    } catch (error) {
       this.logger.error(
-        { err, jobId: this.jobId },
+        { err: error, jobId: this.jobId },
         "failed to emit job.error envelope",
       );
     }
@@ -412,10 +410,9 @@ export class Job {
   private armWatchdog(): void {
     this.disarmWatchdog();
     if (this.isTerminal) return;
-    this.heartbeatTimer = setTimeout(
-      () => this.onWatchdogFire(),
-      this.heartbeatIntervalMs,
-    );
+    this.heartbeatTimer = setTimeout(() => {
+      this.onWatchdogFire();
+    }, this.heartbeatIntervalMs);
     this.heartbeatTimer.unref();
   }
 
@@ -617,7 +614,7 @@ export function makeJobContext(job: Job): JobContext {
       await job.emitEventKind("log", {
         level,
         message,
-        ...(attributes !== undefined ? { attributes } : {}),
+        ...(attributes === undefined ? {} : { attributes }),
       } satisfies LogPayload);
     },
     async thought(text) {
@@ -626,7 +623,7 @@ export function makeJobContext(job: Job): JobContext {
     async status(phase, message) {
       const body: StatusBody = {
         phase,
-        ...(message !== undefined ? { message } : {}),
+        ...(message === undefined ? {} : { message }),
       };
       await job.emitEventKind("status", body);
     },
@@ -648,9 +645,9 @@ export function makeJobContext(job: Job): JobContext {
     async progress(current, opts) {
       const body: ProgressBody = {
         current,
-        ...(opts?.total !== undefined ? { total: opts.total } : {}),
-        ...(opts?.units !== undefined ? { units: opts.units } : {}),
-        ...(opts?.message !== undefined ? { message: opts.message } : {}),
+        ...(opts?.total === undefined ? {} : { total: opts.total }),
+        ...(opts?.units === undefined ? {} : { units: opts.units }),
+        ...(opts?.message === undefined ? {} : { message: opts.message }),
       };
       await job.emitEventKind("progress", body);
     },
@@ -712,10 +709,10 @@ function makeResultStream(job: Job, resultIdIn?: string): ResultStream {
       await job.emitResult({
         final_status: "success",
         result_id: resultId,
-        ...(opts?.summary !== undefined ? { summary: opts.summary } : {}),
-        ...(opts?.resultSize !== undefined
-          ? { result_size: opts.resultSize }
-          : {}),
+        ...(opts?.summary === undefined ? {} : { summary: opts.summary }),
+        ...(opts?.resultSize === undefined
+          ? {}
+          : { result_size: opts.resultSize }),
       });
     },
   };
@@ -732,4 +729,10 @@ export type AgentHandler<Input = unknown, Result = unknown> = (
 ) => Promise<Result>;
 
 // Re-export commonly used error types so consumers can import in one place.
-export { CancelledError, HeartbeatLostError, InternalError, TimeoutError };
+
+export {
+  TimeoutError,
+  CancelledError,
+  HeartbeatLostError,
+  InternalError,
+} from "@arcp/core/errors";

@@ -33,8 +33,8 @@ pnpm tsx examples/lease-expires-at/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT`  | `7890` | server |
-| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7890/arcp` | client |
-| `ARCP_DEMO_TOKEN` | `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7890`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7890/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

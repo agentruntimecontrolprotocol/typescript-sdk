@@ -27,6 +27,7 @@ function instrument(transport: WebSocketTransport): void {
     orig((frame: WireFrame) => {
       if (
         typeof frame === "object" &&
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         frame !== null &&
         "type" in frame &&
         (frame as { type?: unknown }).type === "session.ping"

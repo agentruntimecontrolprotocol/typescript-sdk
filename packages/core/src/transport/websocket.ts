@@ -1,5 +1,7 @@
 import { WebSocket, WebSocketServer } from "ws";
+
 import { InvalidRequestError } from "../errors.js";
+
 import type {
   FrameHandler,
   SendableFrame,
@@ -28,7 +30,14 @@ export class WebSocketTransport implements Transport {
         // v0.1 does not support binary sidecar frames.
         return;
       }
-      const text = typeof data === "string" ? data : data.toString("utf8");
+      const text =
+        typeof data === "string"
+          ? data
+          : Buffer.isBuffer(data)
+            ? data.toString("utf8")
+            : Array.isArray(data)
+              ? Buffer.concat(data).toString("utf8")
+              : Buffer.from(data).toString("utf8");
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
@@ -45,7 +54,7 @@ export class WebSocketTransport implements Transport {
       const h = this.handler;
       if (h !== null) {
         this.inboundChain = this.inboundChain
-          .then(() => Promise.resolve(h(frame)))
+          .then(() => h(frame))
           .catch((): void => {
             /* Keep the queue alive; runtime logs protocol errors. */
           });
@@ -83,8 +92,8 @@ export class WebSocketTransport implements Transport {
     }
     return new Promise<void>((resolve, reject) => {
       this.socket.send(JSON.stringify(frame), (err) => {
-        if (err !== undefined && err !== null) reject(err);
-        else resolve();
+        if (err === undefined) resolve();
+        else reject(err);
       });
     });
   }
@@ -102,6 +111,9 @@ export class WebSocketTransport implements Transport {
     this.closeHandler = handler;
   }
 
+  // Transport.close is async-by-contract; the WS path finishes synchronously
+  // (the close-handler fires via the 'close' event handler upstream).
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async close(_reason?: string): Promise<void> {
     if (this.isClosed) return;
     this.isClosed = true;
@@ -176,9 +188,10 @@ export async function startWebSocketServer(args: {
   const addr = wss.address();
   if (addr === null || typeof addr === "string") {
     await new Promise<void>((resolve, reject) => {
-      wss.close((err) =>
-        err !== undefined && err !== null ? reject(err) : resolve(),
-      );
+      wss.close((err) => {
+        if (err === undefined) resolve();
+        else reject(err);
+      });
     });
     throw new Error("WebSocketServer address unavailable");
   }
@@ -189,8 +202,11 @@ export async function startWebSocketServer(args: {
     close: () =>
       new Promise<void>((resolve, reject) => {
         wss.close((err) => {
-          if (err !== null && err !== undefined) reject(err);
-          else resolve();
+          if (err === undefined) {
+            resolve();
+          } else {
+            reject(err);
+          }
         });
       }),
   };

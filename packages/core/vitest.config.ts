@@ -5,8 +5,8 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     environment: "node",
     pool: "threads",
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    testTimeout: 10_000,
+    hookTimeout: 10_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

@@ -4,7 +4,9 @@
  */
 import { readFileSync } from "node:fs";
 import process from "node:process";
+
 import { Command } from "commander";
+
 import {
   ARCPClient,
   ARCPServer,
@@ -95,12 +97,12 @@ program
     const handle = await client.submit({
       agent: opts.agent,
       input,
-      ...(opts.idempotencyKey !== undefined
-        ? { idempotencyKey: opts.idempotencyKey }
-        : {}),
-      ...(opts.maxRuntime !== undefined
-        ? { maxRuntimeSec: Number.parseInt(opts.maxRuntime, 10) }
-        : {}),
+      ...(opts.idempotencyKey === undefined
+        ? {}
+        : { idempotencyKey: opts.idempotencyKey }),
+      ...(opts.maxRuntime === undefined
+        ? {}
+        : { maxRuntimeSec: Number.parseInt(opts.maxRuntime, 10) }),
     });
     try {
       const result = await handle.done;

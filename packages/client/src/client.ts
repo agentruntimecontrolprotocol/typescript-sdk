@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+
 import {
   type BaseEnvelope,
   buildEnvelope,
@@ -18,7 +19,6 @@ import {
   type Envelope,
   EnvelopeSchema,
   type JobAcceptedPayload,
-  type JobErrorPayload,
   type JobEventPayload,
   type JobListEntry,
   type JobResultPayload,
@@ -219,8 +219,10 @@ export class ARCPClient {
     Deferred<JobSubscribedPayload>
   >();
   /** v1.1 §6.5 — auto-ack scheduler state. */
-  private autoAckOpts: { intervalMs: number; minSeqDelta: number } | null =
-    null;
+  private readonly autoAckOpts: {
+    intervalMs: number;
+    minSeqDelta: number;
+  } | null = null;
   private autoAckTimer: ReturnType<typeof setTimeout> | null = null;
   private lastAckedSeq = 0;
 
@@ -304,13 +306,11 @@ export class ARCPClient {
     // `capabilities` block, build one with our default features. If they
     // did, augment with `features` (unless they explicitly set it).
     const advertisedFeatures = this.options.features ?? V1_1_FEATURES;
-    const baseCaps: Capabilities = { ...(this.options.capabilities ?? {}) };
+    const baseCaps: Capabilities = { ...this.options.capabilities };
     if (baseCaps.features === undefined && advertisedFeatures.length > 0) {
       baseCaps.features = [...advertisedFeatures];
     }
-    if (baseCaps.encodings === undefined) {
-      baseCaps.encodings = ["json"];
-    }
+    baseCaps.encodings ??= ["json"];
 
     const helloId = newMessageId();
     const helloEnv = buildEnvelope({
@@ -320,12 +320,12 @@ export class ARCPClient {
         client: this.options.client,
         auth: {
           scheme: this.options.authScheme,
-          ...(this.options.token !== undefined
-            ? { token: this.options.token }
-            : {}),
+          ...(this.options.token === undefined
+            ? {}
+            : { token: this.options.token }),
         },
         capabilities: baseCaps,
-        ...(resume !== undefined ? { resume } : {}),
+        ...(resume === undefined ? {} : { resume }),
       },
     });
     await transport.send(helloEnv);
@@ -396,7 +396,7 @@ export class ARCPClient {
         const env = buildEnvelope({
           id: newMessageId(),
           type: "session.bye" as const,
-          payload: reason !== undefined ? { reason } : {},
+          payload: reason === undefined ? {} : { reason },
           optional: { session_id: sessionId },
         });
         await this.transport.send(env);
@@ -429,20 +429,20 @@ export class ARCPClient {
       payload: {
         agent: opts.agent,
         input: opts.input,
-        ...(opts.lease !== undefined ? { lease_request: opts.lease } : {}),
-        ...(opts.leaseConstraints !== undefined
-          ? { lease_constraints: opts.leaseConstraints }
-          : {}),
-        ...(opts.idempotencyKey !== undefined
-          ? { idempotency_key: opts.idempotencyKey }
-          : {}),
-        ...(opts.maxRuntimeSec !== undefined
-          ? { max_runtime_sec: opts.maxRuntimeSec }
-          : {}),
+        ...(opts.lease === undefined ? {} : { lease_request: opts.lease }),
+        ...(opts.leaseConstraints === undefined
+          ? {}
+          : { lease_constraints: opts.leaseConstraints }),
+        ...(opts.idempotencyKey === undefined
+          ? {}
+          : { idempotency_key: opts.idempotencyKey }),
+        ...(opts.maxRuntimeSec === undefined
+          ? {}
+          : { max_runtime_sec: opts.maxRuntimeSec }),
       },
       optional: {
         session_id: sessionId,
-        ...(opts.traceId !== undefined ? { trace_id: opts.traceId } : {}),
+        ...(opts.traceId === undefined ? {} : { trace_id: opts.traceId }),
       },
     });
 
@@ -506,7 +506,7 @@ export class ARCPClient {
     const env = buildEnvelope({
       id: newMessageId(),
       type: "job.cancel" as const,
-      payload: options.reason !== undefined ? { reason: options.reason } : {},
+      payload: options.reason === undefined ? {} : { reason: options.reason },
       optional: { session_id: sessionId, job_id: jobId },
     });
     await this.transport.send(env);
@@ -565,9 +565,9 @@ export class ARCPClient {
       id,
       type: "session.list_jobs" as const,
       payload: {
-        ...(filter !== undefined ? { filter } : {}),
-        ...(opts.limit !== undefined ? { limit: opts.limit } : {}),
-        ...(opts.cursor !== undefined ? { cursor: opts.cursor } : {}),
+        ...(filter === undefined ? {} : { filter }),
+        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
+        ...(opts.cursor === undefined ? {} : { cursor: opts.cursor }),
       },
       optional: { session_id: sessionId },
     });
@@ -604,10 +604,10 @@ export class ARCPClient {
       type: "job.subscribe" as const,
       payload: {
         job_id: jobId,
-        ...(opts.history !== undefined ? { history: opts.history } : {}),
-        ...(opts.fromEventSeq !== undefined
-          ? { from_event_seq: opts.fromEventSeq }
-          : {}),
+        ...(opts.history === undefined ? {} : { history: opts.history }),
+        ...(opts.fromEventSeq === undefined
+          ? {}
+          : { from_event_seq: opts.fromEventSeq }),
       },
       optional: { session_id: sessionId },
     });
@@ -640,8 +640,8 @@ export class ARCPClient {
     let parsed: BaseEnvelope;
     try {
       parsed = RoundTripEnvelopeSchema.parse(frame);
-    } catch (err) {
-      this.logger.warn({ err }, "client received malformed frame");
+    } catch (error) {
+      this.logger.warn({ err: error }, "client received malformed frame");
       return;
     }
 
@@ -650,6 +650,9 @@ export class ARCPClient {
       const result = EnvelopeSchema.safeParse(parsed);
       if (result.success && result.data.type === "session.welcome") {
         // Assign session id from the envelope itself.
+        // session_id is typed as required by the schema, but we keep the runtime
+        // check in case the server omits it on the wire.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (result.data.session_id !== undefined) {
           try {
             this.state.assignId(result.data.session_id);
@@ -739,6 +742,8 @@ export class ARCPClient {
       }
     }
     // v1.1 §7.6 — job.subscribed (response to subscribe).
+    // job_id is required by the schema, but we keep the runtime check.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (env.type === "job.subscribed" && env.job_id !== undefined) {
       const d = this.pendingSubscribes.get(env.job_id);
       if (d !== undefined) {
@@ -753,8 +758,11 @@ export class ARCPClient {
     if (handler !== undefined) {
       try {
         await handler(env);
-      } catch (err) {
-        this.logger.error({ err, type: env.type }, "client handler threw");
+      } catch (error) {
+        this.logger.error(
+          { err: error, type: env.type },
+          "client handler threw",
+        );
       }
       return;
     }
@@ -800,7 +808,7 @@ export class ARCPClient {
       // submit() continuation hasn't yet run from the microtask queue.
       const inv = this.pendingAccepts.shift();
       if (inv !== undefined && !inv.acceptance.settled) {
-        const payload = env.payload as JobAcceptedPayload;
+        const payload = env.payload;
         inv.jobId = payload.job_id;
         inv.lease = payload.lease;
         inv.agent = payload.agent;
@@ -812,10 +820,13 @@ export class ARCPClient {
       }
       return;
     }
+
+    // job_id is required by the schema, but we keep the runtime check.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (env.type === "job.event" && env.job_id !== undefined) {
       const inv = this.invocationsByJobId.get(env.job_id);
       if (inv !== undefined) {
-        const ep = env.payload as JobEventPayload;
+        const ep = env.payload;
         inv.events.push(ep);
         // v1.1 §8.4 — accumulate result_chunk bodies for later assembly.
         if (ep.kind === "result_chunk") {
@@ -830,16 +841,18 @@ export class ARCPClient {
       }
       return;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (env.type === "job.result" && env.job_id !== undefined) {
       const inv = this.invocationsByJobId.get(env.job_id);
       if (inv !== undefined) {
-        inv.completion.resolve(env.payload as JobResultPayload);
+        inv.completion.resolve(env.payload);
         this.invocationsByJobId.delete(env.job_id);
       }
       return;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (env.type === "job.error" && env.job_id !== undefined) {
-      const payload = env.payload as JobErrorPayload;
+      const payload = env.payload;
       const err = ARCPError.fromPayload(jobErrorToErrorPayload(payload));
       let inv = this.invocationsByJobId.get(env.job_id);
       if (inv === undefined) {
@@ -895,7 +908,7 @@ function makeHandleFromInvocation(inv: InvocationState): JobHandle {
       if (chunks === undefined || chunks.length === 0) {
         return "";
       }
-      const sorted = [...chunks].sort((a, b) => a.chunk_seq - b.chunk_seq);
+      const sorted = chunks.toSorted((a, b) => a.chunk_seq - b.chunk_seq);
       const encoding = sorted[0]?.encoding ?? "utf8";
       if (encoding === "base64") {
         const buffers = sorted.map((c) => Buffer.from(c.data, "base64"));

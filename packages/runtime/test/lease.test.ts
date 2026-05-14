@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   assertLeaseSubset,
   canonicalizeTarget,
@@ -6,7 +8,6 @@ import {
   validateLeaseOp,
   validateLeaseShape,
 } from "@arcp/runtime";
-import { describe, expect, it } from "vitest";
 
 describe("glob matcher (§9.2)", () => {
   it("single * matches one segment", () => {
@@ -49,23 +50,23 @@ describe("canonicalizeTarget", () => {
 
 describe("validateLeaseOp", () => {
   it("permits a matching capability", () => {
-    expect(() =>
-      validateLeaseOp({ "fs.read": ["/foo/**"] }, "fs.read", "/foo/bar"),
-    ).not.toThrow();
+    expect(() => {
+      validateLeaseOp({ "fs.read": ["/foo/**"] }, "fs.read", "/foo/bar");
+    }).not.toThrow();
   });
   it("rejects unknown capability", () => {
-    expect(() =>
-      validateLeaseOp({ "fs.read": ["/foo/**"] }, "fs.write", "/foo/bar"),
-    ).toThrow(/PERMISSION_DENIED|Capability/);
+    expect(() => {
+      validateLeaseOp({ "fs.read": ["/foo/**"] }, "fs.write", "/foo/bar");
+    }).toThrow(/PERMISSION_DENIED|Capability/);
   });
   it("canonicalizes targets before matching (path traversal)", () => {
-    expect(() =>
+    expect(() => {
       validateLeaseOp(
         { "fs.read": ["/safe/**"] },
         "fs.read",
         "/safe/../etc/passwd",
-      ),
-    ).toThrow();
+      );
+    }).toThrow();
   });
 });
 
@@ -90,27 +91,29 @@ describe("isLeaseSubset (§9.4)", () => {
     );
   });
   it("assertLeaseSubset throws LEASE_SUBSET_VIOLATION on failure", () => {
-    expect(() =>
+    expect(() => {
       assertLeaseSubset(
         { "fs.read": ["/anything/**"] },
         { "fs.read": ["/foo/**"] },
-      ),
-    ).toThrow(/LEASE_SUBSET_VIOLATION|subset/);
+      );
+    }).toThrow(/LEASE_SUBSET_VIOLATION|subset/);
   });
 });
 
 describe("validateLeaseShape", () => {
   it("permits reserved namespaces", () => {
-    expect(() => validateLeaseShape({ "fs.read": ["/x"] })).not.toThrow();
+    expect(() => {
+      validateLeaseShape({ "fs.read": ["/x"] });
+    }).not.toThrow();
   });
   it("permits x-vendor.<vendor>.<name>", () => {
-    expect(() =>
-      validateLeaseShape({ "x-vendor.acme.cap": ["pat"] }),
-    ).not.toThrow();
+    expect(() => {
+      validateLeaseShape({ "x-vendor.acme.cap": ["pat"] });
+    }).not.toThrow();
   });
   it("rejects unknown bare capability", () => {
-    expect(() => validateLeaseShape({ "totally.bogus": ["x"] })).toThrow(
-      /INVALID_REQUEST|capability/,
-    );
+    expect(() => {
+      validateLeaseShape({ "totally.bogus": ["x"] });
+    }).toThrow(/INVALID_REQUEST|capability/);
   });
 });

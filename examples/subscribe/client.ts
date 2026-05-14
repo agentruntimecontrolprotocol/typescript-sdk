@@ -54,6 +54,7 @@ async function main(): Promise<void> {
   clientB.on("job.event", (env) => {
     if (env.type !== "job.event") return;
     const isReplay =
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       env.event_seq !== undefined && env.event_seq <= subscribedFrom;
     if (isReplay) replayedEvents += 1;
     else liveEvents += 1;

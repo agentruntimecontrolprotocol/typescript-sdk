@@ -36,7 +36,9 @@ export class PendingRegistry {
         this.expire(correlationId);
       }, options.deadlineMs);
       timer.unref();
-      entry.cancelTimer = () => clearTimeout(timer);
+      entry.cancelTimer = () => {
+        clearTimeout(timer);
+      };
     }
     if (options.signal !== undefined) {
       const sig = options.signal;
@@ -67,6 +69,9 @@ export class PendingRegistry {
     return this.meta.get(correlationId);
   }
 
+  // The type parameter only narrows `value` for the caller; it's intentionally
+  // unconstrained on the entry side.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   public resolve<T>(correlationId: string, value: T): boolean {
     const entry = this.entries.get(correlationId) as
       | PendingEntry<T>
@@ -94,12 +99,18 @@ export class PendingRegistry {
       correlationId,
       reason instanceof Error
         ? reason
-        : new CancelledError(String(reason ?? "cancelled")),
+        : new CancelledError(
+            typeof reason === "string"
+              ? reason
+              : reason === undefined
+                ? "cancelled"
+                : JSON.stringify(reason),
+          ),
     );
   }
 
   public rejectAll(reason: unknown): void {
-    for (const id of [...this.entries.keys()]) {
+    for (const id of this.entries.keys()) {
       this.reject(id, reason);
     }
   }

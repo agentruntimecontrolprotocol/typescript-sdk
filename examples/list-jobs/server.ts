@@ -37,6 +37,7 @@ async function main(): Promise<void> {
         "abort",
         () => {
           clearTimeout(t);
+          // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
           reject(ctx.signal.reason);
         },
         { once: true },

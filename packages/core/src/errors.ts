@@ -98,7 +98,7 @@ export class ARCPError extends Error {
     this.name = "ARCPError";
     this.code = opts.code;
     this.retryable = opts.retryable ?? isRetryableByDefault(opts.code);
-    this.details = Object.freeze({ ...(opts.details ?? {}) });
+    this.details = Object.freeze({ ...opts.details });
   }
 
   /** Serialize to the wire `ErrorPayload` shape (§12). */
@@ -118,10 +118,10 @@ export class ARCPError extends Error {
     return new ARCPError({
       code: payload.code,
       message: payload.message,
-      ...(payload.retryable !== undefined
-        ? { retryable: payload.retryable }
-        : {}),
-      ...(payload.details !== undefined ? { details: payload.details } : {}),
+      ...(payload.retryable === undefined
+        ? {}
+        : { retryable: payload.retryable }),
+      ...(payload.details === undefined ? {} : { details: payload.details }),
     });
   }
 }

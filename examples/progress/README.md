@@ -29,8 +29,8 @@ prints one line per update.
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT`  | `7892` | server |
-| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7892/arcp` | client |
-| `ARCP_DEMO_TOKEN` | `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7892`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7892/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

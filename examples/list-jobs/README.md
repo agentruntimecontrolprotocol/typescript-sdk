@@ -29,8 +29,8 @@ pnpm tsx examples/list-jobs/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT`  | `7887` | server |
-| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7887/arcp` | client |
-| `ARCP_DEMO_TOKEN` | `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7887`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7887/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

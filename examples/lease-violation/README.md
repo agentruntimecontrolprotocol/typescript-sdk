@@ -3,7 +3,7 @@
 An agent is granted a narrow lease and attempts a tool call outside its
 scope. The runtime's `validateLeaseOp` throws `PermissionDeniedError`;
 the agent surfaces the failure as a `tool_result` with `body.error` and
-continues. The job ultimately succeeds — lease violations are *not*
+continues. The job ultimately succeeds — lease violations are _not_
 session-fatal.
 
 ## Run
@@ -31,8 +31,8 @@ pnpm tsx examples/lease-violation/client.ts
 
 ## Configuration
 
-| Env var | Default | Used by |
-|---|---|---|
-| `ARCP_DEMO_PORT` | `7882` | server |
-| `ARCP_DEMO_URL`  | `ws://127.0.0.1:7882/arcp` | client |
-| `ARCP_DEMO_TOKEN`| `demo-token` | both |
+| Env var           | Default                    | Used by |
+| ----------------- | -------------------------- | ------- |
+| `ARCP_DEMO_PORT`  | `7882`                     | server  |
+| `ARCP_DEMO_URL`   | `ws://127.0.0.1:7882/arcp` | client  |
+| `ARCP_DEMO_TOKEN` | `demo-token`               | both    |

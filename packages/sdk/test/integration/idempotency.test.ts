@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { makePairedHarness } from "../helpers/fixtures.js";
 
 describe("§7.2 idempotency", () => {

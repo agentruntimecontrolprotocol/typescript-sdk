@@ -1,6 +1,9 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { afterAll, describe, expect, it } from "vitest";
+
 import {
   ARCPClient,
   ARCPError,
@@ -12,9 +15,8 @@ import {
   type Transport,
   WebSocketTransport,
 } from "@arcp/sdk";
-import { afterAll, describe, expect, it } from "vitest";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 interface TransportFixture {
   name: string;
@@ -72,8 +74,20 @@ const fixtures: TransportFixture[] = [
   {
     name: "stdio",
     async setup() {
-      const tsxBin = resolve(here, "..", "..", "node_modules", ".bin", "tsx");
-      const runtimeScript = resolve(here, "..", "helpers", "stdio-runtime.ts");
+      const tsxBin = path.resolve(
+        here,
+        "..",
+        "..",
+        "node_modules",
+        ".bin",
+        "tsx",
+      );
+      const runtimeScript = path.resolve(
+        here,
+        "..",
+        "helpers",
+        "stdio-runtime.ts",
+      );
       const child: ChildProcessWithoutNullStreams = spawn(
         tsxBin,
         [runtimeScript, ":memory:"],
@@ -99,7 +113,9 @@ const fixtures: TransportFixture[] = [
           await client.close();
           child.kill("SIGKILL");
           await new Promise<void>((r) => {
-            child.on("exit", () => r());
+            child.on("exit", () => {
+              r();
+            });
           });
         },
       };
@@ -129,7 +145,7 @@ for (const fixture of fixtures) {
     });
 
     it("rejects unknown agent with AGENT_NOT_AVAILABLE", async () => {
-      if (setup === null) setup = await fixture.setup();
+      setup ??= await fixture.setup();
       await expect(
         setup.client.submit({ agent: "unknown.agent" }),
       ).rejects.toBeInstanceOf(ARCPError);

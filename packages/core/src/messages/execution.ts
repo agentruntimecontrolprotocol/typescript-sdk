@@ -1,7 +1,8 @@
 import { z } from "zod";
+
 import { messageEnvelope } from "../envelope.js";
 import { type ErrorPayload, ErrorPayloadSchema } from "../errors.js";
-import { ArtifactRefSchema } from "./artifacts.js";
+
 import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
 
 // ARCP v1.0 §7-§8 job-related envelopes.
@@ -85,7 +86,7 @@ export interface ParsedAgentRef {
  */
 export function parseAgentRef(input: string): ParsedAgentRef {
   const at = input.indexOf("@");
-  if (at < 0) {
+  if (at === -1) {
     if (!AGENT_NAME_REGEX.test(input)) {
       throw new Error(`Invalid agent name "${input}"`);
     }
@@ -131,8 +132,12 @@ export function parseBudgetAmount(input: string): ParsedBudgetAmount {
   if (m === null) {
     throw new Error(`Invalid cost.budget amount "${input}"`);
   }
-  const currency = m[1] as string;
-  const amount = Number.parseFloat(m[2] as string);
+  const currency = m[1];
+  const rawAmount = m[2];
+  if (currency === undefined || rawAmount === undefined) {
+    throw new Error(`Invalid cost.budget amount "${input}"`);
+  }
+  const amount = Number.parseFloat(rawAmount);
   if (!Number.isFinite(amount) || amount < 0) {
     throw new Error(`Invalid cost.budget amount "${input}"`);
   }
@@ -369,28 +374,39 @@ export function parseJobEventBody<K extends ReservedEventKind>(
 export function parseJobEventBody(kind: string, body: unknown): unknown;
 export function parseJobEventBody(kind: string, body: unknown): unknown {
   switch (kind) {
-    case "log":
+    case "log": {
       return LogPayloadSchema.parse(body);
-    case "thought":
+    }
+    case "thought": {
       return ThoughtBodySchema.parse(body);
-    case "tool_call":
+    }
+    case "tool_call": {
       return ToolCallBodySchema.parse(body);
-    case "tool_result":
+    }
+    case "tool_result": {
       return ToolResultBodySchema.parse(body);
-    case "status":
+    }
+    case "status": {
       return StatusBodySchema.parse(body);
-    case "metric":
+    }
+    case "metric": {
       return MetricPayloadSchema.parse(body);
-    case "artifact_ref":
+    }
+    case "artifact_ref": {
       return ArtifactRefBodySchema.parse(body);
-    case "delegate":
+    }
+    case "delegate": {
       return DelegateBodySchema.parse(body);
-    case "progress":
+    }
+    case "progress": {
       return ProgressBodySchema.parse(body);
-    case "result_chunk":
+    }
+    case "result_chunk": {
       return ResultChunkBodySchema.parse(body);
-    default:
+    }
+    default: {
       return body;
+    }
   }
 }
 
@@ -431,8 +447,8 @@ export function jobErrorToErrorPayload(p: JobErrorPayload): ErrorPayload {
   return {
     code: p.code,
     message: p.message,
-    ...(p.retryable !== undefined ? { retryable: p.retryable } : {}),
-    ...(p.details !== undefined ? { details: p.details } : {}),
+    ...(p.retryable === undefined ? {} : { retryable: p.retryable }),
+    ...(p.details === undefined ? {} : { details: p.details }),
   };
 }
 
@@ -540,4 +556,5 @@ export const EXECUTION_ENVELOPES = [
 ] as const;
 
 // Re-export ArtifactRefSchema for convenience even though it's in artifacts.ts.
-export { ArtifactRefSchema };
+
+export { ArtifactRefSchema } from "./artifacts.js";
