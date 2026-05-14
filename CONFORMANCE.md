@@ -124,15 +124,19 @@ The 12 codes above are the *only* values `ErrorCode` admits.
 
 ## §13. Examples
 
-Five runnable examples under `examples/`:
+Eight runnable two-process examples under `examples/` (each a
+`server.ts` + `client.ts` + `README.md`):
 
-| File | Spec |
+| Directory | Spec |
 |---|---|
-| `submit-and-stream.ts` | §13.1 |
-| `delegate/` (server + client) | §13.2 / §10 |
-| `resume.ts` | §13.3 / §6.3 |
-| `idempotent-retry.ts` | §13.5 / §7.2 |
-| `lease-violation.ts` | §13.4 / §9.3 |
+| `submit-and-stream/` | §13.1 / §8.2 |
+| `delegate/` | §13.2 / §10 |
+| `resume/` | §13.3 / §6.3 |
+| `idempotent-retry/` | §13.5 / §7.2 |
+| `lease-violation/` | §13.4 / §9.3 |
+| `cancel/` | §7.4 |
+| `stdio/` | §4.2 / §22 |
+| `vendor-extensions/` | §8.2 / §9.2 / §15 |
 
 ## §14. Security Considerations
 
