@@ -1,0 +1,124 @@
+// ============================================================================
+//  ARCHITECTURE DIAGRAM TEMPLATE — Slate (DARK variant)
+//
+//  Dark companion to diagram-template-light.dot. See that file for the full
+//  design system docs, GitHub <picture> embed snippet, and palette table.
+//
+//  KEEP STRUCTURE IN SYNC with the light variant. Only colors differ here.
+// ============================================================================
+
+digraph Template {
+  // ─── CANVAS ──────────────────────────────────────────────────────────
+  rankdir=TB;
+  bgcolor="transparent";  // sit on whatever dark page bg is active
+  compound=true;
+  fontname="Helvetica";
+  splines=spline;
+  nodesep=0.32;
+  ranksep=0.55;
+  pad="0.35,0.25";
+
+  // ─── NODE DEFAULTS ───────────────────────────────────────────────────
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#334155",      // slate-700
+    color="#475569",          // slate-600 border
+    fontname="Helvetica",
+    fontsize=11,
+    fontcolor="#F1F5F9",      // slate-100
+    margin="0.22,0.11",
+    penwidth=1.0
+  ];
+
+  // ─── EDGE DEFAULTS ───────────────────────────────────────────────────
+  edge [
+    fontname="Helvetica",
+    fontsize=9,
+    fontcolor="#94A3B8",      // slate-400
+    color="#64748B",          // slate-500
+    penwidth=1.1,
+    arrowsize=0.75,
+    arrowhead=vee
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  EXAMPLE — keep structure identical to -light variant
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ─── ENTRY ANCHOR (blue) — unchanged from light ──────────────────────
+  Entry [
+    label=<<FONT POINT-SIZE="12"><B>EntryNode</B></FONT>>,
+    fillcolor="#3B82F6", color="#2563EB",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  // ─── CLUSTER (outer / primary group) ─────────────────────────────────
+  subgraph cluster_outer {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Outer Group</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#0F172A";      // slate-900
+    color="#334155";          // slate-700
+    fontname="Helvetica";
+    fontcolor="#94A3B8";      // slate-400
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    A [label="Component A"];
+    B [label="Component B"];
+
+    A -> B [style=invis];
+    { rank=same; A; B; }
+  }
+
+  // ─── CLUSTER (inner / secondary group) ───────────────────────────────
+  subgraph cluster_inner {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Inner Group</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#1E293B";      // slate-800
+    color="#334155";
+    fontname="Helvetica";
+    fontcolor="#94A3B8";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    // ─── HUB ANCHOR (amber) — unchanged from light ─────────────────────
+    Hub [
+      label=<<FONT POINT-SIZE="12"><B>HubNode</B></FONT>>,
+      fillcolor="#F59E0B", color="#D97706",
+      fontcolor="white", penwidth=1.4
+    ];
+
+    C [label="Component C"];
+    D [label="Component D"];
+
+    // ─── DATA STORE ────────────────────────────────────────────────────
+    Store [
+      label=<<FONT POINT-SIZE="10">Store</FONT><BR/><FONT POINT-SIZE="8" COLOR="#64748B">SQLite</FONT>>,
+      shape=cylinder, fillcolor="#1E293B"
+    ];
+  }
+
+  // ─── WIRING ──────────────────────────────────────────────────────────
+  Entry -> A [dir=both, label="payload", lhead=cluster_outer];
+  A -> Hub   [ltail=cluster_outer];
+
+  // PRIMARY SPINE
+  edge [color="#94A3B8", penwidth=1.2];   // slate-400
+  Hub -> C;
+  Hub -> D;
+
+  // SECONDARY WIRING
+  edge [color="#475569", penwidth=1.0];   // slate-600
+  C -> Store;
+  D -> Store;
+
+  // FEEDBACK / ASYNC RETURN — label uses pink-400 for dark-bg legibility
+  Store -> Hub [
+    style=dashed, color="#F472B6", penwidth=1.1,
+    constraint=false,
+    label=<<FONT COLOR="#F472B6">return</FONT>>, fontsize=9
+  ];
+}

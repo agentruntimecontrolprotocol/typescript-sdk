@@ -16,6 +16,11 @@ This repository is a **pnpm workspace** of independently-versioned
 packages, all ESM, all strictly typed against TypeScript 5.6 with
 `exactOptionalPropertyTypes`.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./diagrams/architecture-dark.svg">
+  <img alt="ARCP TypeScript SDK architecture" src="./diagrams/architecture-light.svg">
+</picture>
+
 ## Install
 
 | Install         | When to use                                                                                       |
@@ -113,6 +118,11 @@ round-tripped per §15.
 
 Three-message handshake:
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./diagrams/session-handshake-dark.svg">
+  <img alt="Session handshake (§6)" src="./diagrams/session-handshake-light.svg">
+</picture>
+
 ```
 C → R   session.hello   { client, auth, capabilities?, resume? }
 R → C   session.welcome { runtime, capabilities, resume_token, resume_window_sec }
@@ -128,6 +138,11 @@ session_id and replays events with `event_seq > last_event_seq` (§6.3).
 ### Jobs (§7)
 
 One verb, one job:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./diagrams/job-lifecycle-dark.svg">
+  <img alt="Job lifecycle (§7)" src="./diagrams/job-lifecycle-light.svg">
+</picture>
 
 ```
 C → R   job.submit   { agent, input, lease_request?, idempotency_key?, max_runtime_sec? }
@@ -151,16 +166,16 @@ Every event the runtime emits to the client is one `job.event` envelope
 whose `payload.kind` is one of eight reserved values or a vendor
 `x-vendor.*` extension:
 
-| Kind           | Body shape                                      | Purpose                                             |
-| -------------- | ----------------------------------------------- | --------------------------------------------------- | ------------------------- |
-| `log`          | `{ level, message, attributes? }`               | Plain log line.                                     |
-| `thought`      | `{ text }`                                      | Model reasoning / internal monologue.               |
-| `tool_call`    | `{ tool, args, call_id }`                       | Agent invoked a tool.                               |
-| `tool_result`  | `{ call_id, result?                             | error? }`                                           | Result for a `tool_call`. |
-| `status`       | `{ phase, message? }`                           | Lifecycle hint (e.g., `running`, `fetching`).       |
-| `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                                |
-| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact (storage is out of scope). |
-| `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Initiate a child job.                               |
+| Kind           | Body shape                                       | Purpose                                             |
+| -------------- | ------------------------------------------------ | --------------------------------------------------- |
+| `log`          | `{ level, message, attributes? }`                | Plain log line.                                     |
+| `thought`      | `{ text }`                                       | Model reasoning / internal monologue.               |
+| `tool_call`    | `{ tool, args, call_id }`                        | Agent invoked a tool.                               |
+| `tool_result`  | `{ call_id, result? \| error? }`                 | Result for a `tool_call`.                           |
+| `status`       | `{ phase, message? }`                            | Lifecycle hint (e.g., `running`, `fetching`).       |
+| `metric`       | `{ name, value, unit?, attributes? }`            | Numeric measurement.                                |
+| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`     | Reference to an artifact (storage is out of scope). |
+| `delegate`     | `{ delegate_id, agent, input, lease_request? }`  | Initiate a child job.                               |
 
 Sequence numbers are session-scoped (§8.3): one counter across all
 concurrent jobs in the session. Replay across a resume preserves
@@ -198,9 +213,7 @@ client re-issues `session.hello` carrying:
 
 ```ts
 {
-  resume: {
-    (session_id, resume_token, last_event_seq);
-  }
+  resume: { session_id, resume_token, last_event_seq }
 }
 ```
 
@@ -374,6 +387,7 @@ packages/
     bun/               # @arcp/bun
     otel/              # @arcp/middleware-otel
 examples/              # Twenty-three runnable two-process demos (v1.0 + v1.1 + host integrations)
+diagrams/              # Graphviz .dot sources + rendered light/dark SVGs (see diagrams/README.md)
 ```
 
 ## Development

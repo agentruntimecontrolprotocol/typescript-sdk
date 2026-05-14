@@ -1,0 +1,91 @@
+digraph ARCPSessionHandshake {
+  rankdir=LR;
+  bgcolor="transparent";
+  compound=true;
+  fontname="Helvetica";
+  splines=spline;
+  nodesep=0.32;
+  ranksep=0.70;
+  pad="0.35,0.25";
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="white",
+    color="#CBD5E1",
+    fontname="Helvetica",
+    fontsize=11,
+    fontcolor="#1F2937",
+    margin="0.22,0.11",
+    penwidth=1.0
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=9,
+    fontcolor="#64748B",
+    color="#94A3B8",
+    penwidth=1.1,
+    arrowsize=0.75,
+    arrowhead=vee
+  ];
+
+  // ENTRY anchor — initiating peer
+  Client [
+    label=<<FONT POINT-SIZE="12"><B>ARCPClient</B></FONT>>,
+    fillcolor="#3B82F6", color="#2563EB",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  // HUB anchor — runtime is the central authority
+  Runtime [
+    label=<<FONT POINT-SIZE="12"><B>ARCPRuntime</B></FONT>>,
+    fillcolor="#F59E0B", color="#D97706",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  subgraph cluster_open {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Handshake (§6)</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#F1F5F9";
+    color="#E2E8F0";
+    fontname="Helvetica";
+    fontcolor="#475569";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    Hello   [label="session.hello"];
+    Welcome [label="session.welcome"];
+    SessErr [label="session.error"];
+
+    Hello -> Welcome -> SessErr [style=invis];
+    { rank=same; Hello; Welcome; SessErr; }
+  }
+
+  // Resume token storage
+  Token [
+    label=<<FONT POINT-SIZE="10">resume_token</FONT><BR/><FONT POINT-SIZE="8" COLOR="#94A3B8">single-use, rotated</FONT>>,
+    shape=cylinder, fillcolor="#FAFBFC"
+  ];
+
+  // PRIMARY SPINE — happy path
+  edge [color="#64748B", penwidth=1.2];
+  Client  -> Hello;
+  Hello   -> Runtime;
+  Runtime -> Welcome;
+  Welcome -> Client;
+
+  // SECONDARY — error path + rotation
+  edge [color="#CBD5E1", penwidth=1.0];
+  Runtime -> SessErr [label="auth /\nversion fail"];
+  SessErr -> Client  [label="transport closes"];
+  Welcome -> Token   [label="rotates"];
+
+  // FEEDBACK — resume reuses the prior token
+  Token -> Hello [
+    style=dashed, color="#F472B6", penwidth=1.1,
+    constraint=false,
+    label=<<FONT COLOR="#DB2777">payload.resume</FONT>>, fontsize=9
+  ];
+}

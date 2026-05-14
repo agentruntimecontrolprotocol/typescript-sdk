@@ -1,0 +1,191 @@
+// ============================================================================
+//  ARCHITECTURE DIAGRAM TEMPLATE — Slate (LIGHT variant)
+//  Light + dark variants for GitHub auto-switching
+// ============================================================================
+//
+//  PAIRED FILES
+//    diagram-template-light.dot  ← this file
+//    diagram-template-dark.dot   ← dark companion, structurally identical
+//
+//  RENDER BOTH
+//    dot -Tsvg diagram-light.dot -o diagram-light.svg
+//    dot -Tsvg diagram-dark.dot  -o diagram-dark.svg
+//
+//  EMBED IN GITHUB MARKDOWN
+//    GitHub honors the <picture> element with `prefers-color-scheme`, so:
+//
+//      <picture>
+//        <source media="(prefers-color-scheme: dark)" srcset="diagram-dark.svg">
+//        <img alt="Architecture" src="diagram-light.svg">
+//      </picture>
+//
+//    Viewers on the light theme see diagram-light.svg, dark theme sees the
+//    dark one. Both SVGs render with a transparent background so they sit on
+//    whatever page color is active.
+//
+//  HOW TO USE
+//    1. Copy both variant files. Rename the digraph and filenames to match.
+//    2. Edit ONLY the EXAMPLE section. Keep the DEFAULTS block in sync between
+//       variants — only colors should differ between -light and -dark.
+//    3. Render both, commit both SVGs, reference both in the <picture> tag.
+//
+//  DESIGN RULES
+//    • Two visual anchors max per diagram: one ENTRY (blue) and one HUB
+//      (amber). If you highlight a third thing, nothing is highlighted.
+//    • Primary spine edges (slate-500 / slate-400) carry the main flow.
+//      Secondary wiring (slate-300 / slate-600) recedes.
+//    • Clusters group related components. Outer/primary uses ink-100 (light)
+//      or slate-900 (dark); inner/secondary uses ink-50 / slate-800.
+//    • Data stores use shape=cylinder; everything else is a rounded box.
+//    • Async / feedback / return paths use dashed pink edges with a label.
+//    • Single-line centered node labels. If a node needs context, put it in
+//      the cluster label instead of as a subtitle.
+//
+//  PALETTE
+//                       LIGHT                       DARK
+//    canvas             white (transparent ok)      transparent
+//    primary text       #1F2937  ink-900            #F1F5F9  slate-100
+//    cluster label      #475569  ink-600            #94A3B8  slate-400
+//    muted subtitle     #94A3B8  ink-400            #64748B  slate-500
+//    primary edge       #64748B  ink-500            #94A3B8  slate-400
+//    default edge       #94A3B8  ink-400            #64748B  slate-500
+//    secondary edge     #CBD5E1  ink-300            #475569  slate-600
+//    node default fill  white                       #334155  slate-700
+//    node default brdr  #CBD5E1  ink-300            #475569  slate-600
+//    cluster brdr       #E2E8F0  ink-200            #334155  slate-700
+//    outer cluster fill #F1F5F9  ink-100            #0F172A  slate-900
+//    inner cluster fill #F8FAFC  ink-50             #1E293B  slate-800
+//    entry fill / brdr  #3B82F6 / #2563EB blue      same (works on both)
+//    hub   fill / brdr  #F59E0B / #D97706 amber     same (works on both)
+//    feedback edge      #F472B6  pink-400           same
+//    feedback label     #DB2777  pink-600           #F472B6  pink-400
+// ============================================================================
+
+digraph Template {
+  // ─── CANVAS ──────────────────────────────────────────────────────────
+  rankdir=TB;             // TB = top-to-bottom flow. LR for horizontal.
+  bgcolor="transparent";  // sit on whatever page bg the viewer has
+  compound=true;          // allow edges to terminate on cluster boundaries
+  fontname="Helvetica";
+  splines=spline;         // curved edges. try `ortho` for right-angle bus look
+  nodesep=0.32;           // horizontal gap between sibling nodes
+  ranksep=0.55;           // vertical gap between ranks (rows)
+  pad="0.35,0.25";        // outer canvas padding
+
+  // ─── NODE DEFAULTS ───────────────────────────────────────────────────
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="white",
+    color="#CBD5E1",          // ink-300 border
+    fontname="Helvetica",
+    fontsize=11,
+    fontcolor="#1F2937",      // ink-900
+    margin="0.22,0.11",
+    penwidth=1.0
+  ];
+
+  // ─── EDGE DEFAULTS ───────────────────────────────────────────────────
+  edge [
+    fontname="Helvetica",
+    fontsize=9,
+    fontcolor="#64748B",      // ink-500
+    color="#94A3B8",          // ink-400
+    penwidth=1.1,
+    arrowsize=0.75,
+    arrowhead=vee
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  EXAMPLE — replace everything below with your own diagram content
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ─── ENTRY ANCHOR (blue) ─────────────────────────────────────────────
+  // Use once, for the external client / user-facing entry point.
+  Entry [
+    label=<<FONT POINT-SIZE="12"><B>EntryNode</B></FONT>>,
+    fillcolor="#3B82F6", color="#2563EB",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  // ─── CLUSTER (outer / primary group) ─────────────────────────────────
+  // The label TABLE puts padding on top + sides but not bottom, so the
+  // group title sits cleanly above its contents. Don't simplify it back
+  // to a plain `label=` — the asymmetric padding is the trick.
+  subgraph cluster_outer {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Outer Group</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#F1F5F9";      // ink-100
+    color="#E2E8F0";          // ink-200
+    fontname="Helvetica";
+    fontcolor="#475569";      // ink-600
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    A [label="Component A"];
+    B [label="Component B"];
+
+    // Same-rank trick: force these onto one row
+    A -> B [style=invis];
+    { rank=same; A; B; }
+  }
+
+  // ─── CLUSTER (inner / secondary group) ───────────────────────────────
+  subgraph cluster_inner {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Inner Group</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#F8FAFC";      // ink-50
+    color="#E2E8F0";
+    fontname="Helvetica";
+    fontcolor="#475569";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    // ─── HUB ANCHOR (amber) ────────────────────────────────────────────
+    // Use once, for the central component everything routes through.
+    Hub [
+      label=<<FONT POINT-SIZE="12"><B>HubNode</B></FONT>>,
+      fillcolor="#F59E0B", color="#D97706",
+      fontcolor="white", penwidth=1.4
+    ];
+
+    C [label="Component C"];
+    D [label="Component D"];
+
+    // ─── DATA STORE ────────────────────────────────────────────────────
+    // Cylinder shape signals persistent state. Optional one-word subtitle
+    // names the storage technology.
+    Store [
+      label=<<FONT POINT-SIZE="10">Store</FONT><BR/><FONT POINT-SIZE="8" COLOR="#94A3B8">SQLite</FONT>>,
+      shape=cylinder, fillcolor="#FAFBFC"
+    ];
+  }
+
+  // ─── WIRING ──────────────────────────────────────────────────────────
+
+  // Edge into/out of a cluster: connect to a real node inside, then use
+  // lhead/ltail to make the arrow attach to the cluster boundary.
+  Entry -> A [dir=both, label="payload", lhead=cluster_outer];
+  A -> Hub   [ltail=cluster_outer];
+
+  // PRIMARY SPINE — main flow. Switch defaults mid-graph; affects all
+  // subsequent edges until you switch again.
+  edge [color="#64748B", penwidth=1.2];
+  Hub -> C;
+  Hub -> D;
+
+  // SECONDARY WIRING — internal / supporting connections, recedes.
+  edge [color="#CBD5E1", penwidth=1.0];
+  C -> Store;
+  D -> Store;
+
+  // FEEDBACK / ASYNC RETURN — dashed pink, off-spine, labeled.
+  // `constraint=false` keeps it from distorting the layout.
+  Store -> Hub [
+    style=dashed, color="#F472B6", penwidth=1.1,
+    constraint=false,
+    label=<<FONT COLOR="#DB2777">return</FONT>>, fontsize=9
+  ];
+}

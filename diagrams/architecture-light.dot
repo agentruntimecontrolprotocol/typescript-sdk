@@ -1,0 +1,129 @@
+digraph ARCPTypescriptSDK {
+  rankdir=TB;
+  bgcolor="transparent";
+  compound=true;
+  fontname="Helvetica";
+  splines=spline;
+  nodesep=0.32;
+  ranksep=0.55;
+  pad="0.35,0.25";
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="white",
+    color="#CBD5E1",
+    fontname="Helvetica",
+    fontsize=11,
+    fontcolor="#1F2937",
+    margin="0.22,0.11",
+    penwidth=1.0
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=9,
+    fontcolor="#64748B",
+    color="#94A3B8",
+    penwidth=1.1,
+    arrowsize=0.75,
+    arrowhead=vee
+  ];
+
+  // ENTRY anchor — user-facing client
+  Client [
+    label=<<FONT POINT-SIZE="12"><B>ARCPClient</B></FONT>>,
+    fillcolor="#3B82F6", color="#2563EB",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  // Transport cluster
+  subgraph cluster_transport {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Transport (@arcp/core)</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#F1F5F9";
+    color="#E2E8F0";
+    fontname="Helvetica";
+    fontcolor="#475569";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    WS    [label="WebSocket"];
+    StdIO [label="stdio"];
+    InMem [label="in-memory"];
+
+    WS -> StdIO -> InMem [style=invis];
+    { rank=same; WS; StdIO; InMem; }
+  }
+
+  // Runtime cluster
+  subgraph cluster_runtime {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>@arcp/runtime</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#F8FAFC";
+    color="#E2E8F0";
+    fontname="Helvetica";
+    fontcolor="#475569";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    // HUB anchor — central component everything routes through
+    Server [
+      label=<<FONT POINT-SIZE="12"><B>ARCPServer</B></FONT>>,
+      fillcolor="#F59E0B", color="#D97706",
+      fontcolor="white", penwidth=1.4
+    ];
+
+    Job    [label="Job"];
+    Lease  [label="Lease"];
+    Auth   [label="BearerVerifier"];
+
+    Store [
+      label=<<FONT POINT-SIZE="10">EventLog</FONT><BR/><FONT POINT-SIZE="8" COLOR="#94A3B8">SQLite</FONT>>,
+      shape=cylinder, fillcolor="#FAFBFC"
+    ];
+  }
+
+  // Agents cluster
+  subgraph cluster_agents {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Registered Agents</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#F8FAFC";
+    color="#E2E8F0";
+    fontname="Helvetica";
+    fontcolor="#475569";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    AgentA [label="agent: echo"];
+    AgentB [label="agent: …"];
+
+    AgentA -> AgentB [style=invis];
+    { rank=same; AgentA; AgentB; }
+  }
+
+  // Wiring — client ↔ transport ↔ runtime
+  Client -> StdIO  [dir=both, label="envelopes", lhead=cluster_transport];
+  StdIO  -> Server [dir=both, label="envelopes", ltail=cluster_transport];
+
+  // PRIMARY SPINE — submit → run
+  edge [color="#64748B", penwidth=1.2];
+  Server -> Job;
+  Job    -> AgentA [lhead=cluster_agents];
+
+  // SECONDARY WIRING — supporting concerns
+  edge [color="#CBD5E1", penwidth=1.0];
+  Server -> Auth;
+  Job    -> Lease;
+  Job    -> Store;
+
+  // FEEDBACK — async event return path
+  AgentA -> Job [
+    style=dashed, color="#F472B6", penwidth=1.1,
+    constraint=false, ltail=cluster_agents,
+    label=<<FONT COLOR="#DB2777">job.event</FONT>>, fontsize=9
+  ];
+}

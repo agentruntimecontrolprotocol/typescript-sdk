@@ -1,0 +1,120 @@
+digraph ARCPTypescriptSDK {
+  rankdir=TB;
+  bgcolor="transparent";
+  compound=true;
+  fontname="Helvetica";
+  splines=spline;
+  nodesep=0.32;
+  ranksep=0.55;
+  pad="0.35,0.25";
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#334155",
+    color="#475569",
+    fontname="Helvetica",
+    fontsize=11,
+    fontcolor="#F1F5F9",
+    margin="0.22,0.11",
+    penwidth=1.0
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=9,
+    fontcolor="#94A3B8",
+    color="#64748B",
+    penwidth=1.1,
+    arrowsize=0.75,
+    arrowhead=vee
+  ];
+
+  Client [
+    label=<<FONT POINT-SIZE="12"><B>ARCPClient</B></FONT>>,
+    fillcolor="#3B82F6", color="#2563EB",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  subgraph cluster_transport {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Transport (@arcp/core)</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#0F172A";
+    color="#334155";
+    fontname="Helvetica";
+    fontcolor="#94A3B8";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    WS    [label="WebSocket"];
+    StdIO [label="stdio"];
+    InMem [label="in-memory"];
+
+    WS -> StdIO -> InMem [style=invis];
+    { rank=same; WS; StdIO; InMem; }
+  }
+
+  subgraph cluster_runtime {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>@arcp/runtime</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#1E293B";
+    color="#334155";
+    fontname="Helvetica";
+    fontcolor="#94A3B8";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    Server [
+      label=<<FONT POINT-SIZE="12"><B>ARCPServer</B></FONT>>,
+      fillcolor="#F59E0B", color="#D97706",
+      fontcolor="white", penwidth=1.4
+    ];
+
+    Job    [label="Job"];
+    Lease  [label="Lease"];
+    Auth   [label="BearerVerifier"];
+
+    Store [
+      label=<<FONT POINT-SIZE="10">EventLog</FONT><BR/><FONT POINT-SIZE="8" COLOR="#64748B">SQLite</FONT>>,
+      shape=cylinder, fillcolor="#1E293B"
+    ];
+  }
+
+  subgraph cluster_agents {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Registered Agents</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#1E293B";
+    color="#334155";
+    fontname="Helvetica";
+    fontcolor="#94A3B8";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    AgentA [label="agent: echo"];
+    AgentB [label="agent: …"];
+
+    AgentA -> AgentB [style=invis];
+    { rank=same; AgentA; AgentB; }
+  }
+
+  Client -> StdIO  [dir=both, label="envelopes", lhead=cluster_transport];
+  StdIO  -> Server [dir=both, label="envelopes", ltail=cluster_transport];
+
+  edge [color="#94A3B8", penwidth=1.2];
+  Server -> Job;
+  Job    -> AgentA [lhead=cluster_agents];
+
+  edge [color="#475569", penwidth=1.0];
+  Server -> Auth;
+  Job    -> Lease;
+  Job    -> Store;
+
+  AgentA -> Job [
+    style=dashed, color="#F472B6", penwidth=1.1,
+    constraint=false, ltail=cluster_agents,
+    label=<<FONT COLOR="#F472B6">job.event</FONT>>, fontsize=9
+  ];
+}
