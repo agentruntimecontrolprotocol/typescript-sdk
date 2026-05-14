@@ -315,7 +315,7 @@ Spec sections implemented:
 
 ## Examples
 
-Seventeen end-to-end examples, each a `server.ts` + `client.ts` pair
+Eighteen end-to-end examples, each a `server.ts` + `client.ts` pair
 that talks over a real `Transport`. See
 [`examples/README.md`](./examples/README.md):
 
@@ -331,6 +331,7 @@ v1.0 core:
 | `cancel/`            | §7.4              |
 | `stdio/`             | §4.2 / §22        |
 | `vendor-extensions/` | §8.2 / §9.2 / §15 |
+| `custom-auth/`       | §6.1              |
 
 v1.1 features:
 
@@ -359,7 +360,7 @@ packages/
     express/           # @arcp/express
     hono/              # @arcp/hono
     otel/              # @arcp/middleware-otel
-examples/              # Seventeen runnable two-process demos (§13 + §4.2 + §7.4 + §15 + all v1.1)
+examples/              # Eighteen runnable two-process demos (§13 + §4.2 + §7.4 + §15 + all v1.1)
 ```
 
 ## Development

@@ -18,6 +18,7 @@ export * from "./control.js";
 export * from "./execution.js";
 export * from "./session.js";
 export * from "./telemetry.js";
+export type * from "./types.js";
 
 const ALL_ENVELOPES = [
   ...SESSION_ENVELOPES,

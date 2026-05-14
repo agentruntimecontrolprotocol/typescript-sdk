@@ -53,3 +53,13 @@ export interface Transport {
   /** Whether the transport has been closed. */
   readonly closed: boolean;
 }
+
+/** Resolved handle returned by `startWebSocketServer`. */
+export interface WebSocketServerHandle {
+  /** Resolved port the server bound to. */
+  readonly port: number;
+  /** Resolved URL clients should use to connect. */
+  readonly url: string;
+  /** Stop accepting new connections and close all open ones. */
+  close(): Promise<void>;
+}

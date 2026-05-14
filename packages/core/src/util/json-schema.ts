@@ -17,10 +17,7 @@
  * to a real JSON-Schema engine after the request leaves this layer.
  */
 
-export interface ValidationError {
-  path: string;
-  message: string;
-}
+import type { ValidationError } from "./types.js";
 
 type SchemaNode = Record<string, unknown> | undefined;
 

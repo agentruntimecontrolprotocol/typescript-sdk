@@ -1,10 +1,9 @@
-export {
-  ARCPClient,
-  type ARCPClientOptions,
-  asEnvelopeOfType,
-  type ClientAutoAckOptions,
-  type ClientHandler,
-  type JobHandle,
-  type JobSubscription,
-  type SubmitOptions,
-} from "./client.js";
+export { ARCPClient, asEnvelopeOfType } from "./client.js";
+export type {
+  ARCPClientOptions,
+  ClientAutoAckOptions,
+  ClientHandler,
+  JobHandle,
+  JobSubscription,
+  SubmitOptions,
+} from "./types.js";

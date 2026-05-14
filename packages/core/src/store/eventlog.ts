@@ -10,6 +10,8 @@ import type { z } from "zod";
 import { type BaseEnvelope, BaseEnvelopeSchema } from "../envelope.js";
 import { InvalidRequestError } from "../errors.js";
 
+import type { EventLogFilter, EventLogOptions } from "./types.js";
+
 type DatabaseInstance = InstanceType<typeof Database>;
 
 const SCHEMA_PATH = fileURLToPath(new URL("schema.sql", import.meta.url));
@@ -34,36 +36,7 @@ interface EventRow extends IndexedFields {
   inserted_at: string;
 }
 
-/** Filter for {@link EventLog.query}. AND-ed across keys, OR-ed within arrays. */
-export interface EventLogFilter {
-  session_id?: string;
-  job_id?: string;
-  trace_id?: string;
-  types?: readonly string[];
-  /** Inclusive lower bound on `id` (lexical, ULID-ordered). */
-  after_id?: string;
-  /** Lower bound on `event_seq` (strict). When set, replaces `after_id` semantics. */
-  after_event_seq?: number;
-  /** Maximum rows to return. Default 1000. */
-  limit?: number;
-}
-
 const ParseEnvelopeFromRow = BaseEnvelopeSchema.passthrough();
-
-export interface EventLogOptions {
-  /** Path to a SQLite file, or `":memory:"` for ephemeral storage. Default `":memory:"`. */
-  path?: string;
-  /**
-   * Optional pre-built `better-sqlite3` Database instance. Tests inject this
-   * to share a database across helpers; production code passes only `path`.
-   */
-  db?: DatabaseInstance;
-  /**
-   * Read-only mode. When true, opening calls into SQLite with the readonly
-   * flag and write methods reject with INVALID_REQUEST.
-   */
-  readonly?: boolean;
-}
 
 /**
  * Append-only SQLite event log.

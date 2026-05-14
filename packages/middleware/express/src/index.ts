@@ -7,22 +7,9 @@ import {
 } from "@arcp/node";
 import express, { type Express, type RequestHandler } from "express";
 
-/**
- * Options for {@link createArcpExpressApp}.
- */
-export interface CreateArcpExpressAppOptions {
-  /**
-   * If set, every HTTP request is rejected with 403 unless its `Host` header
-   * (without port) matches an entry. Mirrors the WebSocket-side check in
-   * {@link attachArcpToExpress} and protects against DNS rebinding.
-   */
-  allowedHosts?: readonly string[];
+import type { CreateArcpExpressAppOptions } from "./types.js";
 
-  /**
-   * Disable Express's `x-powered-by` header. Default: `true`.
-   */
-  disablePoweredBy?: boolean;
-}
+export type { CreateArcpExpressAppOptions } from "./types.js";
 
 /**
  * Create an Express app with safe defaults for ARCP deployments:

@@ -38,27 +38,11 @@ import {
   trace,
 } from "@opentelemetry/api";
 
+import type { WithTracingOptions } from "./types.js";
+
+export type { WithTracingOptions } from "./types.js";
+
 const OTEL_EXTENSION_NAME = "x.otel" as const;
-
-export interface WithTracingOptions {
-  /**
-   * Tracer used to start spans. Required so the consumer controls the
-   * service name and tracer provider.
-   */
-  tracer: Tracer;
-
-  /**
-   * Override the span name for outbound frames. Default:
-   * `` `arcp.send ${envelope.type}` ``.
-   */
-  sendSpanName?: (envelope: BaseEnvelope | WireFrame) => string;
-
-  /**
-   * Override the span name for inbound frames. Default:
-   * `` `arcp.recv ${frame.type}` ``.
-   */
-  recvSpanName?: (frame: WireFrame) => string;
-}
 
 /**
  * Wrap a {@link Transport} so each frame produces a span and W3C trace

@@ -1,6 +1,8 @@
-import type { BearerIdentity } from "../auth/bearer.js";
+import type { BearerIdentity } from "../auth/types.js";
 import { InvalidRequestError, UnauthenticatedError } from "../errors.js";
-import type { Capabilities } from "../messages/session.js";
+import type { Capabilities } from "../messages/types.js";
+
+import type { SessionPhase, SessionSnapshot } from "./types.js";
 
 // ARCP v1.0 session lifecycle. Phases:
 //
@@ -8,30 +10,13 @@ import type { Capabilities } from "../messages/session.js";
 //   accepted  — post-welcome, live
 //   closing   — `session.bye` in flight
 //   rejected  — `session.error` (terminal)
-//
-// `extensions` capability flag is gone in v1.0.
 
-/**
- * Phases of a single ARCP session.
- *
- * @see ARCP v1.0 §6.
- */
-export type SessionPhase = "opening" | "accepted" | "closing" | "rejected";
-
-const VALID_TRANSITIONS: Record<SessionPhase, ReadonlySet<SessionPhase>> = {
+const VALID_TRANSITIONS = {
   opening: new Set<SessionPhase>(["accepted", "rejected"]),
   accepted: new Set<SessionPhase>(["closing"]),
   closing: new Set<SessionPhase>(),
   rejected: new Set<SessionPhase>(),
-};
-
-/** Snapshot of session state shared between server-side and client-side. */
-export interface SessionSnapshot {
-  readonly id: string | undefined;
-  readonly phase: SessionPhase;
-  readonly identity: BearerIdentity | undefined;
-  readonly capabilities: Capabilities | undefined;
-}
+} as const satisfies Record<SessionPhase, ReadonlySet<SessionPhase>>;
 
 /**
  * Mutable session state managed by the runtime/client. Tracks the §6 phase

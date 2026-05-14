@@ -8,17 +8,9 @@ import {
 import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 
-/**
- * Options for {@link createArcpHonoApp}.
- */
-export interface CreateArcpHonoAppOptions {
-  /**
-   * If set, every HTTP request is rejected with 403 unless its `Host` header
-   * (without port) matches an entry. Mirrors the WebSocket-side check in
-   * {@link attachArcpToHono} and protects against DNS rebinding.
-   */
-  allowedHosts?: readonly string[];
-}
+import type { CreateArcpHonoAppOptions } from "./types.js";
+
+export type { CreateArcpHonoAppOptions } from "./types.js";
 
 /**
  * Create a Hono app with safe defaults for ARCP deployments:

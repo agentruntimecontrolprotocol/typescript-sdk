@@ -1,6 +1,6 @@
 import { InvalidRequestError } from "../errors.js";
 
-import type { FrameHandler, SendableFrame, Transport } from "./base.js";
+import type { FrameHandler, SendableFrame, Transport } from "./types.js";
 
 /**
  * Two transports sharing a Promise-coupled queue. Used by tests to drive a

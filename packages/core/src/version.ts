@@ -29,10 +29,17 @@ export const V1_1_FEATURES = [
   "progress",
   "result_chunk",
   "agent_versions",
-] as const;
+] as const satisfies readonly string[];
 
 /** Union of canonical v1.1 feature flag names. */
 export type V1_1_Feature = (typeof V1_1_FEATURES)[number];
+
+/**
+ * Template-literal type that pins the envelope `arcp` field to the literal
+ * `PROTOCOL_VERSION`. Useful for asserting an outbound envelope is
+ * wire-compatible at compile time.
+ */
+export type ProtocolVersion = typeof PROTOCOL_VERSION;
 
 /**
  * Whether `other` is wire-compatible with this implementation.

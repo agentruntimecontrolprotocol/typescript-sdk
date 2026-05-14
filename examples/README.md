@@ -1,6 +1,6 @@
 # ARCP TypeScript Examples
 
-Seventeen end-to-end examples covering ARCP v1.0 and v1.1. Each one
+Eighteen end-to-end examples covering ARCP v1.0 and v1.1. Each one
 is a pair of two processes — a runtime (`server.ts`) and a client
 (`client.ts`) — that talk over a real `Transport`. No mocks. No
 in-memory shortcuts. Each example exits 0 on success.
@@ -17,6 +17,7 @@ in-memory shortcuts. Each example exits 0 on success.
 | [`cancel/`](./cancel/)                       | Client submits a long-running job and sends `job.cancel`; the agent observes `ctx.signal`, exits, and the runtime emits `job.error { final_status: "cancelled" }`.                                                                                   | §7.4              |
 | [`stdio/`](./stdio/)                         | The runtime runs as a child subprocess; the client spawns it and talks ARCP over stdin/stdout via `StdioTransport`. Single-command run.                                                                                                              | §4.2, §22         |
 | [`vendor-extensions/`](./vendor-extensions/) | Agent emits a custom `x-vendor.acme.progress` event kind and declares an `x-vendor.acme.metrics` lease namespace. Client shows both behaviours: a naïve handler that ignores unknown kinds, and a vendor-aware handler that renders the custom kind. | §8.2, §9.2, §15   |
+| [`custom-auth/`](./custom-auth/)             | Custom `BearerVerifier` implementation (stateless HMAC-signed tokens). Demonstrates the integration seam for JWT, JWKS, or HTTP auth providers; bad tokens are rejected with `UNAUTHENTICATED` at handshake.                                         | §6.1              |
 
 ### v1.1 features
 

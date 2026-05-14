@@ -7,14 +7,7 @@ export {
   type SessionSnapshot,
   SessionState,
 } from "@arcp/core/state";
-export {
-  type AgentHandler,
-  Job,
-  type JobContext,
-  JobManager,
-  makeJobContext,
-  type ResultStream,
-} from "./job.js";
+export { Job, JobManager, makeJobContext } from "./job.js";
 export {
   assertLeaseConstraintsSubset,
   assertLeaseSubset,
@@ -25,15 +18,21 @@ export {
   isReservedCapabilityName,
   isValidCapabilityName,
   type Lease,
-  type LeaseOpContext,
   matchGlob,
   validateLeaseConstraints,
   validateLeaseOp,
   validateLeaseShape,
 } from "./lease.js";
-export {
-  ARCPServer,
-  type ARCPServerOptions,
-  type Handler,
-  SessionContext,
-} from "./server.js";
+export { ARCPServer, SessionContext } from "./server.js";
+export type {
+  AgentHandler,
+  ARCPServerOptions,
+  Handler,
+  JobAuthorizationPolicy,
+  JobContext,
+  JobOptions,
+  JobSend,
+  LeaseOpContext,
+  ResultStream,
+  SessionCaps,
+} from "./types.js";

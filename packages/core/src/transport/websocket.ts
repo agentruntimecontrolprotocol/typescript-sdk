@@ -6,8 +6,9 @@ import type {
   FrameHandler,
   SendableFrame,
   Transport,
+  WebSocketServerHandle,
   WireFrame,
-} from "./base.js";
+} from "./types.js";
 
 /**
  * WebSocket transport (§22 mandatory).
@@ -151,15 +152,6 @@ export class WebSocketTransport implements Transport {
     });
     return new WebSocketTransport(socket);
   }
-}
-
-export interface WebSocketServerHandle {
-  /** Resolved port the server bound to. */
-  readonly port: number;
-  /** Resolved URL clients should use to connect. */
-  readonly url: string;
-  /** Stop accepting new connections and close all open ones. */
-  close(): Promise<void>;
 }
 
 /**

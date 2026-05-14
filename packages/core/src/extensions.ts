@@ -11,8 +11,17 @@ import { InvalidRequestError } from "./errors.js";
  */
 const VENDOR_EXTENSION_PATTERN = /^x-vendor(?:\.[a-z0-9_-]+){2,}$/;
 
+/**
+ * Template-literal shape of a vendor extension name. Encodes only the
+ * `x-vendor.<vendor>.<rest>` prefix; the segment characters are still
+ * validated at runtime via `isVendorExtensionName`.
+ */
+export type VendorExtensionName = `x-vendor.${string}.${string}`;
+
 /** Whether `name` is a syntactically valid `x-vendor.*` extension name. */
-export function isVendorExtensionName(name: string): boolean {
+export function isVendorExtensionName(
+  name: string,
+): name is VendorExtensionName {
   return VENDOR_EXTENSION_PATTERN.test(name);
 }
 

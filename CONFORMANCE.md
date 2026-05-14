@@ -123,7 +123,7 @@ new v1.1 subsections appear after them.
 
 ## §13. Examples
 
-Seventeen runnable two-process examples under `examples/`. Each
+Eighteen runnable two-process examples under `examples/`. Each
 exercises one v1.0 or v1.1 feature end-to-end (no mocks; real
 transport).
 
@@ -139,6 +139,7 @@ v1.0 core:
 | `cancel/`            | §7.4              |
 | `stdio/`             | §4.2              |
 | `vendor-extensions/` | §8.2 / §9.2 / §15 |
+| `custom-auth/`       | §6.1              |
 
 v1.1 features (one example per addition):
 

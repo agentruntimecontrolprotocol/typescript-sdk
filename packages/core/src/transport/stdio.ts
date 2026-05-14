@@ -8,7 +8,7 @@ import type {
   SendableFrame,
   Transport,
   WireFrame,
-} from "./base.js";
+} from "./types.js";
 
 /**
  * Newline-delimited JSON transport over a pair of streams (§22).

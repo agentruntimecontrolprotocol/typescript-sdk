@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import type { BearerIdentity, BearerVerifier } from "@arcp/core/auth";
+import type { BearerIdentity } from "@arcp/core/auth";
 import {
   type BaseEnvelope,
   buildEnvelope,
@@ -40,7 +40,6 @@ import {
   type LeaseConstraints,
   type MetricBody,
   parseAgentRef,
-  type RuntimeIdentity,
   type SessionHelloPayload,
   type SessionWelcomePayload,
 } from "@arcp/core/messages";
@@ -55,14 +54,7 @@ import { newJobId, newMessageId, newSessionId } from "@arcp/core/util";
 import { intersectFeatures, V1_1_FEATURES } from "@arcp/core/version";
 import { z } from "zod";
 
-import {
-  type AgentHandler,
-  type EventSeqSource,
-  Job,
-  type JobContext,
-  JobManager,
-  makeJobContext,
-} from "./job.js";
+import { Job, JobManager, makeJobContext } from "./job.js";
 import {
   assertLeaseConstraintsSubset,
   assertLeaseSubset,
@@ -70,6 +62,13 @@ import {
   validateLeaseConstraints,
   validateLeaseShape,
 } from "./lease.js";
+import type {
+  AgentHandler,
+  ARCPServerOptions,
+  EventSeqSource,
+  Handler,
+  JobContext,
+} from "./types.js";
 
 // ARCP v1.1 (additive over v1.0) runtime.
 //
@@ -92,78 +91,6 @@ const DEFAULT_MAX_BUFFERED_EVENTS = 10_000;
 const DEFAULT_MAX_BUFFERED_BYTES = 16 * 1024 * 1024; // 16 MiB
 const DEFAULT_MAX_CONCURRENT_JOBS = 100;
 const DEFAULT_BACK_PRESSURE_THRESHOLD = 1000;
-
-/** Inbound-message dispatcher signature. */
-export type Handler = (
-  env: Envelope,
-  ctx: SessionContext,
-) => Promise<void> | void;
-
-/**
- * v1.1 §6.6 — authorization hook for `session.list_jobs` and
- * `job.subscribe`. Returns true if `principal` may observe `job`.
- *
- * Default: same-principal-only (`job.submitterPrincipal === principal`).
- */
-export type JobAuthorizationPolicy = (
-  job: Job,
-  principal: string | undefined,
-) => boolean;
-
-/** Top-level server options. */
-export interface ARCPServerOptions {
-  /** Identity broadcast in `session.welcome`. */
-  runtime: RuntimeIdentity;
-  /** Capabilities advertised by this runtime. */
-  capabilities: Capabilities;
-  /** Bearer-token verifier. Required in v1.0. */
-  bearer?: BearerVerifier;
-  /** Event log to persist envelopes. Defaults to an in-memory log. */
-  eventLog?: EventLog;
-  /** Logger. Defaults to {@link rootLogger}. */
-  logger?: Logger;
-  /** Heartbeat watchdog interval. Default 30 s. */
-  heartbeatIntervalSeconds?: number;
-  /** Resume buffer window. Default 600 s. */
-  resumeWindowSeconds?: number;
-  /** Cancellation grace period before forced termination. Default 30_000 ms. */
-  cancelGraceMs?: number;
-  /** Idempotency cache TTL. Default 24 h. */
-  idempotencyTtlMs?: number;
-  /** Per-session DoS caps. */
-  caps?: SessionCaps;
-  /**
-   * v1.1 §6.2 — feature flags this runtime advertises. Defaults to every
-   * v1.1 feature. Provide a subset to test degraded-feature behavior.
-   */
-  features?: readonly string[];
-  /**
-   * v1.1 §6.6 — authorization hook for cross-session observation
-   * (`session.list_jobs`, `job.subscribe`). Defaults to same-principal-only.
-   */
-  jobAuthorizationPolicy?: JobAuthorizationPolicy;
-  /**
-   * v1.1 §6.5 — threshold (in unacked events) at which the runtime emits a
-   * `back_pressure` status event. Default 1000.
-   */
-  backPressureThreshold?: number;
-}
-
-/**
- * Per-session DoS / resource caps (§14).
- *
- * Defaults: 10_000 buffered events, 16 MiB buffered bytes, 100 concurrent
- * jobs. Exceeding any cap closes the session with `INTERNAL_ERROR`
- * (non-retryable).
- */
-export interface SessionCaps {
-  /** Max number of outbound envelopes buffered in the event log per session. */
-  maxBufferedEvents?: number;
-  /** Max number of outbound envelope bytes buffered per session. */
-  maxBufferedBytes?: number;
-  /** Max number of concurrent jobs in a single session. */
-  maxConcurrentJobs?: number;
-}
 
 interface IdempotencyEntry {
   jobId: string;

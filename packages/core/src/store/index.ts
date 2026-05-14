@@ -1,7 +1,6 @@
 export {
   EventLog,
-  type EventLogFilter,
-  type EventLogOptions,
   EventRowEnvelopeSchema,
   type ParsedRowEnvelope,
 } from "./eventlog.js";
+export type { EventLogFilter, EventLogOptions } from "./types.js";

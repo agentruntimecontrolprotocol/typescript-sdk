@@ -4,46 +4,9 @@ import type { Duplex } from "node:stream";
 import { WebSocketTransport } from "@arcp/core/transport";
 import { WebSocketServer } from "ws";
 
-/**
- * Options for {@link attachArcpUpgrade}.
- */
-export interface AttachArcpUpgradeOptions {
-  /**
-   * Path the ARCP WebSocket endpoint is mounted at. Requests whose
-   * `req.url` pathname does not match are left untouched (so multiple
-   * upgrade handlers can coexist on the same server).
-   *
-   * Default: `/arcp`.
-   */
-  path?: string;
+import type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
 
-  /**
-   * Allowed `Host` headers. When set, the request is rejected with HTTP 403
-   * unless the `Host` header (without port) is in this list. This is the
-   * defense against DNS rebinding attacks recommended by RFC 6455 §10.2.
-   *
-   * If omitted, the upgrade succeeds regardless of `Host`. Provide an
-   * explicit list (e.g. `["localhost", "127.0.0.1"]`) when binding to
-   * loopback.
-   */
-  allowedHosts?: readonly string[];
-
-  /**
-   * Called once per accepted WebSocket connection with a fresh
-   * {@link WebSocketTransport}. The runtime is expected to call
-   * `ARCPServer.accept(transport)` on it.
-   */
-  onTransport: (transport: WebSocketTransport, req: IncomingMessage) => void;
-}
-
-/**
- * Handle returned by {@link attachArcpUpgrade}. Closing detaches the upgrade
- * listener and closes all open WebSocket connections.
- */
-export interface ArcpUpgradeHandle {
-  /** Detach the upgrade listener and close open WS connections. */
-  close(): Promise<void>;
-}
+export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
 
 /**
  * Attach an ARCP WebSocket upgrade handler to an existing Node `http.Server`.

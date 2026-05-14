@@ -12,6 +12,8 @@ import {
   parseBudgetAmount,
 } from "@arcp/core/messages";
 
+import type { LeaseOpContext } from "./types.js";
+
 // ARCP v1.0 §9 — leases.
 //
 // A lease is an immutable record granted to a job at submission. It maps
@@ -116,22 +118,6 @@ export function canonicalizeTarget(target: string): string {
     out.push(part);
   }
   return (isAbsolute ? "/" : "") + out.join("/");
-}
-
-/**
- * Optional extra context surfaced to {@link validateLeaseOp} for v1.1
- * enforcement: lease expiration and per-currency budget counters.
- *
- * Both `constraints` and `budgetRemaining` are evaluated before the
- * glob/pattern check. Either failing produces a v1.1 error
- * ({@link LeaseExpiredError} or {@link BudgetExhaustedError}); these MUST
- * NOT be silently downgraded to `PERMISSION_DENIED`.
- */
-export interface LeaseOpContext {
-  constraints?: LeaseConstraints | undefined;
-  budgetRemaining?: ReadonlyMap<string, number> | undefined;
-  /** Clock override for tests; defaults to `Date.now()`. */
-  now?: number;
 }
 
 /**

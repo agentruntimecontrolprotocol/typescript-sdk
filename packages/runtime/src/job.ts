@@ -1,4 +1,3 @@
-import type { BaseEnvelope } from "@arcp/core/envelope";
 import { buildEnvelope } from "@arcp/core/envelope";
 import {
   CancelledError,
@@ -8,23 +7,26 @@ import {
 } from "@arcp/core/errors";
 import type { Logger } from "@arcp/core/logger";
 import type {
-  ArtifactRefBody,
-  DelegateBody,
   JobErrorPayload,
   JobResultPayload,
   JobStateName,
   Lease,
   LeaseConstraints,
   LogPayload,
-  MetricPayload,
   ProgressBody,
   ResultChunkBody,
   StatusBody,
   ThoughtBody,
-  ToolCallBody,
-  ToolResultBody,
 } from "@arcp/core/messages";
 import { newJobId, newMessageId, nowTimestamp } from "@arcp/core/util";
+
+import type {
+  EventSeqSource,
+  JobContext,
+  JobOptions,
+  JobSend,
+  ResultStream,
+} from "./types.js";
 
 // ARCP v1.0 §7-§8 job execution.
 //
@@ -32,7 +34,7 @@ import { newJobId, newMessageId, nowTimestamp } from "@arcp/core/util";
 // All event-bearing envelopes (job.event / job.result / job.error) carry a
 // session-scoped `event_seq` stamped by the SessionContext at emit time.
 
-const JOB_TRANSITIONS: Record<JobStateName, ReadonlySet<JobStateName>> = {
+const JOB_TRANSITIONS = {
   pending: new Set<JobStateName>([
     "running",
     "cancelled",
@@ -49,51 +51,14 @@ const JOB_TRANSITIONS: Record<JobStateName, ReadonlySet<JobStateName>> = {
   error: new Set<JobStateName>(),
   cancelled: new Set<JobStateName>(),
   timed_out: new Set<JobStateName>(),
-};
+} as const satisfies Record<JobStateName, ReadonlySet<JobStateName>>;
 
-const TERMINAL: ReadonlySet<JobStateName> = new Set<JobStateName>([
+const TERMINAL = new Set<JobStateName>([
   "success",
   "error",
   "cancelled",
   "timed_out",
 ]);
-
-/** Sequence-number provider (§8.3), implemented by {@link SessionContext}. */
-export interface EventSeqSource {
-  /** Increment and return the next session-scoped event_seq. */
-  nextEventSeq(): number;
-}
-
-/** Send hook the Job uses to flush an outbound envelope. */
-export type JobSend = (env: BaseEnvelope) => Promise<void>;
-
-/** Constructor options for {@link Job}. */
-export interface JobOptions {
-  /** Pre-assigned `job_id` (used on idempotency hits to reuse an existing id). */
-  jobId?: string;
-  /** Owning session id. Stamped on every outbound envelope. */
-  sessionId: string;
-  /** Agent name handling the job. */
-  agent: string;
-  /** v1.1 §7.5 — resolved agent version. May be null when no version is registered. */
-  agentVersion?: string | null;
-  /** Immutable effective lease (§9.1) — already a subset of the request. */
-  lease: Lease;
-  /** v1.1 §9.5 — lease constraints (currently `expires_at`). */
-  leaseConstraints?: LeaseConstraints | undefined;
-  /** v1.1 §9.6 — initial per-currency budget counters. */
-  initialBudget?: ReadonlyMap<string, number> | undefined;
-  /** Parent job id when this is a delegated child (§10). */
-  parentJobId?: string;
-  /** Delegate id assigned by the parent in its `delegate` event (§10). */
-  delegateId?: string;
-  /** W3C trace id propagated for OTel correlation (§11). */
-  traceId?: string;
-  /** Heartbeat watchdog interval. */
-  heartbeatIntervalSeconds: number;
-  /** Heartbeats missed before HEARTBEAT_LOST. Default 2. */
-  missedHeartbeatsAllowed?: number;
-}
 
 /**
  * Per-job state machine (§7.3 / §8).
@@ -491,111 +456,6 @@ export class JobManager {
   }
 }
 
-/**
- * Context surfaced to agent handlers (§7 / §8).
- *
- * Exposes one method per reserved {@link RESERVED_EVENT_KINDS} kind
- * (§8.2), plus {@link JobContext.emitEvent} for `x-vendor.*` kinds.
- * All emit methods stamp the session-scoped `event_seq` automatically.
- */
-/**
- * v1.1 streamed-result writer (§8.4). Push chunks with {@link write}; call
- * {@link finalize} to emit the terminating `job.result` payload. The runtime
- * generates `result_id`/`chunk_seq` automatically.
- */
-export interface ResultStream {
-  /** Stable identifier for the assembled result. */
-  readonly resultId: string;
-  /** Push one chunk. `more: false` is set by {@link finalize}. */
-  write(data: string, opts?: { encoding?: "utf8" | "base64" }): Promise<void>;
-  /**
-   * Emit the final chunk (if `data` is provided) and the terminating
-   * `job.result` carrying `result_id`. Returns the assembled byte count.
-   */
-  finalize(
-    data?: string,
-    opts?: {
-      encoding?: "utf8" | "base64";
-      summary?: string;
-      resultSize?: number;
-    },
-  ): Promise<void>;
-}
-
-export interface JobContext {
-  /** Server-assigned job id. */
-  readonly jobId: string;
-  /** Owning session id. */
-  readonly sessionId: string;
-  /** Agent name handling this job (bare name). */
-  readonly agent: string;
-  /** v1.1 §7.5 — resolved agent version, or null when unversioned. */
-  readonly agentVersion: string | null;
-  /** Wire-form agent reference (`name@version` or bare `name`). */
-  readonly agentRef: string;
-  /** Immutable effective lease (§9.1). */
-  readonly lease: Lease;
-  /** v1.1 §9.5 — lease constraints (currently `expires_at`). */
-  readonly leaseConstraints: LeaseConstraints | undefined;
-  /**
-   * v1.1 §9.6 — read-only snapshot of remaining per-currency budget. Re-read
-   * after `cost.*` metrics fire to observe decrements.
-   */
-  readonly budget: ReadonlyMap<string, number>;
-  /** W3C trace id (§11). */
-  readonly traceId: string | undefined;
-  /** Abort signal — fires on `job.cancel` or grace-expired termination. */
-  readonly signal: AbortSignal;
-  /** Job-scoped logger pre-bound to `job_id`. */
-  readonly logger: Logger;
-
-  /** Emit a `log` job event (§8.2 `log`). */
-  log(
-    level: LogPayload["level"],
-    message: string,
-    attributes?: Record<string, unknown>,
-  ): Promise<void>;
-  /** Emit a `thought` job event (§8.2 `thought`). */
-  thought(text: string): Promise<void>;
-  /** Emit a `status` job event (§8.2 `status`). */
-  status(phase: string, message?: string): Promise<void>;
-  /** Emit a `metric` job event (§8.2 `metric`). */
-  metric(metric: MetricPayload): Promise<void>;
-  /** Emit a `tool_call` job event (§8.2 `tool_call`). */
-  toolCall(body: ToolCallBody): Promise<void>;
-  /** Emit a `tool_result` job event (§8.2 `tool_result`). */
-  toolResult(body: ToolResultBody): Promise<void>;
-  /** Emit an `artifact_ref` job event (§8.2 `artifact_ref`). */
-  artifactRef(body: ArtifactRefBody): Promise<void>;
-  /** Emit a `delegate` job event (§10). Runtime intercepts and spawns the child. */
-  delegate(body: DelegateBody): Promise<void>;
-
-  /**
-   * v1.1 §8.2.1: emit a `progress` event. Advisory — the protocol does not
-   * act on progress events.
-   */
-  progress(
-    current: number,
-    opts?: { total?: number; units?: string; message?: string },
-  ): Promise<void>;
-
-  /**
-   * v1.1 §8.4: emit a single `result_chunk` event. Prefer
-   * {@link streamResult} which manages `result_id`/`chunk_seq` for you.
-   */
-  resultChunk(body: ResultChunkBody): Promise<void>;
-
-  /**
-   * v1.1 §8.4: open a chunked-result writer. The agent pushes chunks via
-   * {@link ResultStream.write} and emits the terminal `job.result` via
-   * {@link ResultStream.finalize}.
-   */
-  streamResult(opts?: { resultId?: string }): ResultStream;
-
-  /** Emit any other event kind (including `x-vendor.*`) with a raw body. */
-  emitEvent(kind: string, body: unknown): Promise<void>;
-}
-
 /** Build a {@link JobContext} backed by a {@link Job}. */
 export function makeJobContext(job: Job): JobContext {
   return {
@@ -717,16 +577,6 @@ function makeResultStream(job: Job, resultIdIn?: string): ResultStream {
     },
   };
 }
-
-/**
- * The handler signature for agents registered with the runtime. Agents
- * receive `input` and a {@link JobContext}; they return the result value
- * or throw an {@link ARCPError} to signal failure.
- */
-export type AgentHandler<Input = unknown, Result = unknown> = (
-  input: Input,
-  ctx: JobContext,
-) => Promise<Result>;
 
 // Re-export commonly used error types so consumers can import in one place.
 

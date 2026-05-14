@@ -1,7 +1,3 @@
-export { type PendingMeta, PendingRegistry } from "./pending.js";
-export {
-  negotiateCapabilities,
-  type SessionPhase,
-  type SessionSnapshot,
-  SessionState,
-} from "./session.js";
+export { PendingRegistry } from "./pending.js";
+export { negotiateCapabilities, SessionState } from "./session.js";
+export type { PendingMeta, SessionPhase, SessionSnapshot } from "./types.js";

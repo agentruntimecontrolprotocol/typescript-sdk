@@ -49,6 +49,7 @@ export {
   looksLikeCoreType,
   type UnknownTypeDisposition,
   validateExtensionsObject,
+  type VendorExtensionName,
 } from "./extensions.js";
 export {
   type Logger,
@@ -66,6 +67,7 @@ export {
   intersectFeatures,
   isCompatibleVersion,
   PROTOCOL_VERSION,
+  type ProtocolVersion,
   V1_1_FEATURES,
   type V1_1_Feature,
 } from "./version.js";

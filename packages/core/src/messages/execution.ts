@@ -405,6 +405,7 @@ export function parseJobEventBody(kind: string, body: unknown): unknown {
       return ResultChunkBodySchema.parse(body);
     }
     default: {
+      // Unknown / vendor kinds pass through unchecked.
       return body;
     }
   }

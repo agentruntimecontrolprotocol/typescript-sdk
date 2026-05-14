@@ -1,11 +1,7 @@
 import { CancelledError, TimeoutError } from "../errors.js";
 import { Deferred } from "../util/deferred.js";
 
-/**
- * Per-entry metadata that handlers can stash to validate or annotate
- * responses. Kept open-ended in v1.0; no specific kinds are reserved.
- */
-export type PendingMeta = Record<string, unknown>;
+import type { PendingMeta } from "./types.js";
 
 /**
  * Registry of in-flight requests keyed by a correlation id (envelope `id`).
