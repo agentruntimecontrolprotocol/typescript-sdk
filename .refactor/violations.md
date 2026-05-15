@@ -76,17 +76,31 @@ canonical wire codes).
 
 ## Sub-phase 2.4 — Async hygiene
 
-- [ ] Verify every public async I/O function accepts an optional
-      `AbortSignal`. Current signal usage points:
-      `packages/client/src/types.ts:127`,
-      `packages/runtime/src/types.ts:125`,
-      `packages/core/src/util/abort.ts`,
-      `packages/core/src/state/pending.ts:22`. Survey other public
-      async functions for missing signal plumbing.
-- [ ] `@typescript-eslint/no-floating-promises` is already enabled
-      and clean. Re-verify after each refactor.
-- [ ] No `async` constructors found in initial scan; re-verify after
-      sub-phase 2.5 splits.
+Survey done in Session 3. The public client surface needs real
+signal plumbing — this is more than verification. Scope:
+
+- [ ] **Add `signal?: AbortSignal` to options on these client
+      methods** (additive, non-breaking; the underlying
+      `pending.register` already accepts a signal):
+  - [ ] `ARCPClient.connect(transport, opts?)` — currently no opts
+        bag; add `{ signal? }`.
+  - [ ] `ARCPClient.resume(transport, resume, opts?)` — same.
+  - [ ] `ARCPClient.send(env, opts?)` — same.
+  - [ ] `ARCPClient.ack(seq, opts?)` — same.
+  - [ ] `ARCPClient.cancelJob(jobId, options)` — already takes
+        `{ reason? }`; add `signal?`.
+  - [ ] `ARCPClient.listJobs(filter?, opts)` — already takes
+        `{ limit?, cursor? }`; add `signal?`.
+  - [ ] `ARCPClient.subscribe(jobId, opts)` — already takes
+        `{ history?, fromEventSeq? }`; add `signal?`.
+  - [x] `ARCPClient.submit(opts: SubmitOptions)` — `SubmitOptions`
+        already includes `signal?: AbortSignal`.
+- [x] `@typescript-eslint/no-floating-promises` enabled and clean.
+- [x] No `async` constructors found.
+- [x] No empty catches found in initial inventory.
+- [ ] Bound any unbounded `Promise.all` over user-supplied input —
+      verify by reading runtime/job-runner.ts (deferred to during
+      sub-phase 2.5 split).
 
 ---
 

@@ -5,6 +5,24 @@ ambiguous. Each entry: date, sub-phase, decision, one-line rationale.
 
 ---
 
+## 2026-05-14 — Session 3 — Sub-phases 2.2 & 2.3
+
+- **`SdkError` is a class union, not a literal-tag union.** The
+  guide example shows a discriminated union on a `kind` literal.
+  This codebase already discriminates on `code: ErrorCode` plus
+  `instanceof` checks against named subclasses; using class union
+  preserves that pattern. Adding a new `kind` field would require
+  changing every existing subclass's wire shape.
+- **Catch-block `cause` audit deferred to post-2.5.** Auditing
+  catch sites in files that 2.5 will split is wasted work; the
+  audit will be straightforward once files settle.
+- **Snapshot is not updated to reflect the additive `SdkError`.**
+  The prompt explicitly says "Update the snapshot only with
+  explicit user approval recorded in DECISIONS.md." Additive
+  drift is allowed and recorded in commit messages; the snapshot
+  remains the Phase-1 frozen baseline. The .d.ts diff at sub-phase
+  2.9 will show only this one additive entry, which is fine.
+
 ## 2026-05-14 — Session 2 — Sub-phase 2.1
 
 - **Pre-commit hook runs `lint:biome` only, not `lint`.** Sub-phase
