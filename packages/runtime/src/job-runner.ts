@@ -1,16 +1,13 @@
 import { randomBytes } from "node:crypto";
 
-import type { TraceId } from "@arcp/core";
-import { type BaseEnvelope, buildEnvelope } from "@arcp/core/envelope";
+import type { SessionId, TraceId } from "@arcp/core";
+import type { BaseEnvelope } from "@arcp/core/envelope";
 import {
   AgentNotAvailableError,
-  AgentVersionNotAvailableError,
   ARCPError,
-  CancelledError,
   InternalError,
   InvalidRequestError,
   LeaseExpiredError,
-  LeaseSubsetViolationError,
 } from "@arcp/core/errors";
 import {
   type DelegateBody,
@@ -20,16 +17,25 @@ import {
   type MetricBody,
   parseAgentRef,
 } from "@arcp/core/messages";
-import { newJobId, newMessageId } from "@arcp/core/util";
 
-import { Job, makeJobContext } from "./job.js";
 import {
-  assertLeaseConstraintsSubset,
-  assertLeaseSubset,
-  initialBudgetFromLease,
-  validateLeaseConstraints,
-  validateLeaseShape,
-} from "./lease.js";
+  type DelegateOutcome,
+  emitAgentResolveError,
+  emitArcpError,
+  emitHandlerFailure,
+  emitParseError,
+  forwardEventToSubscriber,
+  type MetricInterceptor,
+  type ResolvedSubmitAgent,
+  runAndEmitResult,
+  scheduleRuntimeTimeout,
+  type SubmitPayload,
+  type SubscriberBroadcaster,
+  validateDelegateLease,
+  wrapJobCtx,
+} from "./job-runner-helpers.js";
+import { Job, makeJobContext } from "./job.js";
+import { initialBudgetFromLease, validateLeaseConstraints, validateLeaseShape } from "./lease.js";
 import type { ARCPServer, SessionContext } from "./server.js";
 import { digest, type IdempotencyEntry } from "./stores.js";
 import type { AgentHandler, JobContext } from "./types.js";
@@ -39,8 +45,60 @@ const DEFAULT_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_CONCURRENT_JOBS = 100;
 
 type DelegateInterceptor = (body: DelegateBody) => Promise<void>;
-type MetricInterceptor = (body: MetricBody) => Promise<void>;
-type SubscriberBroadcaster = (env: BaseEnvelope) => void;
+
+interface LeaseFields {
+  requestedLease: Lease;
+  leaseConstraints: LeaseConstraints | undefined;
+  initialBudget: ReadonlyMap<string, number>;
+}
+
+interface AcceptDispatchArgs {
+  ctx: SessionContext;
+  env: Envelope;
+  sessionId: SessionId;
+  resolved: ResolvedSubmitAgent;
+  leaseFields: LeaseFields;
+  principal: string;
+  idempotency: IdempotencyEntry | null;
+}
+
+interface ConstructJobInput {
+  ctx: SessionContext;
+  env: Envelope;
+  sessionId: SessionId;
+  payload: SubmitPayload;
+  parsedAgentName: string;
+  resolvedVersion: string;
+  leaseFields: LeaseFields;
+  idempotencyHit: IdempotencyEntry | null;
+  principal: string;
+}
+
+interface RunHandlerArgs {
+  ctx: SessionContext;
+  job: Job;
+  handler: AgentHandler;
+  input: unknown;
+  jobCtx: JobContext;
+  maxRuntimeSec: number | undefined;
+}
+
+interface RecordIdempotencyArgs {
+  job: Job;
+  principal: string;
+  payload: SubmitPayload;
+  idempotencyHit: IdempotencyEntry | "conflict" | null;
+}
+
+interface ConstructDelegateChildInput {
+  ctx: SessionContext;
+  parent: Job;
+  body: DelegateBody;
+  sessionId: SessionId;
+  requested: Lease;
+  parsedAgentName: string;
+  resolvedVersion: string;
+}
 
 /**
  * Owns the job-submission and job-execution pipeline (§7): handler
@@ -58,142 +116,160 @@ export class JobRunner {
     if (env.type !== "job.submit") return;
     const sessionId = ctx.state.id;
     if (sessionId === undefined) return;
-    const payload = env.payload;
+    if (await this.rejectIfOverConcurrencyCap(ctx)) return;
+    const resolved = await this.resolveSubmitAgent(ctx, env.payload);
+    if (resolved === null) return;
+    const leaseFields = await this.validateLeaseAndConstraints(ctx, env.payload);
+    if (leaseFields === null) return;
+    const principal = ctx.state.identity?.principal ?? "<anonymous>";
+    const idempotency = await this.checkIdempotency(ctx, principal, env.payload);
+    if (idempotency === "conflict") return;
+    await this.acceptAndDispatchSubmit({
+      ctx,
+      env,
+      sessionId,
+      resolved,
+      leaseFields,
+      principal,
+      idempotency,
+    });
+  }
 
-    // Per-session max concurrent jobs cap (§14).
-    const caps = this.server.options.caps ?? {};
-    const maxConcurrent = caps.maxConcurrentJobs ?? DEFAULT_MAX_CONCURRENT_JOBS;
-    if (ctx.jobs.list().length >= maxConcurrent) {
-      await ctx.emitSessionError(
-        new InternalError("Max concurrent jobs reached", { retryable: false }),
-      );
-      return;
-    }
+  private async acceptAndDispatchSubmit(
+    args: AcceptDispatchArgs,
+  ): Promise<void> {
+    const { ctx, env, resolved, principal, idempotency } = args;
+    if (env.type !== "job.submit") return;
+    const job = this.constructJob({
+      ctx,
+      env,
+      sessionId: args.sessionId,
+      payload: env.payload,
+      parsedAgentName: resolved.parsedAgent.name,
+      resolvedVersion: resolved.resolvedVersion,
+      leaseFields: args.leaseFields,
+      idempotencyHit: idempotency,
+      principal,
+    });
+    this.recordIdempotency({
+      job,
+      principal,
+      payload: env.payload,
+      idempotencyHit: idempotency,
+    });
+    await job.emitAccepted();
+    await job.emitRunning();
+    void this.runHandler({
+      ctx,
+      job,
+      handler: resolved.handler,
+      input: env.payload.input,
+      jobCtx: makeJobContext(job),
+      maxRuntimeSec: env.payload.max_runtime_sec,
+    });
+  }
 
-    // v1.1 §7.5 — parse agent reference and resolve a handler.
+  private async rejectIfOverConcurrencyCap(
+    ctx: SessionContext,
+  ): Promise<boolean> {
+    const maxConcurrent =
+      this.server.options.caps?.maxConcurrentJobs ??
+      DEFAULT_MAX_CONCURRENT_JOBS;
+    if (ctx.jobs.list().length < maxConcurrent) return false;
+    await ctx.emitSessionError(
+      new InternalError("Max concurrent jobs reached", { retryable: false }),
+    );
+    return true;
+  }
+
+  private async resolveSubmitAgent(
+    ctx: SessionContext,
+    payload: SubmitPayload,
+  ): Promise<ResolvedSubmitAgent | null> {
     let parsedAgent: { name: string; version: string | null };
     try {
       parsedAgent = parseAgentRef(payload.agent);
     } catch (error) {
-      await ctx.emitJobError(newJobId(), {
-        final_status: "error",
-        code: "INVALID_REQUEST",
-        message: error instanceof Error ? error.message : String(error),
-        retryable: false,
-      });
-      return;
+      await emitParseError(ctx, error);
+      return null;
     }
-    let handler: AgentHandler;
-    let resolvedVersion: string;
     try {
-      const resolved = this.server.resolveAgent(
-        parsedAgent.name,
-        parsedAgent.version,
-      );
-      handler = resolved.handler;
-      resolvedVersion = resolved.version;
+      const r = this.server.resolveAgent(parsedAgent.name, parsedAgent.version);
+      return { parsedAgent, handler: r.handler, resolvedVersion: r.version };
     } catch (error) {
-      // §7.5: version errors emit session.error per spec example (§13.7).
-      if (error instanceof AgentVersionNotAvailableError) {
-        await ctx.emitSessionError(error);
-        return;
-      }
-      const wrapped =
-        error instanceof ARCPError
-          ? error
-          : new AgentNotAvailableError(
-              `Agent "${payload.agent}" is not registered`,
-            );
-      const jobId = newJobId();
-      await ctx.emitJobError(jobId, {
-        final_status: "error",
-        code: wrapped.code,
-        message: wrapped.message,
-        retryable: wrapped.retryable,
-      });
-      return;
+      await emitAgentResolveError(ctx, error, payload.agent);
+      return null;
     }
+  }
 
-    // Lease validation (shape + cost.budget patterns).
+  private async validateLeaseAndConstraints(
+    ctx: SessionContext,
+    payload: SubmitPayload,
+  ): Promise<{
+    requestedLease: Lease;
+    leaseConstraints: LeaseConstraints | undefined;
+    initialBudget: ReadonlyMap<string, number>;
+  } | null> {
     const requestedLease: Lease = payload.lease_request ?? {};
     try {
       validateLeaseShape(requestedLease);
     } catch (error) {
-      const wrapped =
-        error instanceof ARCPError
-          ? error
-          : new InvalidRequestError(String(error));
-      await ctx.emitJobError(newJobId(), {
-        final_status: "error",
-        code: wrapped.code,
-        message: wrapped.message,
-        retryable: wrapped.retryable,
-      });
-      return;
+      await emitArcpError(ctx, error);
+      return null;
     }
-
-    // v1.1 §9.5 — validate lease_constraints (UTC, future).
-    const leaseConstraints: LeaseConstraints | undefined =
-      payload.lease_constraints;
+    const leaseConstraints = payload.lease_constraints;
     try {
       validateLeaseConstraints(leaseConstraints);
     } catch (error) {
-      const wrapped =
-        error instanceof ARCPError
-          ? error
-          : new InvalidRequestError(String(error));
-      await ctx.emitJobError(newJobId(), {
-        final_status: "error",
-        code: wrapped.code,
-        message: wrapped.message,
-        retryable: wrapped.retryable,
-      });
-      return;
+      await emitArcpError(ctx, error);
+      return null;
     }
+    return {
+      requestedLease,
+      leaseConstraints,
+      initialBudget: initialBudgetFromLease(requestedLease),
+    };
+  }
 
-    // v1.1 §9.6 — initial budget counters.
-    const initialBudget = initialBudgetFromLease(requestedLease);
-
-    // Idempotency: keyed by (principal, idempotency_key).
-    const principal = ctx.state.identity?.principal ?? "<anonymous>";
-    let idempotencyHit: IdempotencyEntry | null = null;
-    if (payload.idempotency_key !== undefined) {
-      const key = `${principal}::${payload.idempotency_key}`;
-      this.server.idempotencyStore.sweep();
-      const existing = this.server.idempotencyStore.get(key);
-      if (existing !== undefined && existing.expiresAt > Date.now()) {
-        const sameAgent = existing.agent === payload.agent;
-        const sameInput = existing.inputDigest === digest(payload.input);
-        if (!sameAgent || !sameInput) {
-          await ctx.emitJobError(existing.jobId, {
-            final_status: "error",
-            code: "DUPLICATE_KEY",
-            message: `idempotency_key "${payload.idempotency_key}" reused with conflicting params`,
-            retryable: false,
-            details: { existing_job_id: existing.jobId },
-          });
-          return;
-        }
-        idempotencyHit = existing;
-      } else {
-        ctx.addLocalIdempotencyKey(key);
-      }
+  private async checkIdempotency(
+    ctx: SessionContext,
+    principal: string,
+    payload: SubmitPayload,
+  ): Promise<IdempotencyEntry | "conflict" | null> {
+    if (payload.idempotency_key === undefined) return null;
+    const key = `${principal}::${payload.idempotency_key}`;
+    this.server.idempotencyStore.sweep();
+    const existing = this.server.idempotencyStore.get(key);
+    if (existing === undefined || existing.expiresAt <= Date.now()) {
+      ctx.addLocalIdempotencyKey(key);
+      return null;
     }
+    const sameAgent = existing.agent === payload.agent;
+    const sameInput = existing.inputDigest === digest(payload.input);
+    if (sameAgent && sameInput) return existing;
+    await ctx.emitJobError(existing.jobId, {
+      final_status: "error",
+      code: "DUPLICATE_KEY",
+      message: `idempotency_key "${payload.idempotency_key}" reused with conflicting params`,
+      retryable: false,
+      details: { existing_job_id: existing.jobId },
+    });
+    return "conflict";
+  }
 
-    // Generate or echo trace_id (§11). Runtime MUST mint one if absent so
-    // `job.accepted.payload.trace_id` always has a value to echo back.
+  private constructJob(input: ConstructJobInput): Job {
     const traceId: TraceId =
-      env.trace_id ?? (randomBytes(16).toString("hex") as TraceId);
-
+      input.env.trace_id ?? (randomBytes(16).toString("hex") as TraceId);
+    const idempotencyHit = input.idempotencyHit;
     const job = new Job({
       options: {
         ...(idempotencyHit === null ? {} : { jobId: idempotencyHit.jobId }),
-        sessionId,
-        agent: parsedAgent.name,
-        agentVersion: resolvedVersion === "" ? null : resolvedVersion,
-        lease: requestedLease,
-        leaseConstraints,
-        initialBudget,
+        sessionId: input.sessionId,
+        agent: input.parsedAgentName,
+        agentVersion: input.resolvedVersion === "" ? null : input.resolvedVersion,
+        lease: input.leaseFields.requestedLease,
+        leaseConstraints: input.leaseFields.leaseConstraints,
+        initialBudget: input.leaseFields.initialBudget,
         heartbeatIntervalSeconds:
           this.server.options.heartbeatIntervalSeconds ??
           DEFAULT_HEARTBEAT_SECONDS,
@@ -201,160 +277,94 @@ export class JobRunner {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         ...(traceId === undefined ? {} : { traceId }),
       },
-      send: (out) => ctx.send(out),
-      seq: ctx,
-      logger: ctx.logger.child({ job_id: "<pending>" }),
+      send: (out) => input.ctx.send(out),
+      seq: input.ctx,
+      logger: input.ctx.logger.child({ job_id: "<pending>" }),
     });
-    job.submitterPrincipal = principal;
-    job.owningSession = ctx;
+    job.submitterPrincipal = input.principal;
+    job.owningSession = input.ctx;
     this.server.globalJobs.set(job.jobId, job);
-    ctx.jobs.register(job);
-    Object.assign(job, { logger: ctx.logger.child({ job_id: job.jobId }) });
-
-    if (payload.idempotency_key !== undefined && idempotencyHit === null) {
-      const key = `${principal}::${payload.idempotency_key}`;
-      const ttl =
-        this.server.options.idempotencyTtlMs ?? DEFAULT_IDEMPOTENCY_TTL_MS;
-      this.server.idempotencyStore.set(key, {
-        jobId: job.jobId,
-        agent: payload.agent,
-        inputDigest: digest(payload.input),
-        expiresAt: Date.now() + ttl,
-      });
-    }
-
-    await job.emitAccepted();
-    await job.emitRunning();
-
-    const jobCtx = makeJobContext(job);
-    void this.runHandler(
-      ctx,
-      job,
-      handler,
-      payload.input,
-      jobCtx,
-      payload.max_runtime_sec,
-    );
+    input.ctx.jobs.register(job);
+    Object.assign(job, {
+      logger: input.ctx.logger.child({ job_id: job.jobId }),
+    });
+    return job;
   }
 
-  public async runHandler(
+  private recordIdempotency(args: RecordIdempotencyArgs): void {
+    const { job, principal, payload, idempotencyHit } = args;
+    if (payload.idempotency_key === undefined) return;
+    if (idempotencyHit !== null) return;
+    const key = `${principal}::${payload.idempotency_key}`;
+    const ttl =
+      this.server.options.idempotencyTtlMs ?? DEFAULT_IDEMPOTENCY_TTL_MS;
+    this.server.idempotencyStore.set(key, {
+      jobId: job.jobId,
+      agent: payload.agent,
+      inputDigest: digest(payload.input),
+      expiresAt: Date.now() + ttl,
+    });
+  }
+
+  public async runHandler(args: RunHandlerArgs): Promise<void> {
+    const { ctx, job, handler, input, jobCtx, maxRuntimeSec } = args;
+    const timeoutTimer = scheduleRuntimeTimeout(job, maxRuntimeSec);
+    const leaseTimer = this.scheduleLeaseExpiry(ctx, job);
+    if (leaseTimer === "expired") return;
+
+    const wrapped = wrapJobCtx({
+      base: jobCtx,
+      delegateInterceptor: this.makeDelegateInterceptor(ctx, job),
+      metricInterceptor: this.metricInterceptor(job),
+      broadcast: this.subscriberBroadcaster(job),
+    });
+
+    try {
+      await runAndEmitResult({ job, handler, input, wrappedCtx: wrapped });
+    } catch (error) {
+      await emitHandlerFailure(job, error);
+    } finally {
+      if (timeoutTimer !== null) clearTimeout(timeoutTimer);
+      if (leaseTimer !== null) clearTimeout(leaseTimer);
+      ctx.jobs.retire(job.jobId);
+      this.server.globalJobs.delete(job.jobId);
+      this.server.subscribers.delete(job.jobId);
+    }
+  }
+
+  private scheduleLeaseExpiry(
     ctx: SessionContext,
     job: Job,
-    handler: AgentHandler,
-    input: unknown,
-    jobCtx: JobContext,
-    maxRuntimeSec: number | undefined,
-  ): Promise<void> {
-    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
-    if (maxRuntimeSec !== undefined && maxRuntimeSec > 0) {
-      timeoutTimer = setTimeout(() => {
-        if (!job.isTerminal) {
-          job.abortController.abort(
-            new InternalError("max_runtime_sec exceeded"),
-          );
-          void job.emitErrorEnvelope({
-            final_status: "timed_out",
-            code: "TIMEOUT",
-            message: `Job exceeded max_runtime_sec=${maxRuntimeSec}`,
-            retryable: true,
-          });
-        }
-      }, maxRuntimeSec * 1000);
-      timeoutTimer.unref();
-    }
-
-    // v1.1 §9.5 — lease-expiration watchdog. If expires_at elapses while the
-    // job is still running, surface LEASE_EXPIRED as job.error.
-    let leaseExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+  ): ReturnType<typeof setTimeout> | "expired" | null {
     const expiresAt = job.leaseConstraints?.expires_at;
-    if (expiresAt !== undefined) {
-      const ms = Date.parse(expiresAt) - Date.now();
-      if (Number.isFinite(ms) && ms > 0) {
-        leaseExpiryTimer = setTimeout(() => {
-          if (!job.isTerminal) {
-            void job.emitErrorEnvelope({
-              final_status: "error",
-              code: "LEASE_EXPIRED",
-              message: `Lease expired at ${expiresAt}`,
-              retryable: false,
-            });
-            job.abortController.abort(
-              new LeaseExpiredError(`Lease expired at ${expiresAt}`),
-            );
-          }
-        }, ms);
-        leaseExpiryTimer.unref();
-      } else {
-        // Past or invalid — terminate immediately.
+    if (expiresAt === undefined) return null;
+    const ms = Date.parse(expiresAt) - Date.now();
+    if (Number.isFinite(ms) && ms > 0) {
+      const timer = setTimeout(() => {
+        if (job.isTerminal) return;
         void job.emitErrorEnvelope({
           final_status: "error",
           code: "LEASE_EXPIRED",
           message: `Lease expired at ${expiresAt}`,
           retryable: false,
         });
-        ctx.jobs.retire(job.jobId);
-        this.server.globalJobs.delete(job.jobId);
-        return;
-      }
+        job.abortController.abort(
+          new LeaseExpiredError(`Lease expired at ${expiresAt}`),
+        );
+      }, ms);
+      timer.unref();
+      return timer;
     }
-
-    // Listen for delegate events on this job context — runtime intercepts them.
-    const delegateInterceptor = this.makeDelegateInterceptor(ctx, job);
-    const wrapped = wrapJobCtx(
-      jobCtx,
-      delegateInterceptor,
-      this.metricInterceptor(job),
-      this.subscriberBroadcaster(job),
-    );
-
-    try {
-      const result = await handler(input, wrapped);
-      if (!job.isTerminal) {
-        await (job.chunkedResultStarted
-          ? // The agent should have called `finalize` on its ResultStream.
-            // If not, emit a terminal result_chunk{more:false}+job.result.
-            job.emitResult({
-              final_status: "success",
-              result_id: `res_${job.jobId.replace(/^job_/, "")}_auto`,
-            })
-          : job.emitResult({
-              final_status: "success",
-              result,
-            }));
-      }
-    } catch (error) {
-      if (job.isTerminal) return;
-      const wrappedErr =
-        error instanceof ARCPError
-          ? error
-          : error instanceof Error && error.name === "CancelledError"
-            ? new CancelledError(error.message)
-            : new InternalError(
-                error instanceof Error ? error.message : String(error),
-                {
-                  cause: error instanceof Error ? error : undefined,
-                },
-              );
-      const finalStatus =
-        wrappedErr instanceof CancelledError
-          ? "cancelled"
-          : wrappedErr.code === "TIMEOUT"
-            ? "timed_out"
-            : "error";
-      await job.emitErrorEnvelope({
-        final_status: finalStatus,
-        code: wrappedErr.code,
-        message: wrappedErr.message,
-        retryable: wrappedErr.retryable,
-      });
-    } finally {
-      if (timeoutTimer !== null) clearTimeout(timeoutTimer);
-      if (leaseExpiryTimer !== null) clearTimeout(leaseExpiryTimer);
-      ctx.jobs.retire(job.jobId);
-      this.server.globalJobs.delete(job.jobId);
-      // Drop any active subscriptions for this job.
-      this.server.subscribers.delete(job.jobId);
-    }
+    // Past or invalid — terminate immediately.
+    void job.emitErrorEnvelope({
+      final_status: "error",
+      code: "LEASE_EXPIRED",
+      message: `Lease expired at ${expiresAt}`,
+      retryable: false,
+    });
+    ctx.jobs.retire(job.jobId);
+    this.server.globalJobs.delete(job.jobId);
+    return "expired";
   }
 
   /**
@@ -367,8 +377,41 @@ export class JobRunner {
     ctx: SessionContext,
     parent: Job,
     body: DelegateBody,
-  ): Promise<{ ok: true; jobId: string } | { ok: false; error: ARCPError }> {
+  ): Promise<DelegateOutcome> {
     const requested: Lease = body.lease_request ?? {};
+    const agent = this.resolveDelegateAgent(body);
+    if (!agent.ok) return agent;
+    const leaseCheck = validateDelegateLease(requested, parent, body);
+    if (leaseCheck !== null) return { ok: false, error: leaseCheck };
+    const sessionId = ctx.state.id;
+    if (sessionId === undefined) {
+      return { ok: false, error: new InternalError("session has no id") };
+    }
+    const child = this.constructDelegateChild({
+      ctx,
+      parent,
+      body,
+      sessionId,
+      requested,
+      parsedAgentName: agent.parsedAgent.name,
+      resolvedVersion: agent.resolvedVersion,
+    });
+    await child.emitAccepted();
+    await child.emitRunning();
+    void this.runHandler({
+      ctx,
+      job: child,
+      handler: agent.handler,
+      input: body.input,
+      jobCtx: makeJobContext(child),
+      maxRuntimeSec: undefined,
+    });
+    return { ok: true, jobId: child.jobId };
+  }
+
+  private resolveDelegateAgent(
+    body: DelegateBody,
+  ): { ok: true } & ResolvedSubmitAgent | { ok: false; error: ARCPError } {
     let parsedAgent: { name: string; version: string | null };
     try {
       parsedAgent = parseAgentRef(body.agent);
@@ -383,12 +426,14 @@ export class JobRunner {
               ),
       };
     }
-    let handler: AgentHandler;
-    let resolvedVersion: string;
     try {
       const r = this.server.resolveAgent(parsedAgent.name, parsedAgent.version);
-      handler = r.handler;
-      resolvedVersion = r.version;
+      return {
+        ok: true,
+        parsedAgent,
+        handler: r.handler,
+        resolvedVersion: r.version,
+      };
     } catch (error) {
       return {
         ok: false,
@@ -400,41 +445,20 @@ export class JobRunner {
               ),
       };
     }
-    try {
-      validateLeaseShape(requested);
-      // Pass parent's REMAINING budget for §9.4 enforcement.
-      assertLeaseSubset(requested, parent.lease, parent.budget);
-      assertLeaseConstraintsSubset(
-        body.lease_constraints,
-        parent.leaseConstraints,
-      );
-      // Child inherits parent expiry implicitly if absent.
-      validateLeaseConstraints(body.lease_constraints);
-    } catch (error) {
-      const wrapped =
-        error instanceof LeaseSubsetViolationError
-          ? error
-          : error instanceof ARCPError
-            ? error
-            : new InvalidRequestError(String(error));
-      return { ok: false, error: wrapped };
-    }
-    const sessionId = ctx.state.id;
-    if (sessionId === undefined) {
-      return { ok: false, error: new InternalError("session has no id") };
-    }
-    // Effective child constraints: child explicit OR inherited from parent.
+  }
+
+  private constructDelegateChild(input: ConstructDelegateChildInput): Job {
+    const { ctx, parent, body, sessionId, requested } = input;
     const effectiveConstraints: LeaseConstraints | undefined =
       body.lease_constraints ?? parent.leaseConstraints;
-    const childBudget = initialBudgetFromLease(requested);
     const child = new Job({
       options: {
         sessionId,
-        agent: parsedAgent.name,
-        agentVersion: resolvedVersion === "" ? null : resolvedVersion,
+        agent: input.parsedAgentName,
+        agentVersion: input.resolvedVersion === "" ? null : input.resolvedVersion,
         lease: requested,
         leaseConstraints: effectiveConstraints,
-        initialBudget: childBudget,
+        initialBudget: initialBudgetFromLease(requested),
         parentJobId: parent.jobId,
         delegateId: body.delegate_id,
         heartbeatIntervalSeconds:
@@ -454,11 +478,7 @@ export class JobRunner {
     this.server.globalJobs.set(child.jobId, child);
     ctx.jobs.register(child);
     Object.assign(child, { logger: ctx.logger.child({ job_id: child.jobId }) });
-    await child.emitAccepted();
-    await child.emitRunning();
-    const childCtx = makeJobContext(child);
-    void this.runHandler(ctx, child, handler, body.input, childCtx, undefined);
-    return { ok: true, jobId: child.jobId };
+    return child;
   }
 
   /** Intercept `metric` events to apply v1.1 §9.6 budget decrements. */
@@ -523,46 +543,5 @@ export class JobRunner {
   }
 }
 
-export async function forwardEventToSubscriber(
-  sub: SessionContext,
-  src: BaseEnvelope,
-): Promise<void> {
-  if (sub.state.id === undefined) return;
-  // Build a fresh envelope: same payload/type/job_id but new id and a new
-  // session-scoped event_seq. Preserve trace_id when present.
-  const env = buildEnvelope({
-    id: newMessageId(),
-    type: src.type,
-    payload: src.payload,
-    optional: {
-      session_id: sub.state.id,
-      ...(src.job_id === undefined ? {} : { job_id: src.job_id }),
-      ...(src.trace_id === undefined ? {} : { trace_id: src.trace_id }),
-      ...(src.event_seq === undefined
-        ? {}
-        : { event_seq: sub.nextEventSeq() }),
-    },
-  });
-  await sub.send(env);
-}
+export { forwardEventToSubscriber } from "./job-runner-helpers.js";
 
-function wrapJobCtx(
-  ctx: JobContext,
-  interceptor: DelegateInterceptor,
-  metricInterceptor: MetricInterceptor,
-  // subscriberBroadcaster is invoked at the Job-emit-level via a Job wrapper;
-  // event broadcasting actually hooks via the SessionContext.send pipeline,
-  // not here. The argument is retained for future expansion.
-  _broadcaster: SubscriberBroadcaster,
-): JobContext {
-  return {
-    ...ctx,
-    async delegate(body: DelegateBody) {
-      await interceptor(body);
-    },
-    async metric(body) {
-      await ctx.metric(body);
-      await metricInterceptor(body);
-    },
-  };
-}
