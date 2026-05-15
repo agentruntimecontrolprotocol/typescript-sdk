@@ -185,8 +185,8 @@ export class JobRunner {
     const traceId: TraceId =
       env.trace_id ?? (randomBytes(16).toString("hex") as TraceId);
 
-    const job = new Job(
-      {
+    const job = new Job({
+      options: {
         ...(idempotencyHit === null ? {} : { jobId: idempotencyHit.jobId }),
         sessionId,
         agent: parsedAgent.name,
@@ -201,10 +201,10 @@ export class JobRunner {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         ...(traceId === undefined ? {} : { traceId }),
       },
-      (out) => ctx.send(out),
-      ctx,
-      ctx.logger.child({ job_id: "<pending>" }),
-    );
+      send: (out) => ctx.send(out),
+      seq: ctx,
+      logger: ctx.logger.child({ job_id: "<pending>" }),
+    });
     job.submitterPrincipal = principal;
     job.owningSession = ctx;
     this.server.globalJobs.set(job.jobId, job);
@@ -427,8 +427,8 @@ export class JobRunner {
     const effectiveConstraints: LeaseConstraints | undefined =
       body.lease_constraints ?? parent.leaseConstraints;
     const childBudget = initialBudgetFromLease(requested);
-    const child = new Job(
-      {
+    const child = new Job({
+      options: {
         sessionId,
         agent: parsedAgent.name,
         agentVersion: resolvedVersion === "" ? null : resolvedVersion,
@@ -442,10 +442,13 @@ export class JobRunner {
           DEFAULT_HEARTBEAT_SECONDS,
         ...(parent.traceId === undefined ? {} : { traceId: parent.traceId }),
       },
-      (out) => ctx.send(out),
-      ctx,
-      ctx.logger.child({ job_id: "<pending>", parent_job_id: parent.jobId }),
-    );
+      send: (out) => ctx.send(out),
+      seq: ctx,
+      logger: ctx.logger.child({
+        job_id: "<pending>",
+        parent_job_id: parent.jobId,
+      }),
+    });
     child.submitterPrincipal = parent.submitterPrincipal;
     child.owningSession = ctx;
     this.server.globalJobs.set(child.jobId, child);
