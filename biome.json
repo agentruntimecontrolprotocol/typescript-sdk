@@ -12,7 +12,8 @@
       "!**/dist",
       "!**/node_modules",
       "!**/.tsbuildinfo",
-      "!pnpm-lock.yaml"
+      "!pnpm-lock.yaml",
+      "!.refactor"
     ]
   },
   "formatter": {
