@@ -12,10 +12,8 @@ import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
 
 // ARCP v1.0 §7-§8 job-related envelopes.
 
-// ---------------------------------------------------------------------------
 // Lease shape (§9.1) — embedded on job.submit (request) and job.accepted
 // (effective).
-// ---------------------------------------------------------------------------
 
 /**
  * §9.2 reserved capability namespaces.
@@ -67,9 +65,7 @@ export const LeaseConstraintsSchema = z.object({
 });
 export type LeaseConstraints = z.infer<typeof LeaseConstraintsSchema>;
 
-// ---------------------------------------------------------------------------
 // v1.1 §7.5 agent versioning helpers.
-// ---------------------------------------------------------------------------
 
 const AGENT_NAME_REGEX = /^[a-z0-9][a-z0-9._-]*$/;
 const AGENT_VERSION_REGEX = /^[a-zA-Z0-9.+_-]+$/;
@@ -115,9 +111,7 @@ export function formatAgentRef(ref: ParsedAgentRef): string {
   return ref.version === null ? ref.name : `${ref.name}@${ref.version}`;
 }
 
-// ---------------------------------------------------------------------------
 // v1.1 §9.6 cost.budget helpers.
-// ---------------------------------------------------------------------------
 
 /** Parsed `cost.budget` amount pattern (`currency:decimal`). */
 export interface ParsedBudgetAmount {
@@ -151,9 +145,7 @@ export function parseBudgetAmount(input: string): ParsedBudgetAmount {
   return { currency, amount };
 }
 
-// ---------------------------------------------------------------------------
 // Job submit / accepted (§7.1)
-// ---------------------------------------------------------------------------
 
 export const JobSubmitPayloadSchema = z.object({
   agent: z.string().min(1),
@@ -190,18 +182,14 @@ export const JobAcceptedPayloadSchema = z.object({
 });
 export type JobAcceptedPayload = z.infer<typeof JobAcceptedPayloadSchema>;
 
-// ---------------------------------------------------------------------------
 // Job cancel (§7.4)
-// ---------------------------------------------------------------------------
 
 export const JobCancelPayloadSchema = z.object({
   reason: z.string().optional(),
 });
 export type JobCancelPayload = z.infer<typeof JobCancelPayloadSchema>;
 
-// ---------------------------------------------------------------------------
 // Job lifecycle states (§7.3)
-// ---------------------------------------------------------------------------
 
 export const JOB_STATES = [
   "pending",
@@ -222,9 +210,7 @@ export const TERMINAL_JOB_STATES = [
 ] as const;
 export type TerminalJobState = (typeof TERMINAL_JOB_STATES)[number];
 
-// ---------------------------------------------------------------------------
 // Job event (§8) — eight reserved kinds + x-vendor.*
-// ---------------------------------------------------------------------------
 
 export const RESERVED_EVENT_KINDS = [
   "log",
@@ -443,9 +429,7 @@ export function parseJobEventBody(kind: string, body: unknown): unknown {
   return body;
 }
 
-// ---------------------------------------------------------------------------
 // Terminal events: job.result (success) and job.error (failure variants).
-// ---------------------------------------------------------------------------
 
 /**
  * v1.0 `job.result` carries the inline `result`. v1.1 §8.4 adds
@@ -485,9 +469,7 @@ export function jobErrorToErrorPayload(p: JobErrorPayload): ErrorPayload {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Envelopes
-// ---------------------------------------------------------------------------
 
 export const JobSubmitEnvelopeSchema = messageEnvelope(
   "job.submit",
@@ -537,9 +519,7 @@ export const JobErrorEnvelopeSchema = messageEnvelope(
   event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
 });
 
-// ---------------------------------------------------------------------------
 // v1.1 §7.6 subscribe / subscribed / unsubscribe envelopes.
-// ---------------------------------------------------------------------------
 
 export const JobSubscribePayloadSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),
