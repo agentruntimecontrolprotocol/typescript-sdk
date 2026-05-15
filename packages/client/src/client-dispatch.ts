@@ -90,7 +90,7 @@ function onSessionWelcome(target: DispatchTarget, parsed: BaseEnvelope): void {
       // ignore — likely a resume on the same id
     }
   }
-  (target.handshake as Deferred<unknown> | null)?.resolve(result.data.payload);
+  target.handshake?.resolve(result.data.payload);
 }
 
 function onSessionError(target: DispatchTarget, parsed: BaseEnvelope): void {
@@ -100,10 +100,18 @@ function onSessionError(target: DispatchTarget, parsed: BaseEnvelope): void {
   if (target.handshake !== null && !target.handshake.settled) {
     target.handshake.reject(err);
   }
+  rejectAllInvocations(target, err);
+  rejectAllPendingMaps(target, err);
+}
+
+function rejectAllInvocations(target: DispatchTarget, err: ARCPError): void {
   for (const inv of target.invocationsByOriginId.values()) {
     if (!inv.acceptance.settled) inv.acceptance.reject(err);
     if (!inv.completion.settled) inv.completion.reject(err);
   }
+}
+
+function rejectAllPendingMaps(target: DispatchTarget, err: ARCPError): void {
   for (const d of target.pendingLists.values()) if (!d.settled) d.reject(err);
   for (const d of target.pendingSubscribes.values()) {
     if (!d.settled) d.reject(err);
@@ -166,7 +174,7 @@ function handleSessionJobs(target: DispatchTarget, env: Envelope): boolean {
   const deferred = target.pendingLists.get(reqId);
   if (deferred === undefined) return false;
   target.pendingLists.delete(reqId);
-  (deferred as Deferred<unknown>).resolve(env.payload);
+  deferred.resolve(env.payload);
   return true;
 }
 
@@ -177,7 +185,7 @@ function handleJobSubscribed(target: DispatchTarget, env: Envelope): boolean {
   const d = target.pendingSubscribes.get(env.job_id);
   if (d === undefined) return false;
   target.pendingSubscribes.delete(env.job_id);
-  (d as Deferred<unknown>).resolve(env.payload);
+  d.resolve(env.payload);
   return true;
 }
 

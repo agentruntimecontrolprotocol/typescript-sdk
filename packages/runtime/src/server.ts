@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import type { EventSeq, JobId } from "@arcp/core";
+import type { EventSeq, JobId, SessionId } from "@arcp/core";
 import type { BearerIdentity } from "@arcp/core/auth";
 import {
   type BaseEnvelope,
@@ -27,11 +27,10 @@ import {
   type Capabilities,
   type Envelope,
   EnvelopeSchema,
-  JOB_STATES,
   type JobErrorPayload,
   type JobListEntry,
-  parseAgentRef,
   type SessionHelloPayload,
+  type SessionListJobsFilter,
   type SessionWelcomePayload,
 } from "@arcp/core/messages";
 import {
@@ -49,6 +48,12 @@ import { AgentRegistry } from "./agent-registry.js";
 import { forwardEventToSubscriber, JobRunner } from "./job-runner.js";
 import type { Job } from "./job.js";
 import { JobManager } from "./job.js";
+import {
+  compareJobListEntries,
+  compileListJobsFilter,
+  type ListJobsFilter,
+  paginateJobList,
+} from "./list-jobs.js";
 import { IdempotencyStore, newResumeToken, ResumeStore } from "./stores.js";
 import type {
   AgentHandler,
@@ -69,6 +74,13 @@ import type {
 // `cost.budget`, and agent versioning.
 
 const HANDSHAKE_TYPES = new Set<string>(["session.hello"]);
+// session.ping/pong/ack are session-control envelopes (not event-seq-bearing),
+// so they bypass the inbound dedupe-and-log step.
+const INBOUND_DEDUPE_SKIP: ReadonlySet<string> = new Set([
+  "session.ping",
+  "session.pong",
+  "session.ack",
+]);
 
 const DEFAULT_HEARTBEAT_SECONDS = 30;
 const DEFAULT_RESUME_WINDOW_SECONDS = 600;
@@ -82,6 +94,35 @@ function defaultJobAuthorizationPolicy(
   principal: string | undefined,
 ): boolean {
   return job.submitterPrincipal === principal;
+}
+
+function isReplayableForJob(env: BaseEnvelope, jobId: JobId): boolean {
+  if (env.job_id !== jobId) return false;
+  return (
+    env.type === "job.event" ||
+    env.type === "job.result" ||
+    env.type === "job.error"
+  );
+}
+
+function buildSubscribedPayload(
+  job: Job,
+  subscribedFrom: number,
+  replayed: boolean,
+): Record<string, unknown> {
+  return {
+    job_id: job.jobId,
+    current_status: job.state,
+    agent: job.agentRef,
+    lease: job.lease,
+    ...(job.leaseConstraints === undefined
+      ? {}
+      : { lease_constraints: job.leaseConstraints }),
+    parent_job_id: job.parentJobId ?? null,
+    ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
+    subscribed_from: subscribedFrom,
+    replayed,
+  };
 }
 
 /**
@@ -190,66 +231,82 @@ export class SessionContext implements EventSeqSource {
     }
     this.touch();
     await this.transport.send(envelope);
-    if (envelope.session_id !== undefined && envelope.session_id !== "") {
-      try {
-        await this.server.eventLog.append(envelope);
-        // Account against per-session caps for replay buffer estimation.
-        const size = JSON.stringify(envelope).length;
-        this.bufferedEventCount += 1;
-        this.bufferedBytes += size;
-        this.checkCaps();
-      } catch (error) {
-        this.logger.error({ err: error }, "event log append (outbound) failed");
-      }
+    await this.persistOutbound(envelope);
+    await this.fanOutToSubscribers(envelope);
+    this.maybeEmitBackPressure();
+  }
+
+  private async persistOutbound(envelope: BaseEnvelope): Promise<void> {
+    if (envelope.session_id === undefined || envelope.session_id === "") return;
+    try {
+      await this.server.eventLog.append(envelope);
+      // Account against per-session caps for replay buffer estimation.
+      this.bufferedEventCount += 1;
+      this.bufferedBytes += JSON.stringify(envelope).length;
+      this.checkCaps();
+    } catch (error) {
+      this.logger.error({ err: error }, "event log append (outbound) failed");
     }
-    // v1.1 §7.6 — fan-out event-bearing envelopes to subscriber sessions.
+  }
+
+  private async fanOutToSubscribers(envelope: BaseEnvelope): Promise<void> {
+    if (envelope.job_id === undefined) return;
     if (
-      envelope.job_id !== undefined &&
-      (envelope.type === "job.event" ||
-        envelope.type === "job.result" ||
-        envelope.type === "job.error")
+      envelope.type !== "job.event" &&
+      envelope.type !== "job.result" &&
+      envelope.type !== "job.error"
     ) {
-      const subs = this.server.subscribers.get(envelope.job_id);
-      if (subs !== undefined && subs.size > 0) {
-        for (const sub of subs) {
-          if (sub === this) continue;
-          if (sub.state.id === undefined) continue;
-          try {
-            const forwarded = buildEnvelope({
-              id: newMessageId(),
-              type: envelope.type,
-              payload: envelope.payload,
-              optional: {
-                session_id: sub.state.id,
-                job_id: envelope.job_id,
-                ...(envelope.trace_id === undefined
-                  ? {}
-                  : { trace_id: envelope.trace_id }),
-                ...(envelope.event_seq === undefined
-                  ? {}
-                  : { event_seq: sub.nextEventSeq() }),
-              },
-            });
-            await sub.transport.send(forwarded);
-          } catch {
-            // best-effort
-          }
-        }
-      }
+      return;
     }
-    // v1.1 §6.5 back-pressure heuristic — fire once when crossing threshold.
-    if (this.hasFeature("ack")) {
-      const lag = this.eventSeq - this.lastAckedSeq;
-      const threshold =
-        this.server.options.backPressureThreshold ??
-        DEFAULT_BACK_PRESSURE_THRESHOLD;
-      if (lag > threshold && !this.backPressureNotified) {
-        this.backPressureNotified = true;
-        // Best-effort emit — don't fail the outer send if this errors.
-        void this.emitBackPressureStatus(lag).catch(() => undefined);
-      } else if (lag <= threshold / 2 && this.backPressureNotified) {
-        this.backPressureNotified = false;
-      }
+    const subs = this.server.subscribers.get(envelope.job_id);
+    if (subs === undefined || subs.size === 0) return;
+    for (const sub of subs) {
+      if (sub === this || sub.state.id === undefined) continue;
+      await this.forwardEnvelopeToSubscriber(sub, envelope);
+    }
+  }
+
+  private async forwardEnvelopeToSubscriber(
+    sub: SessionContext,
+    envelope: BaseEnvelope,
+  ): Promise<void> {
+    if (sub.state.id === undefined) return;
+    try {
+      const forwarded = buildEnvelope({
+        id: newMessageId(),
+        type: envelope.type,
+        payload: envelope.payload,
+        optional: {
+          session_id: sub.state.id,
+          job_id: envelope.job_id,
+          ...(envelope.trace_id === undefined
+            ? {}
+            : { trace_id: envelope.trace_id }),
+          ...(envelope.event_seq === undefined
+            ? {}
+            : { event_seq: sub.nextEventSeq() }),
+        },
+      });
+      await sub.transport.send(forwarded);
+    } catch {
+      // best-effort
+    }
+  }
+
+  private maybeEmitBackPressure(): void {
+    if (!this.hasFeature("ack")) return;
+    const lag = this.eventSeq - this.lastAckedSeq;
+    const threshold =
+      this.server.options.backPressureThreshold ??
+      DEFAULT_BACK_PRESSURE_THRESHOLD;
+    if (lag > threshold && !this.backPressureNotified) {
+      this.backPressureNotified = true;
+      // Best-effort emit — don't fail the outer send if this errors.
+      void this.emitBackPressureStatus(lag).catch(() => undefined);
+      return;
+    }
+    if (lag <= threshold / 2 && this.backPressureNotified) {
+      this.backPressureNotified = false;
     }
   }
 
@@ -337,83 +394,89 @@ export class SessionContext implements EventSeqSource {
   public async dispatchRaw(frame: WireFrame): Promise<void> {
     this.touch();
     this.lastInboundAt = Date.now();
-    let parsed: BaseEnvelope;
+    const parsed = this.parseInboundFrame(frame);
+    if (parsed === null) return;
+    if (this.dropPreHandshakeNonHandshake(parsed)) return;
+    if (await this.dedupeInbound(parsed)) return;
+    const envelope = await this.validateInbound(parsed);
+    if (envelope === null) return;
+    await this.invokeHandler(envelope);
+  }
+
+  private parseInboundFrame(frame: WireFrame): BaseEnvelope | null {
     try {
-      parsed = RoundTripEnvelopeSchema.parse(frame);
+      return RoundTripEnvelopeSchema.parse(frame);
     } catch (error) {
       this.logger.warn(
         { err: error },
         "inbound envelope failed base-shape validation",
       );
-      return;
+      return null;
     }
+  }
 
-    // Pre-handshake: drop non-handshake messages.
-    if (!this.state.isAccepted && !HANDSHAKE_TYPES.has(parsed.type)) {
-      this.logger.warn(
-        { type: parsed.type, id: parsed.id },
-        "dropping pre-handshake non-handshake message",
-      );
-      return;
-    }
+  private dropPreHandshakeNonHandshake(parsed: BaseEnvelope): boolean {
+    if (this.state.isAccepted || HANDSHAKE_TYPES.has(parsed.type)) return false;
+    this.logger.warn(
+      { type: parsed.type, id: parsed.id },
+      "dropping pre-handshake non-handshake message",
+    );
+    return true;
+  }
 
-    // Idempotent inbound: dedupe by (session_id, id) once a session exists.
+  private async dedupeInbound(parsed: BaseEnvelope): Promise<boolean> {
     // v1.1: session.ping/pong/ack are session-control (not event-seq-bearing),
     // so we skip the dedupe-and-log step for them.
-    const SKIP_LOG: ReadonlySet<string> = new Set([
-      "session.ping",
-      "session.pong",
-      "session.ack",
-    ]);
     if (
-      this.state.id !== undefined &&
-      parsed.session_id === this.state.id &&
-      !SKIP_LOG.has(parsed.type)
+      this.state.id === undefined ||
+      parsed.session_id !== this.state.id ||
+      INBOUND_DEDUPE_SKIP.has(parsed.type)
     ) {
-      try {
-        const inserted = await this.server.eventLog.append(parsed);
-        if (!inserted) {
-          this.logger.debug(
-            { id: parsed.id },
-            "duplicate inbound, skipping dispatch",
-          );
-          return;
-        }
-      } catch (error) {
-        this.logger.error({ err: error }, "event log append (inbound) failed");
-      }
+      return false;
     }
+    try {
+      const inserted = await this.server.eventLog.append(parsed);
+      if (inserted) return false;
+      this.logger.debug({ id: parsed.id }, "duplicate inbound, skipping dispatch");
+      return true;
+    } catch (error) {
+      this.logger.error({ err: error }, "event log append (inbound) failed");
+      return false;
+    }
+  }
 
-    // Validate against the discriminated union.
+  private async validateInbound(parsed: BaseEnvelope): Promise<Envelope | null> {
     const result = EnvelopeSchema.safeParse(parsed);
-    if (!result.success) {
-      const issue = result.error.issues[0];
-      const looksUnknownType =
-        issue?.code === z.ZodIssueCode.invalid_union_discriminator;
-      if (looksUnknownType) {
-        const disposition = classifyUnknownType(parsed.type, {
-          extensionsObject: parsed.extensions,
-        });
-        if (disposition.kind === "drop") {
-          this.logger.debug({ type: parsed.type }, disposition.reason);
-          return;
-        }
-        await this.emitSessionError(
-          new InvalidRequestError(disposition.reason, {
-            details: { type: parsed.type },
-          }),
-        );
-        return;
-      }
-      await this.emitSessionError(
-        new InvalidRequestError(
-          `Invalid envelope: ${issue?.message ?? "schema validation failed"}`,
-        ),
-      );
+    if (result.success) return result.data;
+    const issue = result.error.issues[0];
+    if (issue?.code === z.ZodIssueCode.invalid_union_discriminator) {
+      await this.handleUnknownTypeDisposition(parsed);
+      return null;
+    }
+    await this.emitSessionError(
+      new InvalidRequestError(
+        `Invalid envelope: ${issue?.message ?? "schema validation failed"}`,
+      ),
+    );
+    return null;
+  }
+
+  private async handleUnknownTypeDisposition(parsed: BaseEnvelope): Promise<void> {
+    const disposition = classifyUnknownType(parsed.type, {
+      extensionsObject: parsed.extensions,
+    });
+    if (disposition.kind === "drop") {
+      this.logger.debug({ type: parsed.type }, disposition.reason);
       return;
     }
-    const envelope = result.data;
+    await this.emitSessionError(
+      new InvalidRequestError(disposition.reason, {
+        details: { type: parsed.type },
+      }),
+    );
+  }
 
+  private async invokeHandler(envelope: Envelope): Promise<void> {
     const handler = this.handlers.get(envelope.type);
     if (handler === undefined) {
       await this.emitSessionError(
@@ -421,7 +484,6 @@ export class SessionContext implements EventSeqSource {
       );
       return;
     }
-
     try {
       await handler(envelope, this);
     } catch (error) {
@@ -431,9 +493,7 @@ export class SessionContext implements EventSeqSource {
           ? error
           : new InternalError(
               error instanceof Error ? error.message : String(error),
-              {
-                cause: error instanceof Error ? error : undefined,
-              },
+              { cause: error instanceof Error ? error : undefined },
             );
       // Best effort: route through session.error for now.
       await this.emitSessionError(wrapped);
@@ -682,11 +742,21 @@ export class ARCPServer {
       );
       return;
     }
-    const payload = env.payload;
+    const identity = await this.authenticateHello(ctx, env.payload);
+    if (identity === null) return;
+    if (env.payload.resume !== undefined) {
+      await this.handleResume(ctx, identity, env.payload);
+      return;
+    }
+    await this.acceptFreshSession(ctx, identity, env.payload);
+  }
 
-    let identity: BearerIdentity;
+  private async authenticateHello(
+    ctx: SessionContext,
+    payload: SessionHelloPayload,
+  ): Promise<BearerIdentity | null> {
     try {
-      identity = await this.authenticate(payload.auth);
+      return await this.authenticate(payload.auth);
     } catch (error) {
       const wrapped =
         error instanceof ARCPError
@@ -697,23 +767,21 @@ export class ARCPServer {
         "rejecting session.hello (auth)",
       );
       await ctx.emitSessionError(wrapped);
-      return;
+      return null;
     }
+  }
 
-    // Resume path: validate token & seq, replay events, rotate token.
-    if (payload.resume !== undefined) {
-      await this.handleResume(ctx, identity, payload);
-      return;
-    }
-
-    // Fresh session: assign id, transition, issue welcome with fresh token.
+  private async acceptFreshSession(
+    ctx: SessionContext,
+    identity: BearerIdentity,
+    payload: SessionHelloPayload,
+  ): Promise<void> {
     const sessionId = newSessionId();
     ctx.state.assignId(sessionId);
     ctx.state.assignIdentity(identity);
     const negotiated = this.makeNegotiatedCapabilities(payload, ctx);
     ctx.state.assignCapabilities(negotiated);
     this.bindLogger(ctx, payload.client.name);
-
     const resumeWindowSec =
       this.options.resumeWindowSeconds ?? DEFAULT_RESUME_WINDOW_SECONDS;
     const resumeToken = newResumeToken();
@@ -722,35 +790,47 @@ export class ARCPServer {
       resumeToken,
       expiresAt: Date.now() + resumeWindowSec * 1000,
     });
-
-    const heartbeatSec =
-      this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS;
-    const welcome: SessionWelcomePayload = {
-      runtime: this.options.runtime,
-      resume_token: resumeToken,
-      resume_window_sec: resumeWindowSec,
-      ...(ctx.hasFeature("heartbeat")
-        ? { heartbeat_interval_sec: heartbeatSec }
-        : {}),
-      capabilities: negotiated,
-    };
-    const welcomeEnv = buildEnvelope({
-      id: newMessageId(),
-      type: "session.welcome" as const,
-      payload: welcome,
-      optional: {
-        session_id: sessionId,
-      },
+    const welcome = this.buildWelcomePayload(ctx, negotiated, {
+      resumeToken,
+      resumeWindowSec,
     });
     ctx.state.transition("accepted");
     this.sessions.set(sessionId, ctx);
-    await ctx.send(welcomeEnv);
+    await ctx.send(
+      buildEnvelope({
+        id: newMessageId(),
+        type: "session.welcome" as const,
+        payload: welcome,
+        optional: { session_id: sessionId },
+      }),
+    );
     ctx.logger.info(
       { session_id: sessionId, principal: identity.principal },
       "session welcomed",
     );
     this.registerPostHandshakeHandlers(ctx);
     ctx.startHeartbeat();
+  }
+
+  private buildWelcomePayload(
+    ctx: SessionContext,
+    negotiated: Capabilities,
+    args: {
+      resumeToken: ReturnType<typeof newResumeToken>;
+      resumeWindowSec: number;
+    },
+  ): SessionWelcomePayload {
+    const heartbeatSec =
+      this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS;
+    return {
+      runtime: this.options.runtime,
+      resume_token: args.resumeToken,
+      resume_window_sec: args.resumeWindowSec,
+      ...(ctx.hasFeature("heartbeat")
+        ? { heartbeat_interval_sec: heartbeatSec }
+        : {}),
+      capabilities: negotiated,
+    };
   }
 
   /**
@@ -794,75 +874,107 @@ export class ARCPServer {
       );
       return;
     }
-    // Tentatively bind the session id so any failure-path session.error
-    // envelope still carries session_id per §5.1.
     if (ctx.state.id === undefined) ctx.state.assignId(resume.session_id);
+    if (!(await this.validateResumeRecord(ctx, resume))) return;
+    this.rebindResumedSession(ctx, identity, payload);
+    const freshToken = this.rotateResumeToken(resume.session_id);
+    await this.sendResumeWelcome(ctx, freshToken, resume.session_id);
+    await this.replayResumeEvents(ctx, resume);
+    ctx.logger.info(
+      { session_id: resume.session_id, replayed_from: resume.last_event_seq },
+      "session resumed",
+    );
+    this.registerPostHandshakeHandlers(ctx);
+    ctx.startHeartbeat();
+  }
+
+  private async validateResumeRecord(
+    ctx: SessionContext,
+    resume: NonNullable<SessionHelloPayload["resume"]>,
+  ): Promise<boolean> {
     const record = this.resumeStore.get(resume.session_id);
     if (record?.resumeToken !== resume.resume_token) {
       await ctx.emitSessionError(
         new ResumeWindowExpiredError("Invalid or unknown resume_token"),
       );
-      return;
+      return false;
     }
     if (record.expiresAt < Date.now()) {
       this.resumeStore.delete(resume.session_id);
       await ctx.emitSessionError(
         new ResumeWindowExpiredError("Resume window has expired"),
       );
-      return;
+      return false;
     }
+    return true;
+  }
 
+  private rebindResumedSession(
+    ctx: SessionContext,
+    identity: BearerIdentity,
+    payload: SessionHelloPayload,
+  ): void {
+    const resume = payload.resume;
+    if (resume === undefined) return;
+    const sessionId = resume.session_id;
     // Detach any in-memory session bound to that id (e.g., a dropped socket).
-    const prior = this.sessions.get(resume.session_id);
-    if (prior !== undefined && prior !== ctx) {
-      this.sessions.delete(resume.session_id);
-    }
-
-    ctx.state.assignId(resume.session_id);
+    const prior = this.sessions.get(sessionId);
+    if (prior !== undefined && prior !== ctx) this.sessions.delete(sessionId);
+    ctx.state.assignId(sessionId);
     ctx.state.assignIdentity(identity);
     const negotiated = this.makeNegotiatedCapabilities(payload, ctx);
     ctx.state.assignCapabilities(negotiated);
     this.bindLogger(ctx, payload.client.name);
+  }
 
-    // Rotate the resume_token; the old token is single-use and now invalid.
+  private rotateResumeToken(
+    sessionId: SessionId,
+  ): ReturnType<typeof newResumeToken> {
     const resumeWindowSec =
       this.options.resumeWindowSeconds ?? DEFAULT_RESUME_WINDOW_SECONDS;
     const freshToken = newResumeToken();
-    this.resumeStore.set(resume.session_id, {
-      sessionId: resume.session_id,
+    this.resumeStore.set(sessionId, {
+      sessionId,
       resumeToken: freshToken,
       expiresAt: Date.now() + resumeWindowSec * 1000,
     });
+    return freshToken;
+  }
 
-    const heartbeatSec =
-      this.options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS;
-    const welcome: SessionWelcomePayload = {
-      runtime: this.options.runtime,
-      resume_token: freshToken,
-      resume_window_sec: resumeWindowSec,
-      ...(ctx.hasFeature("heartbeat")
-        ? { heartbeat_interval_sec: heartbeatSec }
-        : {}),
-      capabilities: negotiated,
-    };
-    const welcomeEnv = buildEnvelope({
-      id: newMessageId(),
-      type: "session.welcome" as const,
-      payload: welcome,
-      optional: { session_id: resume.session_id },
-    });
+  private async sendResumeWelcome(
+    ctx: SessionContext,
+    freshToken: ReturnType<typeof newResumeToken>,
+    sessionId: SessionId,
+  ): Promise<void> {
+    const resumeWindowSec =
+      this.options.resumeWindowSeconds ?? DEFAULT_RESUME_WINDOW_SECONDS;
+    const welcome = this.buildWelcomePayload(
+      ctx,
+      ctx.state.capabilities ?? {},
+      { resumeToken: freshToken, resumeWindowSec },
+    );
     ctx.state.transition("accepted");
-    this.sessions.set(resume.session_id, ctx);
-    await ctx.send(welcomeEnv);
+    this.sessions.set(sessionId, ctx);
+    await ctx.send(
+      buildEnvelope({
+        id: newMessageId(),
+        type: "session.welcome" as const,
+        payload: welcome,
+        optional: { session_id: sessionId },
+      }),
+    );
+  }
 
-    // Replay events strictly greater than `last_event_seq`.
+  private async replayResumeEvents(
+    ctx: SessionContext,
+    resume: NonNullable<SessionHelloPayload["resume"]>,
+  ): Promise<void> {
     try {
       const replayed = await this.eventLog.readSinceSeq(
         resume.session_id,
         resume.last_event_seq,
         10_000,
       );
-      // Track highest replayed seq so future emits continue monotonic.
       let highest = resume.last_event_seq;
       for (const env of replayed) {
         if (env.event_seq !== undefined && env.event_seq > highest) {
@@ -874,13 +986,6 @@ export class ARCPServer {
     } catch (error) {
       ctx.logger.warn({ err: error }, "resume replay failed");
     }
-
-    ctx.logger.info(
-      { session_id: resume.session_id, replayed_from: resume.last_event_seq },
-      "session resumed",
-    );
-    this.registerPostHandshakeHandlers(ctx);
-    ctx.startHeartbeat();
   }
 
   private bindLogger(ctx: SessionContext, clientName: string): void {
@@ -892,6 +997,13 @@ export class ARCPServer {
   }
 
   private registerPostHandshakeHandlers(ctx: SessionContext): void {
+    this.registerJobLifecycleHandlers(ctx);
+    this.registerSessionControlHandlers(ctx);
+    this.registerListJobsHandler(ctx);
+    this.registerSubscriptionHandlers(ctx);
+  }
+
+  private registerJobLifecycleHandlers(ctx: SessionContext): void {
     ctx.registerHandler("job.submit", async (env) => {
       if (env.type !== "job.submit") return;
       await this.jobRunner.handleJobSubmit(ctx, env);
@@ -910,37 +1022,41 @@ export class ARCPServer {
       }
       await ctx.terminate(env.payload.reason);
     });
+  }
 
+  private registerSessionControlHandlers(ctx: SessionContext): void {
     // v1.1 §6.4 — heartbeat (handled even if not negotiated; receivers always
     // respond to ping per §6.4 to support staggered rollouts).
     ctx.registerHandler("session.ping", async (env) => {
       if (env.type !== "session.ping") return;
       const sessionId = ctx.state.id;
       if (sessionId === undefined) return;
-      const pongEnv = buildEnvelope({
-        id: newMessageId(),
-        type: "session.pong" as const,
-        payload: {
-          ping_nonce: env.payload.nonce,
-          received_at: new Date().toISOString(),
-        },
-        optional: { session_id: sessionId },
-      });
       // Direct transport.send — heartbeats are NOT counted in event_seq.
-      await ctx.transport.send(pongEnv);
+      await ctx.transport.send(
+        buildEnvelope({
+          id: newMessageId(),
+          type: "session.pong" as const,
+          payload: {
+            ping_nonce: env.payload.nonce,
+            received_at: new Date().toISOString(),
+          },
+          optional: { session_id: sessionId },
+        }),
+      );
     });
     ctx.registerHandler("session.pong", (env) => {
       if (env.type !== "session.pong") return;
       ctx.handlePong(env.payload.ping_nonce);
     });
-
     // v1.1 §6.5 — event acknowledgement.
     ctx.registerHandler("session.ack", (env) => {
       if (env.type !== "session.ack") return;
       if (!ctx.hasFeature("ack")) return;
       ctx.recordAck(env.payload.last_processed_seq);
     });
+  }
 
+  private registerListJobsHandler(ctx: SessionContext): void {
     // v1.1 §6.6 — job listing.
     ctx.registerHandler("session.list_jobs", async (env) => {
       if (env.type !== "session.list_jobs") return;
@@ -954,7 +1070,9 @@ export class ARCPServer {
       }
       await this.handleListJobs(ctx, env);
     });
+  }
 
+  private registerSubscriptionHandlers(ctx: SessionContext): void {
     // v1.1 §7.6 — subscription.
     ctx.registerHandler("job.subscribe", async (env) => {
       if (env.type !== "job.subscribe") return;
@@ -988,7 +1106,6 @@ export class ARCPServer {
   ): Promise<void> {
     if (env.type !== "job.cancel") return;
     const jobId = env.job_id;
-    // job_id is required by the job.cancel schema, but we keep the runtime check.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (jobId === undefined) {
       await ctx.emitSessionError(
@@ -998,41 +1115,49 @@ export class ARCPServer {
     }
     const job = ctx.jobs.get(jobId);
     if (job === undefined) {
-      // v1.1 §7.6 — subscription does NOT grant cancel authority. If the
-      // job exists but this session is only a subscriber, refuse with
-      // PERMISSION_DENIED rather than masquerading as JOB_NOT_FOUND.
-      const global = this.globalJobs.get(jobId);
-      if (global !== undefined) {
-        await ctx.emitJobError(jobId, {
-          final_status: "error",
-          code: "PERMISSION_DENIED",
-          message: "Subscription does not confer cancel authority",
-          retryable: false,
-        });
-        return;
-      }
+      await this.emitCancelTargetMissing(ctx, jobId);
+      return;
+    }
+    if (job.isTerminal) return;
+    job.cancel(env.payload.reason ?? "client_cancel");
+    this.scheduleCancelGrace(job);
+  }
+
+  private async emitCancelTargetMissing(
+    ctx: SessionContext,
+    jobId: JobId,
+  ): Promise<void> {
+    // v1.1 §7.6 — subscription does NOT grant cancel authority. If the job
+    // exists but this session is only a subscriber, refuse with
+    // PERMISSION_DENIED rather than masquerading as JOB_NOT_FOUND.
+    if (this.globalJobs.get(jobId) !== undefined) {
       await ctx.emitJobError(jobId, {
         final_status: "error",
-        code: "JOB_NOT_FOUND",
-        message: `Job "${jobId}" not found in this session`,
+        code: "PERMISSION_DENIED",
+        message: "Subscription does not confer cancel authority",
         retryable: false,
       });
       return;
     }
-    if (job.isTerminal) return;
-    const reason = env.payload.reason ?? "client_cancel";
-    job.cancel(reason);
-    // Grace period (§7.4): default 30s; force-emit cancelled error on expiry.
+    await ctx.emitJobError(jobId, {
+      final_status: "error",
+      code: "JOB_NOT_FOUND",
+      message: `Job "${jobId}" not found in this session`,
+      retryable: false,
+    });
+  }
+
+  private scheduleCancelGrace(job: Job): void {
+    // §7.4: default 30s; force-emit cancelled error on expiry.
     const graceMs = this.options.cancelGraceMs ?? DEFAULT_GRACE_MS;
     const timer = setTimeout(() => {
-      if (!job.isTerminal) {
-        void job.emitErrorEnvelope({
-          final_status: "cancelled",
-          code: "CANCELLED",
-          message: `Cancellation grace expired (${graceMs}ms)`,
-          retryable: false,
-        });
-      }
+      if (job.isTerminal) return;
+      void job.emitErrorEnvelope({
+        final_status: "cancelled",
+        code: "CANCELLED",
+        message: `Cancellation grace expired (${graceMs}ms)`,
+        retryable: false,
+      });
     }, graceMs);
     timer.unref();
   }
@@ -1048,44 +1173,36 @@ export class ARCPServer {
     if (env.type !== "session.list_jobs") return;
     const sessionId = ctx.state.id;
     if (sessionId === undefined) return;
+    const candidates = this.buildListJobsCandidates(ctx, env.payload.filter);
+    candidates.sort(compareJobListEntries);
+    const { page, nextCursor } = paginateJobList(
+      candidates,
+      env.payload.cursor ?? undefined,
+      env.payload.limit ?? 100,
+    );
+    await ctx.send(
+      buildEnvelope({
+        id: newMessageId(),
+        type: "session.jobs" as const,
+        payload: { request_id: env.id, jobs: page, next_cursor: nextCursor },
+        optional: { session_id: sessionId },
+      }),
+    );
+  }
+
+  private buildListJobsCandidates(
+    ctx: SessionContext,
+    rawFilter: SessionListJobsFilter | undefined,
+  ): JobListEntry[] {
     const principal = ctx.state.identity?.principal;
     const policy =
       this.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
-    const payload = env.payload;
-    const filter = payload.filter ?? {};
-    const limit = payload.limit ?? 100;
-
-    const allowedStatuses = new Set<string>(filter.status ?? JOB_STATES);
-    const createdAfter = filter.created_after
-      ? Date.parse(filter.created_after)
-      : null;
-    const createdBefore = filter.created_before
-      ? Date.parse(filter.created_before)
-      : null;
-
-    // Build candidate list across global jobs and apply filter+auth.
-    const candidates: JobListEntry[] = [];
+    const filter: ListJobsFilter = compileListJobsFilter(rawFilter ?? {});
+    const out: JobListEntry[] = [];
     for (const job of this.globalJobs.values()) {
       if (!policy(job, principal)) continue;
-      if (!allowedStatuses.has(job.state)) continue;
-      if (filter.agent !== undefined) {
-        const parsed = parseAgentRef(filter.agent);
-        if (parsed.version === null) {
-          if (job.agent !== parsed.name) continue;
-        } else {
-          if (job.agent !== parsed.name || job.agentVersion !== parsed.version)
-            continue;
-        }
-      }
-      if (createdAfter !== null) {
-        const t = Date.parse(job.createdAt);
-        if (!Number.isFinite(t) || t <= createdAfter) continue;
-      }
-      if (createdBefore !== null) {
-        const t = Date.parse(job.createdAt);
-        if (!Number.isFinite(t) || t >= createdBefore) continue;
-      }
-      candidates.push({
+      if (!filter.matches(job)) continue;
+      out.push({
         job_id: job.jobId,
         agent: job.agentRef,
         status: job.state,
@@ -1096,39 +1213,7 @@ export class ARCPServer {
         last_event_seq: ctx.latestEventSeq,
       });
     }
-    // Sort by created_at ascending, then by job_id for determinism.
-    candidates.sort((a, b) => {
-      const ta = Date.parse(a.created_at);
-      const tb = Date.parse(b.created_at);
-      if (ta !== tb) return ta - tb;
-      return a.job_id.localeCompare(b.job_id);
-    });
-
-    // Cursor: opaque ULID of the last-emitted job_id in the previous page.
-    const cursor = payload.cursor ?? null;
-    let startIdx = 0;
-    if (cursor !== null && cursor !== "") {
-      const idx = candidates.findIndex((c) => c.job_id === cursor);
-      if (idx !== -1) startIdx = idx + 1;
-    }
-    const page = candidates.slice(startIdx, startIdx + limit);
-    const lastEntry = page.length > 0 ? page.at(-1) : undefined;
-    const nextCursor =
-      startIdx + limit < candidates.length && lastEntry !== undefined
-        ? lastEntry.job_id
-        : null;
-
-    const responseEnv = buildEnvelope({
-      id: newMessageId(),
-      type: "session.jobs" as const,
-      payload: {
-        request_id: env.id,
-        jobs: page,
-        next_cursor: nextCursor,
-      },
-      optional: { session_id: sessionId },
-    });
-    await ctx.send(responseEnv);
+    return out;
   }
 
   // ---------------------------------------------------------------------
@@ -1153,10 +1238,7 @@ export class ARCPServer {
       });
       return;
     }
-    const principal = ctx.state.identity?.principal;
-    const policy =
-      this.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
-    if (!policy(job, principal)) {
+    if (!this.authorizeSubscribe(ctx, job)) {
       await ctx.emitSessionError(
         new PermissionDeniedError(
           "Subscriber's principal is not authorized to observe this job",
@@ -1164,8 +1246,29 @@ export class ARCPServer {
       );
       return;
     }
+    this.registerSubscriber(ctx, jobId);
+    const replayed =
+      env.payload.history === true
+        ? await this.replaySubscribeHistory(ctx, job, env.payload.from_event_seq)
+        : false;
+    await ctx.send(
+      buildEnvelope({
+        id: newMessageId(),
+        type: "job.subscribed" as const,
+        payload: buildSubscribedPayload(job, ctx.latestEventSeq, replayed),
+        optional: { session_id: sessionId, job_id: jobId },
+      }),
+    );
+  }
 
-    // Register subscriber.
+  private authorizeSubscribe(ctx: SessionContext, job: Job): boolean {
+    const principal = ctx.state.identity?.principal;
+    const policy =
+      this.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
+    return policy(job, principal);
+  }
+
+  private registerSubscriber(ctx: SessionContext, jobId: JobId): void {
     let set = this.subscribers.get(jobId);
     if (set === undefined) {
       set = new Set<SessionContext>();
@@ -1174,64 +1277,35 @@ export class ARCPServer {
     set.add(ctx);
     ctx.subscriptions.set(jobId, () => {
       const s = this.subscribers.get(jobId);
-      if (s !== undefined) {
-        s.delete(ctx);
-        if (s.size === 0) this.subscribers.delete(jobId);
-      }
+      if (s === undefined) return;
+      s.delete(ctx);
+      if (s.size === 0) this.subscribers.delete(jobId);
     });
+  }
 
-    // Replay history if requested.
-    const wantHistory = env.payload.history === true;
-    const fromSeq = env.payload.from_event_seq;
-    let replayed = false;
-    if (wantHistory && job.owningSession !== undefined) {
-      const owner = job.owningSession;
-      if (owner.state.id !== undefined) {
-        try {
-          const events = await this.eventLog.readSinceSeq(
-            owner.state.id,
-            fromSeq ?? 0,
-            10_000,
-          );
-          for (const e of events) {
-            if (e.job_id !== jobId) continue;
-            // Only forward event-bearing types.
-            if (
-              e.type !== "job.event" &&
-              e.type !== "job.result" &&
-              e.type !== "job.error"
-            ) {
-              continue;
-            }
-            await forwardEventToSubscriber(ctx, e);
-          }
-          replayed = events.some((e) => e.job_id === jobId);
-        } catch (error) {
-          ctx.logger.warn({ err: error }, "subscribe history replay failed");
-        }
+  private async replaySubscribeHistory(
+    ctx: SessionContext,
+    job: Job,
+    fromSeq: number | undefined,
+  ): Promise<boolean> {
+    if (job.owningSession === undefined) return false;
+    const ownerSessionId = job.owningSession.state.id;
+    if (ownerSessionId === undefined) return false;
+    try {
+      const events = await this.eventLog.readSinceSeq(
+        ownerSessionId,
+        fromSeq ?? 0,
+        10_000,
+      );
+      for (const e of events) {
+        if (!isReplayableForJob(e, job.jobId)) continue;
+        await forwardEventToSubscriber(ctx, e);
       }
+      return events.some((e) => e.job_id === job.jobId);
+    } catch (error) {
+      ctx.logger.warn({ err: error }, "subscribe history replay failed");
+      return false;
     }
-
-    const subscribedFrom = ctx.latestEventSeq;
-    const respEnv = buildEnvelope({
-      id: newMessageId(),
-      type: "job.subscribed" as const,
-      payload: {
-        job_id: jobId,
-        current_status: job.state,
-        agent: job.agentRef,
-        lease: job.lease,
-        ...(job.leaseConstraints === undefined
-          ? {}
-          : { lease_constraints: job.leaseConstraints }),
-        parent_job_id: job.parentJobId ?? null,
-        ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
-        subscribed_from: subscribedFrom,
-        replayed,
-      },
-      optional: { session_id: sessionId, job_id: jobId },
-    });
-    await ctx.send(respEnv);
   }
 
   // ---------------------------------------------------------------------
