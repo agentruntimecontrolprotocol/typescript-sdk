@@ -5,6 +5,30 @@ ambiguous. Each entry: date, sub-phase, decision, one-line rationale.
 
 ---
 
+## 2026-05-14 — Session 2 — Sub-phase 2.1
+
+- **Pre-commit hook runs `lint:biome` only, not `lint`.** Sub-phase
+  2.1 enables strict ESLint complexity rules that will be red until
+  2.5. Running the full `pnpm lint` in pre-commit would block every
+  intermediate refactor commit. `lint:biome` provides fast
+  obvious-mistake protection; full ESLint runs in CI (advisory
+  during 2.5) and is required for the final Phase 3 gate.
+- **CI `Lint (eslint)` and `Cycles` marked `continue-on-error`.**
+  Same reasoning. The publish workflow downstream depends on the
+  test workflow's overall success, which would otherwise fail.
+  These will be flipped back to required at the end of sub-phase
+  2.5.
+- **`madge --exclude '(dist|node_modules)'`.** Without the
+  exclusion, madge double-counted cycles via dist `.d.ts` files
+  that mirror the src cycles. Excluding gives a clean signal:
+  6 real cycles in `@arcp/runtime`.
+- **`tsd` / `expectTypeOf` setup deferred to 2.7.** The public
+  generic surface is small enough that adding type tests can live
+  with the documentation pass rather than gate sub-phase 2.1.
+- **`useUnknownInCatchVariables: true` was safe to enable.** No
+  typecheck errors surfaced because catch blocks were already
+  written defensively (no `err.foo` access without narrowing).
+
 ## 2026-05-14 — Session 2 — WIP recovery
 
 - **Recovered stashed WIP onto `refactor/automation` as one commit.**

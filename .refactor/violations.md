@@ -12,24 +12,25 @@ mechanical violations. The real work is **complexity reduction**
 
 ---
 
-## Sub-phase 2.1 — Tooling baseline
+## Sub-phase 2.1 — Tooling baseline — **complete (2026-05-14)**
 
-- [ ] Add `useUnknownInCatchVariables` to `tsconfig.base.json`
+- [x] Add `useUnknownInCatchVariables` to `tsconfig.base.json`
       (only Section-0 flag missing).
-- [ ] Add `max-lines: 300` to ESLint config.
-- [ ] Add `max-lines-per-function: 40` to ESLint config.
-- [ ] Add `max-params: 3` to ESLint config.
-- [ ] Add `max-depth: 3` to ESLint config.
-- [ ] Add `complexity: 10` to ESLint config.
-- [ ] Add `prefer-readonly: error` (currently `warn`) to ESLint
-      config (guide section 11).
-- [ ] Add `import/no-cycle: error` to ESLint config (already there;
-      verify configured per-package).
-- [ ] Install `@arethetypeswrong/cli`, `publint`, `madge`,
+- [x] Add `max-lines: 300` to ESLint config.
+- [x] Add `max-lines-per-function: 40` to ESLint config.
+- [x] Add `max-params: 3` to ESLint config.
+- [x] Add `max-depth: 3` to ESLint config.
+- [x] Add `complexity: 10` to ESLint config.
+- [x] Add `prefer-readonly: error` (was `warn`) to ESLint config.
+- [x] `import/no-cycle: error` confirmed in workspace ESLint config.
+- [x] Install `@arethetypeswrong/cli`, `publint`, `madge`,
       `eslint-plugin-tsdoc` as devDependencies.
-- [ ] Add CI steps: `attw --pack`, `publint`, `madge --circular`
-      per published package.
+- [x] CI steps added: `check:cycles` (advisory), `check:attw`
+      (required), `check:publint` (required). `lint:eslint` is now
+      advisory until sub-phase 2.5 wraps; `lint:biome` is required.
 - [ ] Add `tsd` or `expectTypeOf` setup for type tests on generics.
+      *Deferred to sub-phase 2.7 (Documentation) — generics-heavy
+      public surface is small and can be covered there.*
 
 ---
 
@@ -122,12 +123,46 @@ sub-phase 2.5 work brings them across the line.
 - `packages/sdk/src/cli.ts` — 154
 - `packages/core/src/state/session.ts` — 150
 
-### Function-level complexity
+### Function-level complexity (measured by ESLint, 2026-05-14)
 
-- [ ] Re-measure with ESLint `max-lines-per-function`,
-      `max-params`, `max-depth`, `complexity` after sub-phase 2.1
-      enables them. Current heuristic scan was insufficient.
-- [ ] Address every violation surfaced.
+Total: **79 errors across 12 files**. Breakdown:
+
+- `max-lines-per-function`: 28 functions
+- `max-depth`: 22 occurrences
+- `complexity`: 20 functions
+- `max-lines`: 5 files
+- `max-params`: 4 functions
+
+Files with violations (each is its own checkpoint inside 2.5):
+
+- [ ] `packages/runtime/src/server.ts` (1290 lines)
+- [ ] `packages/runtime/src/job-runner.ts` (565 lines)
+- [ ] `packages/runtime/src/job.ts` (589 lines)
+- [ ] `packages/runtime/src/lease.ts` (430 lines)
+- [ ] `packages/client/src/client.ts` (822 lines)
+- [ ] `packages/core/src/messages/execution.ts` (593 lines)
+- [ ] `packages/core/src/store/eventlog.ts` (303 lines)
+- [ ] `packages/core/src/transport/websocket.ts` (function-level)
+- [ ] `packages/core/src/state/session.ts` (function-level)
+- [ ] `packages/core/src/util/json-schema.ts` (function-level)
+- [ ] `packages/middleware/bun/src/index.ts` (function-level)
+- [ ] `packages/middleware/otel/src/index.ts` (function-level)
+
+### Circular imports (G4)
+
+- [ ] **6 circular dependencies in `@arcp/runtime`**
+      (`madge --circular`):
+  1. `types.ts > job.ts > types.ts`
+  2. `agent-registry.ts > types.ts > server.ts > agent-registry.ts`
+  3. `types.ts > server.ts > job-runner.ts > lease.ts > types.ts`
+  4. `server.ts > job-runner.ts > server.ts`
+  5. `types.ts > server.ts > job-runner.ts > types.ts`
+  6. `types.ts > server.ts > types.ts`
+  Root cause: `runtime/src/types.ts` declares interfaces that the
+  server depends on, and the server is referenced back by the
+  collaborators (`job-runner`, `agent-registry`) for context. To
+  break: extract pure types into a leaf module (`runtime/src/api.ts`
+  or similar) that no other runtime file imports from `server.ts`.
 
 ---
 
