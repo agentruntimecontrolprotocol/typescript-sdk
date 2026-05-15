@@ -85,13 +85,12 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # Cycles, attw, publint were added in sub-phase 2.1 of the refactor.
-      # Cycles is currently red (6 cycles in @arcp/runtime introduced by
-      # the WIP server.ts split); kept advisory until sub-phase 2.5
-      # untangles them. attw and publint are clean and required.
-      - name: Cycle check (advisory during refactor)
+      # check:cycles runs madge against the compiled .js so it reports only
+      # real runtime cycles. Type-only imports (erased by
+      # verbatimModuleSyntax) can form source-level cycles that don't exist
+      # at runtime; those are not bugs.
+      - name: Cycle check
         run: pnpm run check:cycles
-        continue-on-error: true
 
       - name: Are the types wrong?
         run: pnpm run check:attw
