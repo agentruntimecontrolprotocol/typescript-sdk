@@ -58,127 +58,155 @@ export function withTracing(
   inner: Transport,
   options: WithTracingOptions,
 ): Transport {
-  const { tracer } = options;
-
   return {
     get closed() {
       return inner.closed;
     },
-
-    async send(frame: SendableFrame): Promise<void> {
-      const type =
-        typeof (frame as { type?: unknown }).type === "string"
-          ? (frame as { type: string }).type
-          : "unknown";
-      const spanName = options.sendSpanName?.(frame) ?? `arcp.send ${type}`;
-
-      const span = tracer.startSpan(spanName, {
-        kind: SpanKind.PRODUCER,
-        attributes: extractAttributes(frame, "out"),
-      });
-
-      const carrier: Record<string, string> = {};
-      propagation.inject(trace.setSpan(context.active(), span), carrier);
-
-      const enriched = injectExtension(frame, carrier);
-
-      try {
-        await context.with(trace.setSpan(context.active(), span), () =>
-          inner.send(enriched),
-        );
-      } catch (error) {
-        recordError(span, error);
-        throw error;
-      } finally {
-        span.end();
-      }
+    send: (frame) => sendWithSpan(inner, options, frame),
+    onFrame: (handler) => {
+      inner.onFrame((frame) => recvWithSpan(options, frame, handler));
     },
-
-    onFrame(handler: FrameHandler): void {
-      inner.onFrame(async (frame) => {
-        const carrier = extractExtension(frame);
-        const parent =
-          carrier === undefined
-            ? context.active()
-            : propagation.extract(context.active(), carrier);
-
-        const type =
-          typeof frame["type"] === "string" ? frame["type"] : "unknown";
-        const spanName = options.recvSpanName?.(frame) ?? `arcp.recv ${type}`;
-
-        const span = tracer.startSpan(
-          spanName,
-          {
-            kind: SpanKind.CONSUMER,
-            attributes: extractAttributes(frame, "in"),
-          },
-          parent,
-        );
-
-        try {
-          await context.with(trace.setSpan(parent, span), () => handler(frame));
-        } catch (error) {
-          recordError(span, error);
-          throw error;
-        } finally {
-          span.end();
-        }
-      });
-    },
-
-    onClose(handler: (err?: Error) => void): void {
+    onClose: (handler) => {
       inner.onClose(handler);
     },
-
-    close(reason?: string): Promise<void> {
-      return inner.close(reason);
-    },
+    close: (reason) => inner.close(reason),
   };
+}
+
+async function sendWithSpan(
+  inner: Transport,
+  options: WithTracingOptions,
+  frame: SendableFrame,
+): Promise<void> {
+  const type = frameType(frame);
+  const spanName = options.sendSpanName?.(frame) ?? `arcp.send ${type}`;
+  const span = options.tracer.startSpan(spanName, {
+    kind: SpanKind.PRODUCER,
+    attributes: extractAttributes(frame, "out"),
+  });
+  const carrier: Record<string, string> = {};
+  propagation.inject(trace.setSpan(context.active(), span), carrier);
+  const enriched = injectExtension(frame, carrier);
+  try {
+    await context.with(trace.setSpan(context.active(), span), () =>
+      inner.send(enriched),
+    );
+  } catch (error) {
+    recordError(span, error);
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
+async function recvWithSpan(
+  options: WithTracingOptions,
+  frame: WireFrame,
+  handler: FrameHandler,
+): Promise<void> {
+  const carrier = extractExtension(frame);
+  const parent =
+    carrier === undefined
+      ? context.active()
+      : propagation.extract(context.active(), carrier);
+  const type = frameType(frame);
+  const spanName = options.recvSpanName?.(frame) ?? `arcp.recv ${type}`;
+  const span = options.tracer.startSpan(
+    spanName,
+    {
+      kind: SpanKind.CONSUMER,
+      attributes: extractAttributes(frame, "in"),
+    },
+    parent,
+  );
+  try {
+    await context.with(trace.setSpan(parent, span), () => handler(frame));
+  } catch (error) {
+    recordError(span, error);
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
+function frameType(frame: BaseEnvelope | WireFrame): string {
+  const t = (frame as { type?: unknown }).type;
+  return typeof t === "string" ? t : "unknown";
+}
+
+type AttrValue = string | number;
+
+const ENVELOPE_FIELDS: readonly (readonly [
+  string,
+  string,
+  "string" | "number",
+])[] = [
+  ["type", "arcp.type", "string"],
+  ["id", "arcp.id", "string"],
+  ["session_id", "arcp.session_id", "string"],
+  ["job_id", "arcp.job_id", "string"],
+  ["trace_id", "arcp.trace_id", "string"],
+  ["event_seq", "arcp.event_seq", "number"],
+];
+
+function pickEnvelopeFields(
+  attrs: Record<string, AttrValue>,
+  obj: Record<string, unknown>,
+): void {
+  for (const [src, dst, kind] of ENVELOPE_FIELDS) {
+    const v = obj[src];
+    if (typeof v === kind) attrs[dst] = v as AttrValue;
+  }
+}
+
+function pickLeaseAttributes(
+  attrs: Record<string, AttrValue>,
+  p: Record<string, unknown>,
+): void {
+  pickLeaseCapabilities(attrs, p["lease"] ?? p["lease_request"]);
+  pickLeaseExpiry(attrs, p["lease_constraints"]);
+  pickBudget(attrs, p["budget"]);
+}
+
+function pickLeaseCapabilities(
+  attrs: Record<string, AttrValue>,
+  lease: unknown,
+): void {
+  if (typeof lease !== "object" || lease === null) return;
+  const caps = Object.keys(lease);
+  if (caps.length > 0) attrs["arcp.lease.capabilities"] = caps.join(",");
+}
+
+function pickLeaseExpiry(
+  attrs: Record<string, AttrValue>,
+  constraints: unknown,
+): void {
+  if (typeof constraints !== "object" || constraints === null) return;
+  const ea = (constraints as Record<string, unknown>)["expires_at"];
+  if (typeof ea === "string") attrs["arcp.lease.expires_at"] = ea;
+}
+
+function pickBudget(attrs: Record<string, AttrValue>, budget: unknown): void {
+  if (typeof budget !== "object" || budget === null) return;
+  try {
+    attrs["arcp.budget.remaining"] = JSON.stringify(budget);
+  } catch {
+    // best-effort serialization; non-serializable budgets are skipped.
+  }
 }
 
 function extractAttributes(
   frame: BaseEnvelope | WireFrame,
   direction: "in" | "out",
-): Record<string, string | number> {
-  const attrs: Record<string, string | number> = {
-    "arcp.direction": direction,
-  };
+): Record<string, AttrValue> {
+  const attrs: Record<string, AttrValue> = { "arcp.direction": direction };
   const obj = frame as Record<string, unknown>;
-  if (typeof obj["type"] === "string") attrs["arcp.type"] = obj["type"];
-  if (typeof obj["id"] === "string") attrs["arcp.id"] = obj["id"];
-  if (typeof obj["session_id"] === "string")
-    attrs["arcp.session_id"] = obj["session_id"];
-  if (typeof obj["job_id"] === "string") attrs["arcp.job_id"] = obj["job_id"];
-  if (typeof obj["trace_id"] === "string")
-    attrs["arcp.trace_id"] = obj["trace_id"];
-  if (typeof obj["event_seq"] === "number")
-    attrs["arcp.event_seq"] = obj["event_seq"];
-  // For job.submit / job.accepted, surface agent and lease capabilities.
+  pickEnvelopeFields(attrs, obj);
   const payload = obj["payload"];
   if (typeof payload === "object" && payload !== null) {
     const p = payload as Record<string, unknown>;
     if (typeof p["agent"] === "string") attrs["arcp.agent"] = p["agent"];
-    const lease = p["lease"] ?? p["lease_request"];
-    if (typeof lease === "object" && lease !== null) {
-      const caps = Object.keys(lease);
-      if (caps.length > 0) attrs["arcp.lease.capabilities"] = caps.join(",");
-    }
-    // v1.1 §11 — surface lease expiration when present.
-    const constraints = p["lease_constraints"];
-    if (typeof constraints === "object" && constraints !== null) {
-      const ea = (constraints as Record<string, unknown>)["expires_at"];
-      if (typeof ea === "string") attrs["arcp.lease.expires_at"] = ea;
-    }
-    // v1.1 §11 — surface the initial / declared budget as a JSON-string
-    // record so per-currency totals are preserved.
-    const budget = p["budget"];
-    if (typeof budget === "object" && budget !== null) {
-      try {
-        attrs["arcp.budget.remaining"] = JSON.stringify(budget);
-      } catch {
-        // best-effort
-      }
-    }
+    pickLeaseAttributes(attrs, p);
   }
   return attrs;
 }
