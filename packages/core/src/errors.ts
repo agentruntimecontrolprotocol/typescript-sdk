@@ -304,3 +304,38 @@ export class AgentVersionNotAvailableError extends ARCPError {
     this.name = "AgentVersionNotAvailableError";
   }
 }
+
+/**
+ * Discriminated union of every typed error thrown by this SDK to consumers.
+ *
+ * All members extend {@link ARCPError} and carry a canonical {@link ErrorCode}
+ * on `code`. Narrow with `instanceof` against a specific subclass, or branch
+ * on `code` for a switch:
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await client.submit(...);
+ * } catch (err) {
+ *   if (err instanceof TimeoutError) { ... }
+ *   else if (err instanceof PermissionDeniedError) { ... }
+ *   else { throw err; }
+ * }
+ * ```
+ */
+export type SdkError =
+  | AgentNotAvailableError
+  | AgentVersionNotAvailableError
+  | BudgetExhaustedError
+  | CancelledError
+  | DuplicateKeyError
+  | HeartbeatLostError
+  | InternalError
+  | InvalidRequestError
+  | JobNotFoundError
+  | LeaseExpiredError
+  | LeaseSubsetViolationError
+  | PermissionDeniedError
+  | ResumeWindowExpiredError
+  | TimeoutError
+  | UnauthenticatedError;

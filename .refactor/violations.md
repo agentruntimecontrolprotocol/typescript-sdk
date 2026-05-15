@@ -47,29 +47,30 @@ mechanical violations. The real work is **complexity reduction**
 
 ---
 
-## Sub-phase 2.3 — Errors
+## Sub-phase 2.3 — Errors — **complete (2026-05-14)**
 
 `@arcp/core` already has a rich typed error hierarchy
-(`packages/core/src/errors.ts`, 306 lines, 17 exported error
-classes). The work is to ensure every raise site uses one:
+(`packages/core/src/errors.ts`, 14 exported subclasses pinned to
+canonical wire codes).
 
-- [ ] Replace `throw new Error(...)` with a typed subclass at all
-      sites listed below (9 occurrences):
-  - [ ] `packages/core/src/messages/execution.ts:91`
-  - [ ] `packages/core/src/messages/execution.ts:98`
-  - [ ] `packages/core/src/messages/execution.ts:101`
-  - [ ] `packages/core/src/messages/execution.ts:133`
-  - [ ] `packages/core/src/messages/execution.ts:138`
-  - [ ] `packages/core/src/messages/execution.ts:142`
-  - [ ] `packages/core/src/messages/execution.ts:411` (exhaustiveness
-        guard — consider `InternalError` or a dedicated
-        `UnreachableError`)
-  - [ ] `packages/core/src/transport/websocket.ts:191`
-  - [ ] `packages/core/src/state/pending.ts:25`
-- [ ] Add `SdkError` discriminated union type alias exported from
-      `@arcp/core/errors`.
-- [ ] Audit every catch block for swallowed `cause` (manual review
-      after 2.5 splits files).
+- [x] Replace `throw new Error(...)` with a typed subclass at all
+      9 sites:
+  - [x] `core/messages/execution.ts:91,98,101` (agent name parser)
+        → `InvalidRequestError`
+  - [x] `core/messages/execution.ts:133,138,142` (cost.budget
+        parser) → `InvalidRequestError`
+  - [x] `core/messages/execution.ts:411` (exhaustiveness guard)
+        → `InternalError`
+  - [x] `core/transport/websocket.ts:191` (WS address unavailable)
+        → `InternalError`
+  - [x] `core/state/pending.ts:25` (correlation_id reuse)
+        → `InternalError`
+- [x] Add `SdkError` discriminated union type alias exported from
+      `@arcp/core` (additive, non-breaking; .d.ts diff confirmed
+      additive only).
+- [ ] Audit every catch block for swallowed `cause`. **Deferred to
+      after sub-phase 2.5 splits files** — auditing while files are
+      mid-refactor wastes effort.
 
 ---
 

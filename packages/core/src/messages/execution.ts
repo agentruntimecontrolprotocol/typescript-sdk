@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import { messageEnvelope } from "../envelope.js";
-import { type ErrorPayload, ErrorPayloadSchema } from "../errors.js";
+import {
+  type ErrorPayload,
+  ErrorPayloadSchema,
+  InternalError,
+  InvalidRequestError,
+} from "../errors.js";
 
 import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
 
@@ -88,17 +93,19 @@ export function parseAgentRef(input: string): ParsedAgentRef {
   const at = input.indexOf("@");
   if (at === -1) {
     if (!AGENT_NAME_REGEX.test(input)) {
-      throw new Error(`Invalid agent name "${input}"`);
+      throw new InvalidRequestError(`Invalid agent name "${input}"`);
     }
     return { name: input, version: null };
   }
   const name = input.slice(0, at);
   const version = input.slice(at + 1);
   if (!AGENT_NAME_REGEX.test(name)) {
-    throw new Error(`Invalid agent name "${name}" in "${input}"`);
+    throw new InvalidRequestError(`Invalid agent name "${name}" in "${input}"`);
   }
   if (!AGENT_VERSION_REGEX.test(version)) {
-    throw new Error(`Invalid agent version "${version}" in "${input}"`);
+    throw new InvalidRequestError(
+      `Invalid agent version "${version}" in "${input}"`,
+    );
   }
   return { name, version };
 }
@@ -130,16 +137,16 @@ const BUDGET_AMOUNT_REGEX = /^([A-Za-z][A-Za-z0-9_-]*):(\d+(?:\.\d+)?)$/;
 export function parseBudgetAmount(input: string): ParsedBudgetAmount {
   const m = BUDGET_AMOUNT_REGEX.exec(input);
   if (m === null) {
-    throw new Error(`Invalid cost.budget amount "${input}"`);
+    throw new InvalidRequestError(`Invalid cost.budget amount "${input}"`);
   }
   const currency = m[1];
   const rawAmount = m[2];
   if (currency === undefined || rawAmount === undefined) {
-    throw new Error(`Invalid cost.budget amount "${input}"`);
+    throw new InvalidRequestError(`Invalid cost.budget amount "${input}"`);
   }
   const amount = Number.parseFloat(rawAmount);
   if (!Number.isFinite(amount) || amount < 0) {
-    throw new Error(`Invalid cost.budget amount "${input}"`);
+    throw new InvalidRequestError(`Invalid cost.budget amount "${input}"`);
   }
   return { currency, amount };
 }
@@ -408,7 +415,9 @@ function parseReservedEventBody<K extends ReservedEventKind>(
       // in the switch above. If a new kind is added to RESERVED_EVENT_KINDS
       // without a corresponding case here, this assignment fails to compile.
       const _exhaustive: never = kind;
-      throw new Error(`Unhandled reserved event kind: ${String(_exhaustive)}`);
+      throw new InternalError(
+        `Unhandled reserved event kind: ${String(_exhaustive)}`,
+      );
     }
   }
 }

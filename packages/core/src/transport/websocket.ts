@@ -1,6 +1,6 @@
 import { WebSocket, WebSocketServer } from "ws";
 
-import { InvalidRequestError } from "../errors.js";
+import { InternalError, InvalidRequestError } from "../errors.js";
 
 import type {
   FrameHandler,
@@ -188,7 +188,7 @@ export async function startWebSocketServer(args: {
         else reject(err);
       });
     });
-    throw new Error("WebSocketServer address unavailable");
+    throw new InternalError("WebSocketServer address unavailable");
   }
 
   return {

@@ -46,6 +46,7 @@ export {
   LeaseSubsetViolationError,
   PermissionDeniedError,
   ResumeWindowExpiredError,
+  type SdkError,
   TimeoutError,
   UnauthenticatedError,
 } from "./errors.js";
