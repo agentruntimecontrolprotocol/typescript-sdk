@@ -1,28 +1,27 @@
 # Refactor State
 
 - Branch: `refactor/automation` (based on `326dd2b` on `main`)
-- Phase: 1 (Investigation) — **complete**
-- Current sub-phase: 2.3 (Errors) — **complete (2026-05-14)**
-- Next sub-phase: 2.4 (Async hygiene)
-- Current package: workspace-wide
-- Last completed sub-phase: 2.3
-- Last commit on branch: `ed10415` (typed errors + SdkError union)
-- Gates status (measured 2026-05-14 after 2.3):
+- Phase: 4 (Final report) — **complete with partial 2.5**
+- Last completed sub-phases: 2.1, 2.2, 2.3, 2.4, 2.5 (eventlog
+  only), 2.6, 2.7 (survey), 2.8. See `FINAL_REPORT.md`.
+- Deferred: rest of 2.5 (5 files >300 lines, ~80 fn-level violations),
+  rest of 2.7 (full TSDoc on @arcp/core), catch-block cause audit.
+- Current package: n/a (workspace-wide refactor complete to checkpoint)
+- Last commit on branch: see `git log refactor/automation`.
+- Gates status (measured 2026-05-15 end of Session 4):
   - G1 typecheck: 🟢 PASS
-  - G2 lint: 🔴 RED — biome clean, ESLint has 79 errors (advisory)
+  - G2 lint: 🔴 RED — biome clean; ESLint 80 errors (advisory)
   - G3 tests: 🟢 PASS
-  - G4 cycles: 🔴 RED — 6 cycles in @arcp/runtime
-  - G5 .d.ts diff: 🟡 ADDITIVE — `SdkError` type alias added in 2.3
-    (non-breaking; recorded in commit message, not in
-    breaking_changes.md)
-  - G6 files ≤300 lines: 🔴 RED — 5 files over
+  - G4 cycles: 🟢 PASS (measured against compiled JS)
+  - G5 .d.ts diff: 🟡 ADDITIVE-ONLY (SdkError, client signal opts)
+  - G6 files ≤300 lines: 🔴 RED — 7 files over
   - G7 functions ≤40 lines: 🔴 RED — 28 violations
   - G8 complexity ≤10: 🔴 RED — 20 violations
   - G9 params ≤3: 🔴 RED — 4 violations
   - G10 TSDoc on every public export: 🔴 RED — not yet enforced
   - G11 `attw`: 🟢 PASS
   - G12 `publint`: 🟢 PASS
-- Sessions consumed: 3 (Session 3 = sub-phases 2.2 + 2.3)
+- Sessions consumed: 4 (see FINAL_REPORT.md §7)
 - Estimated remaining work:
   - ~~Sub-phase 2.1 (Tooling baseline)~~ — done Session 2.
   - ~~Sub-phase 2.2 (Surface audit)~~ — done Session 3 (no drift).
