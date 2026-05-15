@@ -65,35 +65,18 @@ export function rowToEnvelope(row: EventRow): BaseEnvelope {
   return result.data;
 }
 
+const EQUALITY_COLUMNS: readonly (keyof EventLogFilter)[] = [
+  "session_id",
+  "job_id",
+  "trace_id",
+];
+
 export function buildQuery(filter: EventLogFilter): BuiltQuery {
   const where: string[] = [];
   const params: Record<string, unknown> = {};
-  if (filter.session_id !== undefined) {
-    where.push("session_id = @session_id");
-    params["session_id"] = filter.session_id;
-  }
-  if (filter.job_id !== undefined) {
-    where.push("job_id = @job_id");
-    params["job_id"] = filter.job_id;
-  }
-  if (filter.trace_id !== undefined) {
-    where.push("trace_id = @trace_id");
-    params["trace_id"] = filter.trace_id;
-  }
-  if (filter.types !== undefined && filter.types.length > 0) {
-    const placeholders = filter.types.map((_, i) => `@type_${i}`).join(",");
-    where.push(`type IN (${placeholders})`);
-    for (const [i, t] of filter.types.entries()) {
-      params[`type_${i}`] = t;
-    }
-  }
-  if (filter.after_event_seq !== undefined) {
-    where.push("event_seq > @after_event_seq");
-    params["after_event_seq"] = filter.after_event_seq;
-  } else if (filter.after_id !== undefined && filter.after_id !== "") {
-    where.push("id > @after_id");
-    params["after_id"] = filter.after_id;
-  }
+  pushEqualityClauses(filter, where, params);
+  pushTypesClause(filter, where, params);
+  pushPaginationClause(filter, where, params);
   const orderBy =
     filter.after_event_seq === undefined ? "id ASC" : "event_seq ASC";
   const sql = `
@@ -104,4 +87,47 @@ export function buildQuery(filter: EventLogFilter): BuiltQuery {
   `;
   params["limit"] = filter.limit ?? 1000;
   return { sql, params };
+}
+
+function pushEqualityClauses(
+  filter: EventLogFilter,
+  where: string[],
+  params: Record<string, unknown>,
+): void {
+  for (const col of EQUALITY_COLUMNS) {
+    const v = filter[col];
+    if (v !== undefined) {
+      where.push(`${col} = @${col}`);
+      params[col] = v;
+    }
+  }
+}
+
+function pushTypesClause(
+  filter: EventLogFilter,
+  where: string[],
+  params: Record<string, unknown>,
+): void {
+  if (filter.types === undefined || filter.types.length === 0) return;
+  const placeholders = filter.types.map((_, i) => `@type_${i}`).join(",");
+  where.push(`type IN (${placeholders})`);
+  for (const [i, t] of filter.types.entries()) {
+    params[`type_${i}`] = t;
+  }
+}
+
+function pushPaginationClause(
+  filter: EventLogFilter,
+  where: string[],
+  params: Record<string, unknown>,
+): void {
+  if (filter.after_event_seq !== undefined) {
+    where.push("event_seq > @after_event_seq");
+    params["after_event_seq"] = filter.after_event_seq;
+    return;
+  }
+  if (filter.after_id !== undefined && filter.after_id !== "") {
+    where.push("id > @after_id");
+    params["after_id"] = filter.after_id;
+  }
 }

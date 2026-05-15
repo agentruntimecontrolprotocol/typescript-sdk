@@ -25,6 +25,12 @@ type SchemaNode = Record<string, unknown> | undefined;
  * Validate `value` against `schema`. Returns an array of errors; empty means
  * valid. The `schema` is treated permissively: unknown keywords are ignored.
  */
+interface ValidationFrame {
+  value: unknown;
+  schema: Record<string, unknown>;
+  path: string;
+}
+
 export function validateAgainstSchema(
   value: unknown,
   schema: SchemaNode,
@@ -34,88 +40,137 @@ export function validateAgainstSchema(
   // says `SchemaNode` — callers may pass parsed JSON.
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (schema === undefined || schema === null) return [];
+  const frame: ValidationFrame = { value, schema, path };
   const errors: ValidationError[] = [];
-
-  const enumValues = schema["enum"];
-  if (
-    Array.isArray(enumValues) &&
-    !enumValues.some((opt) => deepEqual(opt, value))
-  ) {
-    errors.push({ path, message: "value is not in enum" });
-  }
-
+  pushEnumError(errors, frame);
   const type = schema["type"];
   if (typeof type === "string" && !matchesType(value, type)) {
     errors.push({ path, message: `expected type "${type}"` });
-    return errors; // further checks would not be meaningful
+    return errors;
   }
-
-  if (type === "string" && typeof value === "string") {
-    const minLen = schema["minLength"];
-    const maxLen = schema["maxLength"];
-    if (typeof minLen === "number" && value.length < minLen) {
-      errors.push({ path, message: `string shorter than minLength=${minLen}` });
-    }
-    if (typeof maxLen === "number" && value.length > maxLen) {
-      errors.push({ path, message: `string longer than maxLength=${maxLen}` });
-    }
-  }
-
-  if ((type === "number" || type === "integer") && typeof value === "number") {
-    const minimum = schema["minimum"];
-    const maximum = schema["maximum"];
-    if (typeof minimum === "number" && value < minimum) {
-      errors.push({ path, message: `number below minimum=${minimum}` });
-    }
-    if (typeof maximum === "number" && value > maximum) {
-      errors.push({ path, message: `number above maximum=${maximum}` });
-    }
-  }
-
-  if (type === "array" && Array.isArray(value)) {
-    const items = schema["items"];
-    if (items !== undefined && typeof items === "object" && items !== null) {
-      for (const [idx, item] of value.entries()) {
-        errors.push(
-          ...validateAgainstSchema(
-            item,
-            items as Record<string, unknown>,
-            `${path}[${idx}]`,
-          ),
-        );
-      }
-    }
-  }
-
-  if (type === "object" && isPlainObject(value)) {
-    const required = schema["required"];
-    if (Array.isArray(required)) {
-      for (const key of required) {
-        if (typeof key === "string" && !(key in value)) {
-          errors.push({
-            path: joinPath(path, key),
-            message: "required property missing",
-          });
-        }
-      }
-    }
-    const properties = schema["properties"];
-    if (properties !== undefined && isPlainObject(properties)) {
-      for (const [key, propSchema] of Object.entries(properties)) {
-        if (key in value) {
-          errors.push(
-            ...validateAgainstSchema(
-              value[key],
-              propSchema as Record<string, unknown>,
-              joinPath(path, key),
-            ),
-          );
-        }
-      }
-    }
-  }
-
+  pushStringErrors(errors, frame, type);
+  pushNumberErrors(errors, frame, type);
+  pushArrayErrors(errors, frame, type);
+  pushObjectErrors(errors, frame, type);
   return errors;
+}
+
+function pushEnumError(
+  errors: ValidationError[],
+  { value, schema, path }: ValidationFrame,
+): void {
+  const enumValues = schema["enum"];
+  if (!Array.isArray(enumValues)) return;
+  if (enumValues.some((opt) => deepEqual(opt, value))) return;
+  errors.push({ path, message: "value is not in enum" });
+}
+
+function pushStringErrors(
+  errors: ValidationError[],
+  { value, schema, path }: ValidationFrame,
+  type: unknown,
+): void {
+  if (type !== "string" || typeof value !== "string") return;
+  const minLen = schema["minLength"];
+  const maxLen = schema["maxLength"];
+  if (typeof minLen === "number" && value.length < minLen) {
+    errors.push({ path, message: `string shorter than minLength=${minLen}` });
+  }
+  if (typeof maxLen === "number" && value.length > maxLen) {
+    errors.push({ path, message: `string longer than maxLength=${maxLen}` });
+  }
+}
+
+function pushNumberErrors(
+  errors: ValidationError[],
+  { value, schema, path }: ValidationFrame,
+  type: unknown,
+): void {
+  if (type !== "number" && type !== "integer") return;
+  if (typeof value !== "number") return;
+  const minimum = schema["minimum"];
+  const maximum = schema["maximum"];
+  if (typeof minimum === "number" && value < minimum) {
+    errors.push({ path, message: `number below minimum=${minimum}` });
+  }
+  if (typeof maximum === "number" && value > maximum) {
+    errors.push({ path, message: `number above maximum=${maximum}` });
+  }
+}
+
+function pushArrayErrors(
+  errors: ValidationError[],
+  { value, schema, path }: ValidationFrame,
+  type: unknown,
+): void {
+  if (type !== "array" || !Array.isArray(value)) return;
+  const items = schema["items"];
+  if (items === undefined || typeof items !== "object" || items === null) return;
+  for (const [idx, item] of value.entries()) {
+    errors.push(
+      ...validateAgainstSchema(
+        item,
+        items as Record<string, unknown>,
+        `${path}[${idx}]`,
+      ),
+    );
+  }
+}
+
+function pushObjectErrors(
+  errors: ValidationError[],
+  frame: ValidationFrame,
+  type: unknown,
+): void {
+  if (type !== "object" || !isPlainObject(frame.value)) return;
+  const objFrame: ObjectFrame = {
+    value: frame.value,
+    schema: frame.schema,
+    path: frame.path,
+  };
+  pushRequiredErrors(errors, objFrame);
+  pushPropertyErrors(errors, objFrame);
+}
+
+interface ObjectFrame {
+  value: Record<string, unknown>;
+  schema: Record<string, unknown>;
+  path: string;
+}
+
+function pushRequiredErrors(
+  errors: ValidationError[],
+  { value, schema, path }: ObjectFrame,
+): void {
+  const required = schema["required"];
+  if (!Array.isArray(required)) return;
+  for (const key of required) {
+    if (typeof key === "string" && !(key in value)) {
+      errors.push({
+        path: joinPath(path, key),
+        message: "required property missing",
+      });
+    }
+  }
+}
+
+function pushPropertyErrors(
+  errors: ValidationError[],
+  { value, schema, path }: ObjectFrame,
+): void {
+  const properties = schema["properties"];
+  if (properties === undefined || !isPlainObject(properties)) return;
+  for (const [key, propSchema] of Object.entries(properties)) {
+    if (key in value) {
+      errors.push(
+        ...validateAgainstSchema(
+          value[key],
+          propSchema as Record<string, unknown>,
+          joinPath(path, key),
+        ),
+      );
+    }
+  }
 }
 
 function matchesType(value: unknown, type: string): boolean {

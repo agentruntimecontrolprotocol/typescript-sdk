@@ -27,45 +27,24 @@ export class WebSocketTransport implements Transport {
 
   public constructor(private readonly socket: WebSocket) {
     socket.on("message", (data, isBinary) => {
-      if (isBinary) {
-        // v0.1 does not support binary sidecar frames.
-        return;
-      }
-      const text =
-        typeof data === "string"
-          ? data
-          : Buffer.isBuffer(data)
-            ? data.toString("utf8")
-            : Array.isArray(data)
-              ? Buffer.concat(data).toString("utf8")
-              : Buffer.from(data).toString("utf8");
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        return;
-      }
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed)
-      )
-        return;
-      const frame = parsed as WireFrame;
-      const h = this.handler;
-      if (h !== null) {
-        this.inboundChain = this.inboundChain
-          .then(() => h(frame))
-          .catch((): void => {
-            /* Keep the queue alive; runtime logs protocol errors. */
-          });
-      }
+      this.handleMessage(data, isBinary);
     });
     socket.on("close", () => {
       this.fireClose();
     });
     socket.on("error", (err) => {
       this.fireClose(err);
+    });
+  }
+
+  private handleMessage(data: unknown, isBinary: boolean): void {
+    if (isBinary) return; // v0.1 does not support binary sidecar frames.
+    const frame = parseWireFrame(data);
+    if (frame === null) return;
+    const h = this.handler;
+    if (h === null) return;
+    this.inboundChain = this.inboundChain.then(() => h(frame)).catch((): void => {
+      /* Keep the queue alive; runtime logs protocol errors. */
     });
   }
 
@@ -155,6 +134,31 @@ export class WebSocketTransport implements Transport {
     });
     return new WebSocketTransport(socket);
   }
+}
+
+function parseWireFrame(data: unknown): WireFrame | null {
+  const text = wsDataToString(data);
+  if (text === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed as WireFrame;
+}
+
+function wsDataToString(data: unknown): string | null {
+  if (typeof data === "string") return data;
+  if (Buffer.isBuffer(data)) return data.toString("utf8");
+  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
+  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+    return Buffer.from(data as ArrayBuffer).toString("utf8");
+  }
+  return null;
 }
 
 /**
