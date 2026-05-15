@@ -51,21 +51,29 @@ describe("canonicalizeTarget", () => {
 describe("validateLeaseOp", () => {
   it("permits a matching capability", () => {
     expect(() => {
-      validateLeaseOp({ "fs.read": ["/foo/**"] }, "fs.read", "/foo/bar");
+      validateLeaseOp({
+        lease: { "fs.read": ["/foo/**"] },
+        capability: "fs.read",
+        target: "/foo/bar",
+      });
     }).not.toThrow();
   });
   it("rejects unknown capability", () => {
     expect(() => {
-      validateLeaseOp({ "fs.read": ["/foo/**"] }, "fs.write", "/foo/bar");
+      validateLeaseOp({
+        lease: { "fs.read": ["/foo/**"] },
+        capability: "fs.write",
+        target: "/foo/bar",
+      });
     }).toThrow(/PERMISSION_DENIED|Capability/);
   });
   it("canonicalizes targets before matching (path traversal)", () => {
     expect(() => {
-      validateLeaseOp(
-        { "fs.read": ["/safe/**"] },
-        "fs.read",
-        "/safe/../etc/passwd",
-      );
+      validateLeaseOp({
+        lease: { "fs.read": ["/safe/**"] },
+        capability: "fs.read",
+        target: "/safe/../etc/passwd",
+      });
     }).toThrow();
   });
 });

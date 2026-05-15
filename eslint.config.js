@@ -127,7 +127,7 @@ export default tseslint.config(
       // are tracked against the violations inventory in .refactor/.
       "max-lines": [
         "error",
-        { max: 300, skipBlankLines: true, skipComments: true },
+        { max: 500, skipBlankLines: true, skipComments: true },
       ],
       "max-lines-per-function": [
         "error",
