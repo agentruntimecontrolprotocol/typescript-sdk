@@ -151,8 +151,12 @@ export class ARCPClient {
    * Resolves with the negotiated `session.welcome` payload; rejects with
    * an {@link ARCPError} on rejection, malformed envelopes, or timeout.
    */
-  public async connect(transport: Transport): Promise<SessionWelcomePayload> {
-    return this.connectInternal(transport, undefined);
+  public async connect(
+    transport: Transport,
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<SessionWelcomePayload> {
+    opts.signal?.throwIfAborted();
+    return this.connectInternal(transport, undefined, opts.signal);
   }
 
   /**
@@ -162,13 +166,16 @@ export class ARCPClient {
   public async resume(
     transport: Transport,
     resume: SessionResume,
+    opts: { signal?: AbortSignal } = {},
   ): Promise<SessionWelcomePayload> {
-    return this.connectInternal(transport, resume);
+    opts.signal?.throwIfAborted();
+    return this.connectInternal(transport, resume, opts.signal);
   }
 
   private async connectInternal(
     transport: Transport,
     resume: SessionResume | undefined,
+    signal?: AbortSignal,
   ): Promise<SessionWelcomePayload> {
     if (this.transport !== null) {
       throw new InvalidRequestError("ARCPClient is already connected");
@@ -224,6 +231,17 @@ export class ARCPClient {
       }
     }, this.handshakeTimeoutMs);
     timeout.unref();
+    const onAbort = () => {
+      if (this.handshake !== null && !this.handshake.settled) {
+        const reason = signal?.reason;
+        this.handshake.reject(
+          new CancelledError("Handshake aborted by caller", {
+            cause: reason instanceof Error ? reason : undefined,
+          }),
+        );
+      }
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     try {
       const welcome = await this.handshake.promise;
       this.welcome = welcome;
@@ -237,6 +255,7 @@ export class ARCPClient {
       return welcome;
     } finally {
       clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
     }
   }
 
@@ -246,7 +265,11 @@ export class ARCPClient {
   }
 
   /** Send an envelope to the runtime. Requires an accepted session. */
-  public async send(env: BaseEnvelope): Promise<void> {
+  public async send(
+    env: BaseEnvelope,
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<void> {
+    opts.signal?.throwIfAborted();
     if (this.transport === null)
       throw new InvalidRequestError("Client not connected");
     if (!this.state.isAccepted) {
@@ -384,8 +407,9 @@ export class ARCPClient {
   /** Send a `job.cancel` envelope. */
   public async cancelJob(
     jobId: JobId,
-    options: { reason?: string } = {},
+    options: { reason?: string; signal?: AbortSignal } = {},
   ): Promise<void> {
+    options.signal?.throwIfAborted();
     if (this.transport === null)
       throw new InvalidRequestError("Client not connected");
     const sessionId = this.state.id;
@@ -406,7 +430,11 @@ export class ARCPClient {
    * resume window. This is purely advisory and does not affect resume
    * semantics.
    */
-  public async ack(seq: number): Promise<void> {
+  public async ack(
+    seq: number,
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<void> {
+    opts.signal?.throwIfAborted();
     if (!this.hasFeature("ack")) {
       throw new InvalidRequestError(
         "session.ack requires the 'ack' feature to be negotiated",
@@ -434,8 +462,9 @@ export class ARCPClient {
    */
   public async listJobs(
     filter?: SessionListJobsFilter,
-    opts: { limit?: number; cursor?: string } = {},
+    opts: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
   ): Promise<{ jobs: JobListEntry[]; nextCursor: string | null }> {
+    opts.signal?.throwIfAborted();
     if (!this.hasFeature("list_jobs")) {
       throw new InvalidRequestError(
         "session.list_jobs requires the 'list_jobs' feature to be negotiated",
@@ -472,8 +501,13 @@ export class ARCPClient {
    */
   public async subscribe(
     jobId: JobId,
-    opts: { history?: boolean; fromEventSeq?: number } = {},
+    opts: {
+      history?: boolean;
+      fromEventSeq?: number;
+      signal?: AbortSignal;
+    } = {},
   ): Promise<JobSubscription> {
+    opts.signal?.throwIfAborted();
     if (!this.hasFeature("subscribe")) {
       throw new InvalidRequestError(
         "job.subscribe requires the 'subscribe' feature to be negotiated",
