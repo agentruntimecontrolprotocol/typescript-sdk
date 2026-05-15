@@ -92,11 +92,13 @@ classes). The work is to ensure every raise site uses one:
 
 Sorted largest first. Each entry is its own checkpoint.
 
-- [ ] `packages/runtime/src/server.ts` — **1912 lines**. Likely the
-      largest single split required. Coordinate with stashed WIP
-      (see `wip-handling.md`); the user has untracked
-      `agent-registry.ts`, `job-runner.ts`, `stores.ts` ready to
-      receive extracted concerns.
+- [ ] `packages/runtime/src/server.ts` — **1290 lines** (was 1912;
+      dropped after recovering the user's WIP into `8227bda`, which
+      extracted `agent-registry.ts`, `job-runner.ts`, `stores.ts`).
+      Still the largest violation. Further splits to identify in
+      sub-phase 2.5.
+- [ ] `packages/runtime/src/job-runner.ts` — **565 lines** (newly
+      added in the WIP recovery; over the 300-line cap).
 - [ ] `packages/client/src/client.ts` — **822 lines**.
 - [ ] `packages/core/src/messages/execution.ts` — **593 lines**.
 - [ ] `packages/runtime/src/job.ts` — **589 lines**.

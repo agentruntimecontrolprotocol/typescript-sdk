@@ -5,6 +5,22 @@ ambiguous. Each entry: date, sub-phase, decision, one-line rationale.
 
 ---
 
+## 2026-05-14 — Session 2 — WIP recovery
+
+- **Recovered stashed WIP onto `refactor/automation` as one commit.**
+  The user's WIP turned out to be the start of sub-phase 2.5 for
+  `server.ts`. Better to integrate it on the refactor branch than to
+  refactor in parallel and conflict-resolve later. Single commit
+  `8227bda` captures the recovery.
+- **Removed two unused-constant artefacts of the WIP extraction.**
+  `DEFAULT_IDEMPOTENCY_TTL_MS` and `DEFAULT_MAX_CONCURRENT_JOBS`
+  were left in `server.ts` after their consumers moved to
+  `job-runner.ts`. Deleting them is the trivial completion of the
+  half-done extraction, in scope for "recover the WIP cleanly," and
+  required for the lint hook to pass.
+- **Dropped the stash entry after the recovery commit.** The WIP is
+  now on a branch and in git history; the stash is redundant.
+
 ## 2026-05-14 — Phase 1
 
 - **WIP handling: stash, not commit.** Stashed dirty runtime work

@@ -11,14 +11,20 @@ with the following:
 These were stashed (non-destructively) so the refactor could begin
 from a clean tree.
 
-**Stash entry:** `WIP: runtime work parked before refactor automation
-(2026-05-14)` — recover with `git stash list` and
-`git stash pop <ref>`.
+**Status (Session 2):** the stash has been recovered onto
+`refactor/automation` as commit `8227bda`. The user's WIP turned out
+to be exactly the start of sub-phase 2.5 for `server.ts`: a partial
+decomposition into `agent-registry.ts`, `job-runner.ts`, and
+`stores.ts`, shrinking `server.ts` from 1912 → 1290 lines. Two
+unused leftover constants in `server.ts` were removed as trivial
+cleanup. Typecheck, lint, and the test suite all pass on the
+recovered state. **The stash entry has been dropped.**
 
 **Branch base:** `refactor/automation` was created from clean `main`
-at the commit prior to the stash (`326dd2b`).
+at `326dd2b`. The WIP recovery commit (`8227bda`) sits on top of the
+Phase 1 init commits.
 
-**Resume guidance:** the stashed runtime work likely overlaps with
-files that the complexity-reduction sub-phase will touch. Coordinate
-with the user before popping the stash onto a refactored tree —
-prefer cherry-picking specific changes over a blind pop.
+**Implication for sub-phase 2.5:** `server.ts` is still the largest
+remaining file (1290 lines), but the heavy initial extraction is
+done. Future 2.5 work on `server.ts` will continue from this
+post-WIP state.
