@@ -3,7 +3,15 @@ import { z } from "zod";
 import { ErrorPayloadSchema } from "../errors.js";
 
 import { LeaseConstraintsSchema, LeaseSchema } from "./lease-schema.js";
-import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
+// telemetry.ts now exports Effect `Schema` for `LogPayloadSchema` /
+// `MetricPayloadSchema`. `RESERVED_EVENT_SCHEMAS` below is still a
+// `z.discriminatedUnion`-style map keyed by `z.ZodTypeAny`, so we consume
+// the legacy zod twins here until slice #36 migrates the event-body
+// dispatch to Effect.
+import {
+  LogPayloadZodSchema,
+  MetricPayloadZodSchema,
+} from "./telemetry.js";
 
 export const RESERVED_EVENT_KINDS = [
   "log",
@@ -118,12 +126,12 @@ export const JobEventPayloadSchema = z.object({
 });
 export type JobEventPayload = z.infer<typeof JobEventPayloadSchema>;
 
-export type LogBody = z.infer<typeof LogPayloadSchema>;
+export type LogBody = z.infer<typeof LogPayloadZodSchema>;
 export type ThoughtBody = z.infer<typeof ThoughtBodySchema>;
 export type ToolCallBody = z.infer<typeof ToolCallBodySchema>;
 export type ToolResultBody = z.infer<typeof ToolResultBodySchema>;
 export type StatusBody = z.infer<typeof StatusBodySchema>;
-export type MetricBody = z.infer<typeof MetricPayloadSchema>;
+export type MetricBody = z.infer<typeof MetricPayloadZodSchema>;
 export type ArtifactRefBody = z.infer<typeof ArtifactRefBodySchema>;
 export type DelegateBody = z.infer<typeof DelegateBodySchema>;
 
@@ -152,12 +160,12 @@ export interface ReservedEventBodyMap {
 // entry below. Adding a new kind to RESERVED_EVENT_KINDS without extending
 // this map is a compile-time error (the `satisfies` clause enforces it).
 const RESERVED_EVENT_SCHEMAS = {
-  log: LogPayloadSchema,
+  log: LogPayloadZodSchema,
   thought: ThoughtBodySchema,
   tool_call: ToolCallBodySchema,
   tool_result: ToolResultBodySchema,
   status: StatusBodySchema,
-  metric: MetricPayloadSchema,
+  metric: MetricPayloadZodSchema,
   artifact_ref: ArtifactRefBodySchema,
   delegate: DelegateBodySchema,
   progress: ProgressBodySchema,
