@@ -70,7 +70,9 @@
     "@arcp/client": "workspace:*",
     "@arcp/core": "workspace:*",
     "@arcp/runtime": "workspace:*",
-    "commander": "^12.1.0"
+    "@effect/platform": "^0.96.1",
+    "commander": "^12.1.0",
+    "effect": "^3.21.2"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",

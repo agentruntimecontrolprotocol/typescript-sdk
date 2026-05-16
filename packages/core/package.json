@@ -90,7 +90,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@effect/platform": "^0.96.1",
     "better-sqlite3": "^11.5.0",
+    "effect": "^3.21.2",
     "jose": "^5.9.6",
     "pino": "^9.5.0",
     "ulid": "^2.3.0",

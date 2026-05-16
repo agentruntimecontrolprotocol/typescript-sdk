@@ -9,3 +9,4 @@ coverage/
 *.tsbuildinfo
 .vitest/
 *.tgz
+.effect-migration/

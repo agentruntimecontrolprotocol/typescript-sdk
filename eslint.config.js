@@ -1,3 +1,4 @@
+import effect from "@effect/eslint-plugin";
 import eslint from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import importPlugin from "eslint-plugin-import";
@@ -24,6 +25,10 @@ export default tseslint.config(
   importPlugin.flatConfigs.recommended,
   importPlugin.flatConfigs.typescript,
   n.configs["flat/recommended-module"],
+  // @effect/eslint-plugin — registered, no rules enabled at root.
+  // Effect-specific rules (e.g. dangling-effects, no-import-from-barrel)
+  // get opted in by individual files as the migration progresses.
+  { plugins: { effect } },
   {
     languageOptions: {
       parserOptions: {
