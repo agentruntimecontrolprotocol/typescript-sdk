@@ -19,7 +19,6 @@ export * from "./execution.js";
 export * from "./session.js";
 export * from "./telemetry.js";
 export type * from "./types.js";
-export { fromZod } from "./zod-adapter.js";
 
 const ALL_ENVELOPES = [
   ...SESSION_ENVELOPES,

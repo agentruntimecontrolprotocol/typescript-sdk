@@ -4,9 +4,8 @@ import { z } from "zod";
 import { ERROR_CODES } from "../errors.js";
 
 import { ArtifactRefSchema } from "./artifacts.js";
-import { LeaseConstraintsSchema, LeaseZodSchema } from "./lease-schema.js";
+import { LeaseConstraintsSchema } from "./lease-schema.js";
 import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
-import { fromZod } from "./zod-adapter.js";
 
 // ARCP v1.0 §8 + v1.1 §8.2/§8.4 — `job.event` body schemas.
 //
@@ -93,13 +92,21 @@ export const StatusBodySchema = Schema.Struct({
 });
 export type StatusBody = Schema.Schema.Type<typeof StatusBodySchema>;
 
-// `LeaseSchema` infers `Record<string, ReadonlyArray<string>>`; the rest of
-// the runtime (lease.ts, job-runner.ts) treats `Lease` as the mutable
-// `Record<string, string[]>` shape from the zod twin. Bridge through
-// `fromZod` so the inferred `DelegateBody.lease_request` stays
-// assignment-compatible with the zod-derived `Lease` alias until slice #50
-// migrates the `Lease` consumers to readonly arrays.
-const LeaseMutableEffectSchema = fromZod(LeaseZodSchema);
+// `LeaseSchema` in `lease-schema.ts` infers
+// `Record<string, ReadonlyArray<string>>`; the rest of the runtime (lease.ts,
+// job-runner.ts) treats `Lease` as the mutable `Record<string, string[]>`
+// shape from the zod twin. Define a native Effect mirror that wraps the
+// inner array in `Schema.mutable` and applies `Schema.mutable` to the record
+// so the inferred `DelegateBody.lease_request` stays assignment-compatible
+// with the zod-derived `Lease` alias used across the runtime.
+const LeaseMutableEffectSchema = Schema.mutable(
+  Schema.Record({
+    key: Schema.String.pipe(Schema.nonEmptyString()),
+    value: Schema.mutable(
+      Schema.Array(Schema.String.pipe(Schema.nonEmptyString())),
+    ),
+  }),
+);
 
 /** §8.2 `delegate` event-kind body. */
 export const DelegateBodySchema = Schema.Struct({
