@@ -1,2 +1,10 @@
-export { StaticBearerVerifier } from "./bearer.js";
-export type { BearerIdentity, BearerVerifier } from "./types.js";
+export {
+  BearerVerifierService,
+  StaticBearerVerifier,
+  staticBearerVerifierLayer,
+} from "./bearer.js";
+export type {
+  BearerIdentity,
+  BearerVerifier,
+  BearerVerifierEffect,
+} from "./types.js";
