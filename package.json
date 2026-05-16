@@ -29,9 +29,14 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r --workspace-concurrency=1 run test",
     "test:coverage": "pnpm -r --workspace-concurrency=1 run test:coverage",
+    "check:cycles": "madge --circular --extensions js --exclude 'node_modules' packages",
+    "check:attw": "pnpm -r --filter './packages/**' --workspace-concurrency=1 exec attw --pack . --profile esm-only",
+    "check:publint": "pnpm -r --filter './packages/**' --workspace-concurrency=1 exec publint",
+    "check:all": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:cycles && pnpm check:attw && pnpm check:publint",
     "prepare": "simple-git-hooks || true"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@biomejs/biome": "^2.4.15",
     "@eslint/js": "^9.39.4",
     "@types/node": "^22.7.5",
@@ -41,8 +46,11 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-n": "^18.0.1",
+    "eslint-plugin-tsdoc": "^0.5.2",
     "eslint-plugin-unicorn": "^64.0.0",
+    "madge": "^8.0.0",
     "prettier": "^3.8.3",
+    "publint": "^0.3.21",
     "rimraf": "^6.0.1",
     "simple-git-hooks": "^2.11.1",
     "tsx": "^4.19.1",
@@ -51,7 +59,7 @@
     "vitest": "^2.1.2"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint && pnpm typecheck && pnpm test"
+    "pre-commit": "pnpm lint:biome && pnpm typecheck && pnpm test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

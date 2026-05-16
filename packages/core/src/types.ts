@@ -14,7 +14,6 @@
  * `@arcp/core/messages`, ...) stay; this barrel is purely additive.
  */
 
-// ---- brands ----------------------------------------------------------------
 export type {
   Brand,
   EventSeq,
@@ -25,27 +24,22 @@ export type {
   TraceId,
 } from "./brands.js";
 
-// ---- envelope --------------------------------------------------------------
 export type {
   BaseEnvelope,
   EnvelopeOptionalFields,
   RoundTripEnvelope,
 } from "./envelope.js";
 
-// ---- errors ----------------------------------------------------------------
 export type { ARCPErrorOptions, ErrorCode, ErrorPayload } from "./errors.js";
 
-// ---- extensions ------------------------------------------------------------
 export type {
   CoreMessageType,
   UnknownTypeDisposition,
   VendorExtensionName,
 } from "./extensions.js";
 
-// ---- logger ----------------------------------------------------------------
 export type { Logger } from "./logger.js";
 
-// ---- messages --------------------------------------------------------------
 export type {
   AgentInventoryEntry,
   ArtifactRef,
@@ -101,18 +95,15 @@ export type {
   ToolResultBody,
 } from "./messages/index.js";
 
-// ---- state -----------------------------------------------------------------
 export type {
   PendingMeta,
   SessionPhase,
   SessionSnapshot,
 } from "./state/index.js";
 
-// ---- store -----------------------------------------------------------------
 export type { EventLogFilter, EventLogOptions } from "./store/types.js";
 export type { ParsedRowEnvelope } from "./store/eventlog.js";
 
-// ---- transport -------------------------------------------------------------
 export type {
   FrameHandler,
   SendableFrame,
@@ -121,11 +112,8 @@ export type {
   WireFrame,
 } from "./transport/index.js";
 
-// ---- util ------------------------------------------------------------------
 export type { ValidationError } from "./util/index.js";
 
-// ---- version --------------------------------------------------------------
 export type { ProtocolVersion, V1_1_Feature } from "./version.js";
 
-// ---- auth -----------------------------------------------------------------
 export type { BearerIdentity, BearerVerifier } from "./auth/index.js";

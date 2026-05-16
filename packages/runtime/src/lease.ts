@@ -42,41 +42,57 @@ function patternToRegExp(pattern: string): string {
   while (i < pattern.length) {
     const ch = pattern[i];
     if (ch === undefined) break;
-    if (ch === "*") {
-      if (pattern[i + 1] === "*") {
-        const isPrefixSlash = out.endsWith("/");
-        const next = pattern[i + 2];
-        const isSuffixSlash = next === "/";
-        const atEnd = i + 2 >= pattern.length;
-        // `/.../**/...` → strip trailing slash, replace with optional
-        // `(?:/[^/]+)*/` so zero intermediate segments is also a match.
-        if (isPrefixSlash && isSuffixSlash) {
-          out = `${out.slice(0, -1)}(?:/[^/]+)*/`;
-          i += 3;
-          continue;
-        }
-        // `/.../**` at end of pattern → strip trailing slash and accept
-        // zero or more segments INCLUDING the empty tail.
-        if (isPrefixSlash && atEnd) {
-          out = `${out.slice(0, -1)}(?:/[^/]+)*`;
-          i += 2;
-          continue;
-        }
-        // Bare `**` anywhere else.
-        out += ".*";
-        i += 2;
-        continue;
-      }
-      // single-segment `*`
-      out += "[^/]*";
-      i += 1;
-      continue;
-    }
-    // Escape regex metacharacters.
-    out += /[\\^$.|?+()[\]{}]/.test(ch) ? `\\${ch}` : ch;
-    i += 1;
+    const step = consumePatternToken(pattern, i, out);
+    out = step.out;
+    i = step.next;
   }
   return out;
+}
+
+interface PatternStep {
+  out: string;
+  next: number;
+}
+
+function consumePatternToken(
+  pattern: string,
+  i: number,
+  out: string,
+): PatternStep {
+  const ch = pattern[i];
+  if (ch === "*") return consumeStar(pattern, i, out);
+  const escaped = /[\\^$.|?+()[\]{}]/.test(ch ?? "") ? `\\${ch ?? ""}` : ch ?? "";
+  return { out: out + escaped, next: i + 1 };
+}
+
+function consumeStar(pattern: string, i: number, out: string): PatternStep {
+  if (pattern[i + 1] !== "*") {
+    // single-segment `*`
+    return { out: `${out}[^/]*`, next: i + 1 };
+  }
+  return consumeDoubleStar(pattern, i, out);
+}
+
+function consumeDoubleStar(
+  pattern: string,
+  i: number,
+  out: string,
+): PatternStep {
+  const isPrefixSlash = out.endsWith("/");
+  const isSuffixSlash = pattern[i + 2] === "/";
+  const atEnd = i + 2 >= pattern.length;
+  // `/.../**/...` → strip trailing slash, replace with optional
+  // `(?:/[^/]+)*/` so zero intermediate segments is also a match.
+  if (isPrefixSlash && isSuffixSlash) {
+    return { out: `${out.slice(0, -1)}(?:/[^/]+)*/`, next: i + 3 };
+  }
+  // `/.../**` at end of pattern → strip trailing slash and accept
+  // zero or more segments INCLUDING the empty tail.
+  if (isPrefixSlash && atEnd) {
+    return { out: `${out.slice(0, -1)}(?:/[^/]+)*`, next: i + 2 };
+  }
+  // Bare `**` anywhere else.
+  return { out: `${out}.*`, next: i + 2 };
 }
 
 /**
@@ -131,48 +147,62 @@ export function canonicalizeTarget(target: string): string {
  * {@link BudgetExhaustedError}. Both checks fire BEFORE the pattern match
  * — they bound the lease as a whole, not any single capability.
  */
-export function validateLeaseOp(
+export interface ValidateLeaseOpInput {
+  readonly lease: Lease;
+  readonly capability: string;
+  readonly target: string;
+  readonly ctx?: LeaseOpContext;
+}
+
+export function validateLeaseOp(input: ValidateLeaseOpInput): void {
+  const { lease, capability, target, ctx = {} } = input;
+  checkLeaseExpiration(capability, target, ctx);
+  checkBudgetExhaustion(capability, target, ctx);
+  checkCapabilityMatch(lease, capability, target);
+}
+
+function checkLeaseExpiration(
+  capability: string,
+  target: string,
+  ctx: LeaseOpContext,
+): void {
+  // v1.1 §9.5: lease expiration check (applies to every operation).
+  const expiresAt = ctx.constraints?.expires_at;
+  if (expiresAt === undefined) return;
+  const now = ctx.now ?? Date.now();
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresMs) || now < expiresMs) return;
+  throw new LeaseExpiredError(`Lease expired at ${expiresAt}`, {
+    details: { capability, target, expires_at: expiresAt },
+  });
+}
+
+function checkBudgetExhaustion(
+  capability: string,
+  target: string,
+  ctx: LeaseOpContext,
+): void {
+  // v1.1 §9.6: budget exhaustion (across all currencies).
+  if (ctx.budgetRemaining === undefined || capability === "cost.budget") return;
+  for (const [currency, remaining] of ctx.budgetRemaining.entries()) {
+    if (remaining <= 0) {
+      throw new BudgetExhaustedError(`${currency} budget exhausted`, {
+        details: { capability, target, currency, remaining },
+      });
+    }
+  }
+}
+
+function checkCapabilityMatch(
   lease: Lease,
   capability: string,
   target: string,
-  ctx: LeaseOpContext = {},
 ): void {
-  // v1.1 §9.5: lease expiration check (applies to every operation).
-  if (ctx.constraints?.expires_at !== undefined) {
-    const now = ctx.now ?? Date.now();
-    const expiresMs = Date.parse(ctx.constraints.expires_at);
-    if (Number.isFinite(expiresMs) && now >= expiresMs) {
-      throw new LeaseExpiredError(
-        `Lease expired at ${ctx.constraints.expires_at}`,
-        {
-          details: {
-            capability,
-            target,
-            expires_at: ctx.constraints.expires_at,
-          },
-        },
-      );
-    }
-  }
-
-  // v1.1 §9.6: budget exhaustion (across all currencies).
-  if (ctx.budgetRemaining !== undefined && capability !== "cost.budget") {
-    for (const [currency, remaining] of ctx.budgetRemaining.entries()) {
-      if (remaining <= 0) {
-        throw new BudgetExhaustedError(`${currency} budget exhausted`, {
-          details: { capability, target, currency, remaining },
-        });
-      }
-    }
-  }
-
   const patterns = lease[capability];
   if (patterns === undefined || patterns.length === 0) {
     throw new PermissionDeniedError(
       `Capability "${capability}" is not granted by this lease`,
-      {
-        details: { capability, target },
-      },
+      { details: { capability, target } },
     );
   }
   const canonical = canonicalizeTarget(target);
@@ -234,47 +264,57 @@ export function isLeaseSubset(
   for (const cap of Object.keys(child)) {
     const childPatterns = child[cap] ?? [];
     if (cap === "cost.budget") {
-      // Numeric per-currency comparison instead of glob subsumption.
-      const childTotals = new Map<string, number>();
-      for (const p of childPatterns) {
-        try {
-          const { currency, amount } = parseBudgetAmount(p);
-          childTotals.set(currency, (childTotals.get(currency) ?? 0) + amount);
-        } catch {
-          return false;
-        }
-      }
-      // Use parent remaining if provided; else fall back to parent's lease budget.
-      const parentTotals =
-        parentBudgetRemaining ??
-        (() => {
-          const m = new Map<string, number>();
-          const parentPatterns = parent[cap] ?? [];
-          for (const p of parentPatterns) {
-            try {
-              const { currency, amount } = parseBudgetAmount(p);
-              m.set(currency, (m.get(currency) ?? 0) + amount);
-            } catch {
-              return null;
-            }
-          }
-          return m;
-        })();
-      if (parentTotals === null) return false;
-      for (const [currency, total] of childTotals.entries()) {
-        const allowed = parentTotals.get(currency);
-        if (allowed === undefined || total > allowed) return false;
+      if (!isBudgetSubset(childPatterns, parent, parentBudgetRemaining)) {
+        return false;
       }
       continue;
     }
-    const parentPatterns = parent[cap];
-    if (parentPatterns === undefined || parentPatterns.length === 0)
-      return false;
-    for (const cp of childPatterns) {
-      if (!patternSubsumes(parentPatterns, cp)) return false;
-    }
+    if (!isCapabilitySubset(parent[cap], childPatterns)) return false;
   }
   return true;
+}
+
+function isCapabilitySubset(
+  parentPatterns: readonly string[] | undefined,
+  childPatterns: readonly string[],
+): boolean {
+  if (parentPatterns === undefined || parentPatterns.length === 0) return false;
+  for (const cp of childPatterns) {
+    if (!patternSubsumes(parentPatterns, cp)) return false;
+  }
+  return true;
+}
+
+function isBudgetSubset(
+  childPatterns: readonly string[],
+  parent: Lease,
+  parentBudgetRemaining: ReadonlyMap<string, number> | undefined,
+): boolean {
+  const childTotals = sumBudgetPatterns(childPatterns);
+  if (childTotals === null) return false;
+  const parentTotals =
+    parentBudgetRemaining ?? sumBudgetPatterns(parent["cost.budget"] ?? []);
+  if (parentTotals === null) return false;
+  for (const [currency, total] of childTotals.entries()) {
+    const allowed = parentTotals.get(currency);
+    if (allowed === undefined || total > allowed) return false;
+  }
+  return true;
+}
+
+function sumBudgetPatterns(
+  patterns: readonly string[],
+): Map<string, number> | null {
+  const m = new Map<string, number>();
+  for (const p of patterns) {
+    try {
+      const { currency, amount } = parseBudgetAmount(p);
+      m.set(currency, (m.get(currency) ?? 0) + amount);
+    } catch {
+      return null;
+    }
+  }
+  return m;
 }
 
 /** Is `child` subsumed by any pattern in `parents`? */
@@ -306,30 +346,36 @@ export function validateLeaseShape(lease: Lease): void {
         { details: { capability: cap } },
       );
     }
-    const patterns = lease[cap] ?? [];
-    if (!Array.isArray(patterns)) {
-      throw new InvalidRequestError(
-        `Lease capability "${cap}" must map to an array of patterns`,
-      );
-    }
-    for (const pattern of patterns) {
-      if (typeof pattern !== "string" || pattern.length === 0) {
-        throw new InvalidRequestError(
-          `Lease capability "${cap}" contains an empty or non-string pattern`,
-        );
-      }
-      // v1.1 §9.6: cost.budget patterns are amount strings, not globs.
-      if (cap === "cost.budget") {
-        try {
-          parseBudgetAmount(pattern);
-        } catch (error) {
-          throw new InvalidRequestError(
-            error instanceof Error ? error.message : String(error),
-            { details: { capability: cap, pattern } },
-          );
-        }
-      }
-    }
+    validateLeaseCapPatterns(cap, lease[cap] ?? []);
+  }
+}
+
+function validateLeaseCapPatterns(cap: string, patterns: unknown): void {
+  if (!Array.isArray(patterns)) {
+    throw new InvalidRequestError(
+      `Lease capability "${cap}" must map to an array of patterns`,
+    );
+  }
+  for (const pattern of patterns) {
+    validateLeasePattern(cap, pattern);
+  }
+}
+
+function validateLeasePattern(cap: string, pattern: unknown): void {
+  if (typeof pattern !== "string" || pattern.length === 0) {
+    throw new InvalidRequestError(
+      `Lease capability "${cap}" contains an empty or non-string pattern`,
+    );
+  }
+  // v1.1 §9.6: cost.budget patterns are amount strings, not globs.
+  if (cap !== "cost.budget") return;
+  try {
+    parseBudgetAmount(pattern);
+  } catch (error) {
+    throw new InvalidRequestError(
+      error instanceof Error ? error.message : String(error),
+      { details: { capability: cap, pattern } },
+    );
   }
 }
 

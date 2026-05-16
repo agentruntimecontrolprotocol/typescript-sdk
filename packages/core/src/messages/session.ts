@@ -100,8 +100,6 @@ export function normalizeAgentInventory(
   return [...(arr as readonly AgentInventoryEntry[])];
 }
 
-// ---- session.hello ----------------------------------------------------------
-
 /** §6.3 resume block embedded in session.hello to recover a prior session. */
 export const SessionResumeSchema = z.object({
   session_id: z.string().min(1).brand<"SessionId">(),
@@ -118,8 +116,6 @@ export const SessionHelloPayloadSchema = z.object({
 });
 export type SessionHelloPayload = z.infer<typeof SessionHelloPayloadSchema>;
 
-// ---- session.welcome --------------------------------------------------------
-
 /**
  * `session.welcome.payload` — v1.0 fields plus the OPTIONAL v1.1
  * `heartbeat_interval_sec` (§6.4). Absent means heartbeats are not
@@ -135,19 +131,13 @@ export const SessionWelcomePayloadSchema = z.object({
 });
 export type SessionWelcomePayload = z.infer<typeof SessionWelcomePayloadSchema>;
 
-// ---- session.error ----------------------------------------------------------
-
 export const SessionErrorPayloadSchema = ErrorPayloadSchema;
 export type SessionErrorPayload = z.infer<typeof SessionErrorPayloadSchema>;
-
-// ---- session.bye ------------------------------------------------------------
 
 export const SessionByePayloadSchema = z.object({
   reason: z.string().optional(),
 });
 export type SessionByePayload = z.infer<typeof SessionByePayloadSchema>;
-
-// ---- v1.1 session.ping / session.pong (§6.4) -------------------------------
 
 export const SessionPingPayloadSchema = z.object({
   nonce: z.string().min(1),
@@ -161,14 +151,10 @@ export const SessionPongPayloadSchema = z.object({
 });
 export type SessionPongPayload = z.infer<typeof SessionPongPayloadSchema>;
 
-// ---- v1.1 session.ack (§6.5) -----------------------------------------------
-
 export const SessionAckPayloadSchema = z.object({
   last_processed_seq: z.number().int().nonnegative(),
 });
 export type SessionAckPayload = z.infer<typeof SessionAckPayloadSchema>;
-
-// ---- v1.1 session.list_jobs / session.jobs (§6.6) --------------------------
 
 /**
  * Note: `JOB_STATES` lives in `messages/execution.ts`; to avoid an import
@@ -210,8 +196,6 @@ export const SessionJobsPayloadSchema = z.object({
   next_cursor: z.string().nullable(),
 });
 export type SessionJobsPayload = z.infer<typeof SessionJobsPayloadSchema>;
-
-// ---- Envelopes --------------------------------------------------------------
 
 export const SessionHelloEnvelopeSchema = messageEnvelope(
   "session.hello",

@@ -21,15 +21,11 @@ import type { EventLog } from "@arcp/core/store";
 import type { Job } from "./job.js";
 import type { SessionContext } from "./server.js";
 
-// ---- handler ---------------------------------------------------------------
-
 /** Inbound-message dispatcher signature. */
 export type Handler = (
   env: Envelope,
   ctx: SessionContext,
 ) => Promise<void> | void;
-
-// ---- job -------------------------------------------------------------------
 
 /** Sequence-number provider (§8.3), implemented by `SessionContext`. */
 export interface EventSeqSource {
@@ -172,8 +168,6 @@ export type {
   ToolResultBody,
 } from "@arcp/core/messages";
 
-// ---- lease -----------------------------------------------------------------
-
 /**
  * Optional extra context surfaced to `validateLeaseOp` for v1.1 enforcement:
  * lease expiration and per-currency budget counters.
@@ -187,8 +181,6 @@ export interface LeaseOpContext {
   /** Clock override for tests; defaults to `Date.now()`. */
   now?: number;
 }
-
-// ---- server ----------------------------------------------------------------
 
 /**
  * v1.1 §6.6 — authorization hook for `session.list_jobs` and

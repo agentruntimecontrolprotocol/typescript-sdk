@@ -1,4 +1,4 @@
-import { CancelledError, TimeoutError } from "../errors.js";
+import { CancelledError, InternalError, TimeoutError } from "../errors.js";
 import { Deferred } from "../util/deferred.js";
 
 import type { PendingMeta } from "./types.js";
@@ -22,7 +22,9 @@ export class PendingRegistry {
     options: { deadlineMs?: number; signal?: AbortSignal } = {},
   ): Promise<T> {
     if (this.entries.has(correlationId)) {
-      throw new Error(`correlation_id "${correlationId}" already registered`);
+      throw new InternalError(
+        `correlation_id "${correlationId}" already registered`,
+      );
     }
     const deferred = new Deferred<T>();
     const entry: PendingEntry<T> = { deferred, cancelTimer: null };

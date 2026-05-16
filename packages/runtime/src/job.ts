@@ -13,21 +13,18 @@ import type {
   JobStateName,
   Lease,
   LeaseConstraints,
-  LogPayload,
-  ProgressBody,
-  ResultChunkBody,
-  StatusBody,
-  ThoughtBody,
 } from "@arcp/core/messages";
 import { newJobId, newMessageId, nowTimestamp } from "@arcp/core/util";
 
-import type {
-  EventSeqSource,
-  JobContext,
-  JobOptions,
-  JobSend,
-  ResultStream,
-} from "./types.js";
+import type { EventSeqSource, JobOptions, JobSend } from "./types.js";
+
+/** Constructor dependency bag for {@link Job}. */
+export interface JobDependencies {
+  readonly options: JobOptions;
+  readonly send: JobSend;
+  readonly seq: EventSeqSource;
+  readonly logger: Logger;
+}
 
 // ARCP v1.0 §7-§8 job execution.
 //
@@ -112,12 +109,15 @@ export class Job {
   private readonly missesAllowed: number;
   private readonly heartbeatIntervalMs: number;
 
-  public constructor(
-    options: JobOptions,
-    private readonly send: JobSend,
-    private readonly seq: EventSeqSource,
-    public readonly logger: Logger,
-  ) {
+  private readonly send: JobSend;
+  private readonly seq: EventSeqSource;
+  public readonly logger: Logger;
+
+  public constructor(deps: JobDependencies) {
+    const { options, send, seq, logger } = deps;
+    this.send = send;
+    this.seq = seq;
+    this.logger = logger;
     this.jobId = options.jobId ?? newJobId();
     this.sessionId = options.sessionId;
     this.agent = options.agent;
@@ -457,127 +457,7 @@ export class JobManager {
   }
 }
 
-/** Build a {@link JobContext} backed by a {@link Job}. */
-export function makeJobContext(job: Job): JobContext {
-  return {
-    jobId: job.jobId,
-    sessionId: job.sessionId,
-    agent: job.agent,
-    agentVersion: job.agentVersion,
-    agentRef: job.agentRef,
-    lease: job.lease,
-    leaseConstraints: job.leaseConstraints,
-    budget: job.budget,
-    traceId: job.traceId,
-    signal: job.signal,
-    logger: job.logger,
-    async log(level, message, attributes) {
-      await job.emitEventKind("log", {
-        level,
-        message,
-        ...(attributes === undefined ? {} : { attributes }),
-      } satisfies LogPayload);
-    },
-    async thought(text) {
-      await job.emitEventKind("thought", { text } satisfies ThoughtBody);
-    },
-    async status(phase, message) {
-      const body: StatusBody = {
-        phase,
-        ...(message === undefined ? {} : { message }),
-      };
-      await job.emitEventKind("status", body);
-    },
-    async metric(metric) {
-      await job.emitEventKind("metric", metric);
-    },
-    async toolCall(body) {
-      await job.emitEventKind("tool_call", body);
-    },
-    async toolResult(body) {
-      await job.emitEventKind("tool_result", body);
-    },
-    async artifactRef(body) {
-      await job.emitEventKind("artifact_ref", body);
-    },
-    async delegate(body) {
-      await job.emitEventKind("delegate", body);
-    },
-    async progress(current, opts) {
-      const body: ProgressBody = {
-        current,
-        ...(opts?.total === undefined ? {} : { total: opts.total }),
-        ...(opts?.units === undefined ? {} : { units: opts.units }),
-        ...(opts?.message === undefined ? {} : { message: opts.message }),
-      };
-      await job.emitEventKind("progress", body);
-    },
-    async resultChunk(body) {
-      await job.emitEventKind("result_chunk", body);
-    },
-    streamResult(opts) {
-      return makeResultStream(job, opts?.resultId);
-    },
-    async emitEvent(kind, body) {
-      await job.emitEventKind(kind, body);
-    },
-  };
-}
-
-function makeResultStream(job: Job, resultIdIn?: string): ResultStream {
-  const resultId = resultIdIn ?? `res_${newJobId().replace(/^job_/, "")}`;
-  let chunkSeq = 0;
-  let finalized = false;
-  return {
-    resultId,
-    async write(data, opts) {
-      if (finalized) {
-        throw new InvalidRequestError(
-          "ResultStream: cannot write after finalize",
-        );
-      }
-      await job.emitEventKind("result_chunk", {
-        result_id: resultId,
-        chunk_seq: chunkSeq++,
-        data,
-        encoding: opts?.encoding ?? "utf8",
-        more: true,
-      } satisfies ResultChunkBody);
-    },
-    async finalize(data, opts) {
-      if (finalized) {
-        throw new InvalidRequestError("ResultStream: already finalized");
-      }
-      finalized = true;
-      if (data !== undefined) {
-        await job.emitEventKind("result_chunk", {
-          result_id: resultId,
-          chunk_seq: chunkSeq++,
-          data,
-          encoding: opts?.encoding ?? "utf8",
-          more: false,
-        } satisfies ResultChunkBody);
-      } else if (chunkSeq > 0) {
-        // Emit a terminal empty chunk to mark `more: false`.
-        await job.emitEventKind("result_chunk", {
-          result_id: resultId,
-          chunk_seq: chunkSeq++,
-          data: "",
-          encoding: opts?.encoding ?? "utf8",
-          more: false,
-        } satisfies ResultChunkBody);
-      }
-      await job.emitResult({
-        final_status: "success",
-        result_id: resultId,
-        ...(opts?.summary === undefined ? {} : { summary: opts.summary }),
-        ...(opts?.resultSize === undefined
-          ? {}
-          : { result_size: opts.resultSize }),
-      });
-    },
-  };
-}
+export { makeJobContext } from "./job-context.js";
 
 // Re-export commonly used error types so consumers can import in one place.
 

@@ -105,46 +105,75 @@ export function negotiateCapabilities(
   client: Capabilities | undefined,
   runtime: Capabilities,
 ): Capabilities {
-  const out: Capabilities = {};
   const c: Capabilities = client ?? {};
-  const clientEncodings = Array.isArray(c.encodings) ? c.encodings : undefined;
+  const out: Capabilities = {};
+  applyEncodings(out, c, runtime);
+  applyAgents(out, runtime);
+  applyFeatures(out, c, runtime);
+  applyVendorKeys(out, c, runtime);
+  return out;
+}
+
+const KNOWN_CAPABILITY_KEYS: ReadonlySet<string> = new Set([
+  "encodings",
+  "agents",
+  "features",
+]);
+
+function applyEncodings(
+  out: Capabilities,
+  client: Capabilities,
+  runtime: Capabilities,
+): void {
+  const clientEncodings = Array.isArray(client.encodings)
+    ? client.encodings
+    : undefined;
   const runtimeEncodings = Array.isArray(runtime.encodings)
     ? runtime.encodings
     : undefined;
   if (clientEncodings !== undefined && runtimeEncodings !== undefined) {
     out.encodings = clientEncodings.filter((e) => runtimeEncodings.includes(e));
-  } else if (clientEncodings !== undefined) {
-    out.encodings = clientEncodings;
-  } else if (runtimeEncodings !== undefined) {
-    out.encodings = runtimeEncodings;
+    return;
   }
-  if (
-    (Array.isArray(runtime.agents) || Array.isArray(c.agents)) && // Runtime owns the agent inventory; client never advertises agents.
-    Array.isArray(runtime.agents)
-  ) {
+  out.encodings = clientEncodings ?? runtimeEncodings;
+}
+
+function applyAgents(out: Capabilities, runtime: Capabilities): void {
+  // Runtime owns the agent inventory; client never advertises agents.
+  if (Array.isArray(runtime.agents)) {
     out.agents = runtime.agents;
   }
-  // v1.1 §6.2 — `features` is the negotiated intersection. The runtime is
-  // authoritative for what *it* supports; the welcome MUST advertise only
-  // what is in both lists. Use the runtime side as the truth.
+}
+
+function applyFeatures(
+  out: Capabilities,
+  client: Capabilities,
+  runtime: Capabilities,
+): void {
+  // v1.1 §6.2 — runtime is authoritative for advertised features; the
+  // welcome MUST advertise only what is in both lists.
   if (Array.isArray(runtime.features)) {
     out.features = runtime.features;
-  } else if (Array.isArray(c.features)) {
-    out.features = c.features;
+  } else if (Array.isArray(client.features)) {
+    out.features = client.features;
   }
-  // Round-trip vendor-prefixed keys from either side.
-  const known = new Set(["encodings", "agents", "features"]);
-  for (const k of Object.keys(c)) {
-    if (known.has(k)) continue;
-    (out as Record<string, unknown>)[k] = (c as Record<string, unknown>)[k];
+}
+
+function applyVendorKeys(
+  out: Capabilities,
+  client: Capabilities,
+  runtime: Capabilities,
+): void {
+  for (const k of Object.keys(client)) {
+    if (KNOWN_CAPABILITY_KEYS.has(k)) continue;
+    (out as Record<string, unknown>)[k] = (client as Record<string, unknown>)[k];
   }
   for (const k of Object.keys(runtime)) {
-    if (known.has(k)) continue;
+    if (KNOWN_CAPABILITY_KEYS.has(k)) continue;
     if (!(k in out)) {
       (out as Record<string, unknown>)[k] = (
         runtime as Record<string, unknown>
       )[k];
     }
   }
-  return out;
 }

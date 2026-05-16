@@ -64,7 +64,7 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/explicit-module-boundary-types": "error",
       "@typescript-eslint/no-unnecessary-condition": "error",
-      "@typescript-eslint/prefer-readonly": "warn",
+      "@typescript-eslint/prefer-readonly": "error",
       "@typescript-eslint/switch-exhaustiveness-check": "error",
       "@typescript-eslint/no-misused-promises": "error",
       "@typescript-eslint/no-floating-promises": "error",
@@ -121,6 +121,21 @@ export default tseslint.config(
       "n/no-process-exit": "error",
       "n/no-extraneous-import": "off",
       "n/hashbang": "off",
+
+      // Complexity caps from TYPESCRIPT_SDK_GUIDE.md Section 11. These will
+      // be red until sub-phase 2.5 closes them; refactor commits during 2.5
+      // are tracked against the violations inventory in .refactor/.
+      "max-lines": [
+        "error",
+        { max: 500, skipBlankLines: true, skipComments: true },
+      ],
+      "max-lines-per-function": [
+        "error",
+        { max: 40, skipBlankLines: true, skipComments: true, IIFEs: true },
+      ],
+      "max-params": ["error", 3],
+      "max-depth": ["error", 3],
+      complexity: ["error", 10],
     },
   },
   // Examples: relaxed rules — pedagogical, may use console, process.exit, etc.
@@ -151,6 +166,12 @@ export default tseslint.config(
       "unicorn/no-negated-condition": "off",
       "import/no-default-export": "off",
       "import/order": "off",
+      // Examples are pedagogical and may set up scenarios in long bodies.
+      "max-lines": "off",
+      "max-lines-per-function": "off",
+      "max-params": "off",
+      "max-depth": "off",
+      complexity: "off",
     },
   },
   // Tests
@@ -174,6 +195,13 @@ export default tseslint.config(
       // `.sort()` on a spread-copy is fine — the spread already made a new array.
       "unicorn/no-array-sort": "off",
       "unicorn/no-await-expression-member": "off",
+      // Tests describe scenarios; `it()` bodies and integration cases can be
+      // long-by-design. Complexity caps don't apply.
+      "max-lines": "off",
+      "max-lines-per-function": "off",
+      "max-params": "off",
+      "max-depth": "off",
+      complexity: "off",
     },
   },
   // stdio test helper — spawned as a subprocess by integration tests, behaves
@@ -187,6 +215,8 @@ export default tseslint.config(
     },
   },
   // CLI — commander's typings surface as `any`; unsafe-* are unavoidable here.
+  // CLI also defines all subcommands inline at module scope, which exceeds
+  // the file-length cap; this is idiomatic for commander.
   {
     files: ["packages/sdk/src/cli.ts"],
     rules: {
@@ -197,6 +227,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
       "@typescript-eslint/no-unsafe-call": "off",
+      "max-lines": "off",
+      "max-lines-per-function": "off",
     },
   },
   // Disable type-checked rules for non-TS files (JS/MJS)
@@ -216,6 +248,7 @@ export default tseslint.config(
       // eslint.config.js uses `import.meta.dirname`, supported in our Node
       // engines range (^22.16.0 or >=24) but the rule flags >=22 broadly.
       "n/no-unsupported-features/node-builtins": "off",
+      "max-lines": "off",
     },
   },
   prettier,

@@ -1,70 +1,54 @@
 import { z } from "zod";
 
 import { messageEnvelope } from "../envelope.js";
-import { type ErrorPayload, ErrorPayloadSchema } from "../errors.js";
+import {
+  type ErrorPayload,
+  ErrorPayloadSchema,
+  InvalidRequestError,
+} from "../errors.js";
 
-import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
+import { JobEventPayloadSchema } from "./events.js";
+import {
+  LeaseConstraintsSchema,
+  LeaseSchema,
+} from "./lease-schema.js";
 
 // ARCP v1.0 §7-§8 job-related envelopes.
 
-// ---------------------------------------------------------------------------
-// Lease shape (§9.1) — embedded on job.submit (request) and job.accepted
-// (effective).
-// ---------------------------------------------------------------------------
+export {
+  isReservedCapabilityName,
+  isValidCapabilityName,
+  type Lease,
+  LeaseConstraintsSchema,
+  type LeaseConstraints,
+  LeaseSchema,
+  RESERVED_CAPABILITY_NAMES,
+  type ReservedCapabilityName,
+} from "./lease-schema.js";
+export {
+  type ArtifactRefBody,
+  type DelegateBody,
+  isReservedEventKind,
+  isVendorEventKind,
+  type JobEventPayload,
+  JobEventPayloadSchema,
+  type LogBody,
+  type MetricBody,
+  parseJobEventBody,
+  type ProgressBody,
+  ProgressBodySchema,
+  RESERVED_EVENT_KINDS,
+  type ReservedEventBodyMap,
+  type ReservedEventKind,
+  type ResultChunkBody,
+  ResultChunkBodySchema,
+  type StatusBody,
+  type ThoughtBody,
+  type ToolCallBody,
+  type ToolResultBody,
+} from "./events.js";
 
-/**
- * §9.2 reserved capability namespaces.
- *
- * Any other capability name MUST start with `x-vendor.` per §15. The
- * runtime-side `validateLeaseCapabilityName` enforces this; the wire-shape
- * schema below allows any string and defers validation.
- */
-export const RESERVED_CAPABILITY_NAMES = [
-  "fs.read",
-  "fs.write",
-  "net.fetch",
-  "tool.call",
-  "agent.delegate",
-  "cost.budget",
-] as const;
-export type ReservedCapabilityName = (typeof RESERVED_CAPABILITY_NAMES)[number];
-
-/** Whether `name` is a v1.0 reserved capability namespace. */
-export function isReservedCapabilityName(
-  name: string,
-): name is ReservedCapabilityName {
-  return (RESERVED_CAPABILITY_NAMES as readonly string[]).includes(name);
-}
-
-/** Whether `name` is a syntactically valid v1.0 capability name. */
-export function isValidCapabilityName(name: string): boolean {
-  if (isReservedCapabilityName(name)) return true;
-  // x-vendor.<vendor>.<capability> per §15.
-  return /^x-vendor(\.[a-z0-9_-]+){2,}$/.test(name);
-}
-
-/** §9.1 lease: capability → list of glob patterns. */
-export const LeaseSchema = z.record(
-  z.string().min(1),
-  z.array(z.string().min(1)),
-);
-export type Lease = z.infer<typeof LeaseSchema>;
-
-/**
- * v1.1 §9.5 lease constraints. Currently carries only `expires_at` (ISO 8601
- * UTC with `Z` suffix), which sets a hard upper bound on the lease's lifetime.
- *
- * The schema validates `expires_at` is a non-empty string. Stricter checks
- * (UTC, future-dated) are enforced at submit time by the runtime.
- */
-export const LeaseConstraintsSchema = z.object({
-  expires_at: z.string().min(1).optional(),
-});
-export type LeaseConstraints = z.infer<typeof LeaseConstraintsSchema>;
-
-// ---------------------------------------------------------------------------
 // v1.1 §7.5 agent versioning helpers.
-// ---------------------------------------------------------------------------
 
 const AGENT_NAME_REGEX = /^[a-z0-9][a-z0-9._-]*$/;
 const AGENT_VERSION_REGEX = /^[a-zA-Z0-9.+_-]+$/;
@@ -88,17 +72,19 @@ export function parseAgentRef(input: string): ParsedAgentRef {
   const at = input.indexOf("@");
   if (at === -1) {
     if (!AGENT_NAME_REGEX.test(input)) {
-      throw new Error(`Invalid agent name "${input}"`);
+      throw new InvalidRequestError(`Invalid agent name "${input}"`);
     }
     return { name: input, version: null };
   }
   const name = input.slice(0, at);
   const version = input.slice(at + 1);
   if (!AGENT_NAME_REGEX.test(name)) {
-    throw new Error(`Invalid agent name "${name}" in "${input}"`);
+    throw new InvalidRequestError(`Invalid agent name "${name}" in "${input}"`);
   }
   if (!AGENT_VERSION_REGEX.test(version)) {
-    throw new Error(`Invalid agent version "${version}" in "${input}"`);
+    throw new InvalidRequestError(
+      `Invalid agent version "${version}" in "${input}"`,
+    );
   }
   return { name, version };
 }
@@ -108,9 +94,7 @@ export function formatAgentRef(ref: ParsedAgentRef): string {
   return ref.version === null ? ref.name : `${ref.name}@${ref.version}`;
 }
 
-// ---------------------------------------------------------------------------
 // v1.1 §9.6 cost.budget helpers.
-// ---------------------------------------------------------------------------
 
 /** Parsed `cost.budget` amount pattern (`currency:decimal`). */
 export interface ParsedBudgetAmount {
@@ -130,23 +114,21 @@ const BUDGET_AMOUNT_REGEX = /^([A-Za-z][A-Za-z0-9_-]*):(\d+(?:\.\d+)?)$/;
 export function parseBudgetAmount(input: string): ParsedBudgetAmount {
   const m = BUDGET_AMOUNT_REGEX.exec(input);
   if (m === null) {
-    throw new Error(`Invalid cost.budget amount "${input}"`);
+    throw new InvalidRequestError(`Invalid cost.budget amount "${input}"`);
   }
   const currency = m[1];
   const rawAmount = m[2];
   if (currency === undefined || rawAmount === undefined) {
-    throw new Error(`Invalid cost.budget amount "${input}"`);
+    throw new InvalidRequestError(`Invalid cost.budget amount "${input}"`);
   }
   const amount = Number.parseFloat(rawAmount);
   if (!Number.isFinite(amount) || amount < 0) {
-    throw new Error(`Invalid cost.budget amount "${input}"`);
+    throw new InvalidRequestError(`Invalid cost.budget amount "${input}"`);
   }
   return { currency, amount };
 }
 
-// ---------------------------------------------------------------------------
 // Job submit / accepted (§7.1)
-// ---------------------------------------------------------------------------
 
 export const JobSubmitPayloadSchema = z.object({
   agent: z.string().min(1),
@@ -183,18 +165,14 @@ export const JobAcceptedPayloadSchema = z.object({
 });
 export type JobAcceptedPayload = z.infer<typeof JobAcceptedPayloadSchema>;
 
-// ---------------------------------------------------------------------------
 // Job cancel (§7.4)
-// ---------------------------------------------------------------------------
 
 export const JobCancelPayloadSchema = z.object({
   reason: z.string().optional(),
 });
 export type JobCancelPayload = z.infer<typeof JobCancelPayloadSchema>;
 
-// ---------------------------------------------------------------------------
 // Job lifecycle states (§7.3)
-// ---------------------------------------------------------------------------
 
 export const JOB_STATES = [
   "pending",
@@ -215,228 +193,8 @@ export const TERMINAL_JOB_STATES = [
 ] as const;
 export type TerminalJobState = (typeof TERMINAL_JOB_STATES)[number];
 
-// ---------------------------------------------------------------------------
-// Job event (§8) — eight reserved kinds + x-vendor.*
-// ---------------------------------------------------------------------------
 
-export const RESERVED_EVENT_KINDS = [
-  "log",
-  "thought",
-  "tool_call",
-  "tool_result",
-  "status",
-  "metric",
-  "artifact_ref",
-  "delegate",
-  // v1.1 §8.2
-  "progress",
-  "result_chunk",
-] as const;
-export type ReservedEventKind = (typeof RESERVED_EVENT_KINDS)[number];
-
-export function isReservedEventKind(value: string): value is ReservedEventKind {
-  return (RESERVED_EVENT_KINDS as readonly string[]).includes(value);
-}
-
-export function isVendorEventKind(value: string): boolean {
-  return /^x-vendor\.[a-z0-9_.-]+$/.test(value);
-}
-
-const ThoughtBodySchema = z.object({
-  text: z.string(),
-});
-
-const ToolCallBodySchema = z.object({
-  tool: z.string().min(1),
-  args: z.record(z.string(), z.unknown()).optional(),
-  call_id: z.string().min(1),
-});
-
-const ToolResultBodySchema = z
-  .object({
-    call_id: z.string().min(1),
-    result: z.unknown().optional(),
-    error: ErrorPayloadSchema.optional(),
-  })
-  .superRefine((b, ctx) => {
-    if (b.result === undefined && b.error === undefined) {
-      // empty result for void tools is allowed
-      return;
-    }
-    if (b.result !== undefined && b.error !== undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "tool_result body must not carry both `result` and `error`",
-      });
-    }
-  });
-
-const StatusBodySchema = z.object({
-  phase: z.string().min(1),
-  message: z.string().optional(),
-});
-
-const ArtifactRefBodySchema = z.object({
-  uri: z.string().min(1),
-  content_type: z.string().min(1),
-  byte_size: z.number().int().nonnegative().optional(),
-  sha256: z.string().optional(),
-});
-
-const DelegateBodySchema = z.object({
-  delegate_id: z.string().min(1),
-  agent: z.string().min(1),
-  input: z.unknown(),
-  lease_request: LeaseSchema.optional(),
-  /** v1.1 §9.4/§9.5 — child lease bound; MUST NOT exceed parent's. */
-  lease_constraints: LeaseConstraintsSchema.optional(),
-});
-
-/**
- * v1.1 §8.2.1 `progress` body.
- *
- * `current` MUST be non-negative; `total` (if present) is the upper bound.
- * Advisory; the protocol does not act on progress events.
- */
-export const ProgressBodySchema = z.object({
-  current: z.number().nonnegative(),
-  total: z.number().nonnegative().optional(),
-  units: z.string().min(1).optional(),
-  message: z.string().optional(),
-});
-export type ProgressBody = z.infer<typeof ProgressBodySchema>;
-
-/**
- * v1.1 §8.4 `result_chunk` body. Chunks for one `result_id` are emitted in
- * order; `more: false` marks the final chunk. The terminating `job.result`
- * MUST carry `result_id`.
- */
-export const ResultChunkBodySchema = z.object({
-  result_id: z.string().min(1),
-  chunk_seq: z.number().int().nonnegative(),
-  data: z.string(),
-  encoding: z.enum(["utf8", "base64"]),
-  more: z.boolean(),
-});
-export type ResultChunkBody = z.infer<typeof ResultChunkBodySchema>;
-
-/**
- * Job event payload shape. `kind` is one of the eight reserved values OR a
- * vendor-prefixed string. `body` is validated when the kind matches a
- * reserved schema; vendor and unknown kinds get a permissive object body.
- */
-export const JobEventPayloadSchema = z.object({
-  kind: z.string().min(1),
-  ts: z.string().min(1),
-  body: z.unknown(),
-});
-export type JobEventPayload = z.infer<typeof JobEventPayloadSchema>;
-
-export type LogBody = z.infer<typeof LogPayloadSchema>;
-export type ThoughtBody = z.infer<typeof ThoughtBodySchema>;
-export type ToolCallBody = z.infer<typeof ToolCallBodySchema>;
-export type ToolResultBody = z.infer<typeof ToolResultBodySchema>;
-export type StatusBody = z.infer<typeof StatusBodySchema>;
-export type MetricBody = z.infer<typeof MetricPayloadSchema>;
-export type ArtifactRefBody = z.infer<typeof ArtifactRefBodySchema>;
-export type DelegateBody = z.infer<typeof DelegateBodySchema>;
-
-/**
- * Map a reserved event kind to its strongly-typed body.
- *
- * Used by {@link parseJobEventBody} to ensure compile-time exhaustiveness
- * over the v1.0 + v1.1 reserved set (§8.2). Adding a new reserved kind
- * without updating this map (and the matching `parseReservedEventBody`
- * case) is a type error.
- */
-export interface ReservedEventBodyMap {
-  log: LogBody;
-  thought: ThoughtBody;
-  tool_call: ToolCallBody;
-  tool_result: ToolResultBody;
-  status: StatusBody;
-  metric: MetricBody;
-  artifact_ref: ArtifactRefBody;
-  delegate: DelegateBody;
-  progress: ProgressBody;
-  result_chunk: ResultChunkBody;
-}
-
-/**
- * Parse the body of a reserved §8.2 event kind. Exhaustive over the ten
- * reserved kinds — the `default` branch is `never`, so adding a new entry
- * to {@link RESERVED_EVENT_KINDS} without extending this switch is a
- * compile-time error.
- */
-function parseReservedEventBody<K extends ReservedEventKind>(
-  kind: K,
-  body: unknown,
-): ReservedEventBodyMap[K] {
-  switch (kind) {
-    case "log": {
-      return LogPayloadSchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "thought": {
-      return ThoughtBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "tool_call": {
-      return ToolCallBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "tool_result": {
-      return ToolResultBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "status": {
-      return StatusBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "metric": {
-      return MetricPayloadSchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "artifact_ref": {
-      return ArtifactRefBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "delegate": {
-      return DelegateBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "progress": {
-      return ProgressBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    case "result_chunk": {
-      return ResultChunkBodySchema.parse(body) as ReservedEventBodyMap[K];
-    }
-    default: {
-      // Exhaustiveness guard: every member of ReservedEventKind MUST appear
-      // in the switch above. If a new kind is added to RESERVED_EVENT_KINDS
-      // without a corresponding case here, this assignment fails to compile.
-      const _exhaustive: never = kind;
-      throw new Error(`Unhandled reserved event kind: ${String(_exhaustive)}`);
-    }
-  }
-}
-
-/**
- * Parse a `job.event.payload.body` against the kind-specific schema.
- *
- * Reserved kinds (§8.2) are validated against their schemas via the
- * exhaustively-checked {@link parseReservedEventBody}; vendor (`x-vendor.*`)
- * and unknown kinds pass through unchanged (caller MUST treat them as
- * opaque per §15).
- */
-export function parseJobEventBody<K extends ReservedEventKind>(
-  kind: K,
-  body: unknown,
-): ReservedEventBodyMap[K];
-export function parseJobEventBody(kind: string, body: unknown): unknown;
-export function parseJobEventBody(kind: string, body: unknown): unknown {
-  if (isReservedEventKind(kind)) {
-    return parseReservedEventBody(kind, body);
-  }
-  // Vendor (`x-vendor.*`) or unknown kind — pass through unchecked.
-  return body;
-}
-
-// ---------------------------------------------------------------------------
 // Terminal events: job.result (success) and job.error (failure variants).
-// ---------------------------------------------------------------------------
 
 /**
  * v1.0 `job.result` carries the inline `result`. v1.1 §8.4 adds
@@ -476,9 +234,7 @@ export function jobErrorToErrorPayload(p: JobErrorPayload): ErrorPayload {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Envelopes
-// ---------------------------------------------------------------------------
 
 export const JobSubmitEnvelopeSchema = messageEnvelope(
   "job.submit",
@@ -528,9 +284,7 @@ export const JobErrorEnvelopeSchema = messageEnvelope(
   event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
 });
 
-// ---------------------------------------------------------------------------
 // v1.1 §7.6 subscribe / subscribed / unsubscribe envelopes.
-// ---------------------------------------------------------------------------
 
 export const JobSubscribePayloadSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),

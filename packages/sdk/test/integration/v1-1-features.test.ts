@@ -367,8 +367,11 @@ describe("v1.1 §9.5 lease expiration", () => {
   it("validateLeaseOp rejects expired lease with LeaseExpiredError", () => {
     const past = new Date(Date.now() - 1000).toISOString();
     expect(() => {
-      validateLeaseOp({ "fs.read": ["/a"] }, "fs.read", "/a", {
-        constraints: { expires_at: past },
+      validateLeaseOp({
+        lease: { "fs.read": ["/a"] },
+        capability: "fs.read",
+        target: "/a",
+        ctx: { constraints: { expires_at: past } },
       });
     }).toThrow(LeaseExpiredError);
   });
@@ -419,8 +422,11 @@ describe("v1.1 §9.6 cost.budget", () => {
   it("validateLeaseOp throws BUDGET_EXHAUSTED when counter ≤ 0", () => {
     const budget = new Map<string, number>([["USD", 0]]);
     expect(() => {
-      validateLeaseOp({ "fs.read": ["/a"] }, "fs.read", "/a", {
-        budgetRemaining: budget,
+      validateLeaseOp({
+        lease: { "fs.read": ["/a"] },
+        capability: "fs.read",
+        target: "/a",
+        ctx: { budgetRemaining: budget },
       });
     }).toThrow(BudgetExhaustedError);
   });

@@ -45,46 +45,11 @@ export function serveArcp(options: BunServeArcpOptions): ArcpServeHandle {
     );
   }
   const path = options.path ?? "/arcp";
-  const allowed = options.allowedHosts;
-  const fallback =
-    options.fallback ??
-    ((): Response => new Response("Not Found", { status: 404 }));
-
+  const host = options.host ?? "0.0.0.0";
   const server = Bun.serve<ArcpUpgradeData>({
     port: options.port ?? 0,
-    hostname: options.host ?? "0.0.0.0",
-    async fetch(req, srv) {
-      const url = new URL(req.url);
-      if (url.pathname !== path) {
-        return fallback(req);
-      }
-      // DNS-rebinding guard.
-      if (allowed !== undefined) {
-        const raw = req.headers.get("host");
-        if (raw === null) {
-          return new Response("Missing Host header", { status: 400 });
-        }
-        const hostOnly = raw.split(":", 1)[0] ?? "";
-        if (!allowed.includes(hostOnly)) {
-          return new Response("Forbidden: Host header not allowed", {
-            status: 403,
-          });
-        }
-      }
-      const data: ArcpUpgradeData = {
-        origin: req,
-        transport: null,
-        onTransport: options.onTransport,
-      };
-      const ok = srv.upgrade(req, { data });
-      if (!ok) {
-        return new Response("Upgrade failed", { status: 426 });
-      }
-      // Returning undefined is valid for upgraded requests; Bun handles the
-      // rest of the response. The `await` keyword above is for `fallback`
-      // returning a Promise.
-      return undefined;
-    },
+    hostname: host,
+    fetch: buildFetchHandler(options, path),
     websocket: {
       open(ws) {
         const transport = new BunWebSocketTransport(ws);
@@ -105,7 +70,6 @@ export function serveArcp(options: BunServeArcpOptions): ArcpServeHandle {
   });
 
   const port = server.port ?? options.port ?? 0;
-  const host = options.host ?? "0.0.0.0";
   return {
     port,
     url: `ws://${host}:${port}${path}`,
@@ -114,3 +78,46 @@ export function serveArcp(options: BunServeArcpOptions): ArcpServeHandle {
     },
   };
 }
+
+type BunFetchHandler = (
+  req: Request,
+  srv: { upgrade: (r: Request, opts: { data: ArcpUpgradeData }) => boolean },
+) => Promise<Response | undefined>;
+
+function buildFetchHandler(
+  options: BunServeArcpOptions,
+  path: string,
+): BunFetchHandler {
+  const allowed = options.allowedHosts;
+  const fallback =
+    options.fallback ??
+    ((): Response => new Response("Not Found", { status: 404 }));
+  return async (req, srv) => {
+    const url = new URL(req.url);
+    if (url.pathname !== path) return fallback(req);
+    const hostGuardError = checkHostHeader(req, allowed);
+    if (hostGuardError !== null) return hostGuardError;
+    const data: ArcpUpgradeData = {
+      origin: req,
+      transport: null,
+      onTransport: options.onTransport,
+    };
+    if (!srv.upgrade(req, { data })) {
+      return new Response("Upgrade failed", { status: 426 });
+    }
+    return undefined;
+  };
+}
+
+function checkHostHeader(
+  req: Request,
+  allowed: readonly string[] | undefined,
+): Response | null {
+  if (allowed === undefined) return null;
+  const raw = req.headers.get("host");
+  if (raw === null) return new Response("Missing Host header", { status: 400 });
+  const hostOnly = raw.split(":", 1)[0] ?? "";
+  if (allowed.includes(hostOnly)) return null;
+  return new Response("Forbidden: Host header not allowed", { status: 403 });
+}
+
