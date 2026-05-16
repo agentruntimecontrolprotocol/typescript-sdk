@@ -1,6 +1,6 @@
 import { TaggedInvalidRequest, TaggedPermissionDenied } from "@arcp/core";
 import type { Lease } from "@arcp/core/messages";
-import { Cause, Effect, Exit } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -34,8 +34,8 @@ describe("validateLeaseOpEffect", () => {
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const failure = Cause.failureOption(exit.cause);
-      expect(failure._tag).toBe("Some");
-      if (failure._tag === "Some") {
+      expect(Option.isSome(failure)).toBe(true);
+      if (Option.isSome(failure)) {
         expect(failure.value).toBeInstanceOf(TaggedPermissionDenied);
       }
     }
@@ -84,7 +84,8 @@ describe("validateLeaseConstraintsEffect", () => {
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const failure = Cause.failureOption(exit.cause);
-      if (failure._tag === "Some") {
+      expect(Option.isSome(failure)).toBe(true);
+      if (Option.isSome(failure)) {
         expect(failure.value).toBeInstanceOf(TaggedInvalidRequest);
       }
     }

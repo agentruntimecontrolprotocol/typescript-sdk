@@ -99,26 +99,19 @@ export interface ARCPClientServiceShape {
 // `ARCPClient | null`). Without the explicit annotation Effect.Service infers
 // `client: null` and `ARCPClientService.make({ client })` rejects a non-null
 // client.
+const UNBOUND_MESSAGE =
+  "ARCPClientService is not bound; use ARCPClientLayer or makeARCPClientRuntime";
+
+const unboundError = (): TaggedTransportError =>
+  new TaggedTransportError({
+    cause: new Error(UNBOUND_MESSAGE),
+    kind: "send",
+  });
+
 const UNBOUND: ARCPClientServiceShape = {
   client: null,
-  submit: () =>
-    Effect.fail(
-      new TaggedTransportError({
-        cause: new Error(
-          "ARCPClientService is not bound; use ARCPClientLayer or makeARCPClientRuntime",
-        ),
-        kind: "send",
-      }),
-    ),
-  cancel: () =>
-    Effect.fail(
-      new TaggedTransportError({
-        cause: new Error(
-          "ARCPClientService is not bound; use ARCPClientLayer or makeARCPClientRuntime",
-        ),
-        kind: "send",
-      }),
-    ),
+  submit: () => Effect.fail(unboundError()),
+  cancel: () => Effect.fail(unboundError()),
   close: Effect.void,
 };
 

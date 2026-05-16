@@ -6,7 +6,7 @@ import type {
   JobResultPayload,
   JobStateName,
 } from "@arcp/core/messages";
-import { Cause, Effect, Exit, Fiber } from "effect";
+import { Cause, Effect, Exit, Fiber, Option } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -135,7 +135,8 @@ describe("JobService (Effect)", () => {
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const failure = Cause.failureOption(exit.cause);
-      if (failure._tag === "Some") {
+      expect(Option.isSome(failure)).toBe(true);
+      if (Option.isSome(failure)) {
         expect(failure.value).toBeInstanceOf(TaggedInvalidRequest);
       }
     }
@@ -238,8 +239,8 @@ describe("watchdogEffect (Effect)", () => {
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const failure = Cause.failureOption(exit.cause);
-      expect(failure._tag).toBe("Some");
-      if (failure._tag === "Some") {
+      expect(Option.isSome(failure)).toBe(true);
+      if (Option.isSome(failure)) {
         expect(failure.value).toBeInstanceOf(TaggedHeartbeatLost);
       }
     }

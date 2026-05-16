@@ -4,7 +4,7 @@ import {
   silentLogger,
   type TransportEffect,
 } from "@arcp/core";
-import { Effect, Fiber, Stream } from "effect";
+import { Effect, Fiber, Option, Stream } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
 import { AgentRegistryService } from "../src/agent-registry.js";
@@ -197,14 +197,8 @@ async function collectFirstFrame(
   );
   const result = await Effect.runPromise(program);
   // `runHead` resolves to an Option; an empty stream is a test failure.
-  const opt = result as { _tag: "Some" | "None"; value?: Record<string, unknown> };
-  if (opt._tag === "None") {
+  if (Option.isNone(result)) {
     throw new Error(`stream ended without a "${type}" frame`);
   }
-  // value is guaranteed defined when _tag is Some — narrow defensively.
-  const frame = opt.value;
-  if (frame === undefined) {
-    throw new Error(`stream resolved Some without a frame value`);
-  }
-  return frame;
+  return result.value;
 }

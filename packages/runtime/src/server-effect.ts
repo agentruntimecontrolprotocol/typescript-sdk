@@ -144,25 +144,21 @@ function eventLogServiceLayer(
   return opts.eventLogLayer ?? unconfiguredEventLogLayer();
 }
 
+const UNCONFIGURED_EVENT_LOG = "EventLogService not provided to ARCPRuntimeLayer";
+
 function unconfiguredEventLogLayer(): Layer.Layer<EventLogService> {
   // The default-provided ops on `EventLogService` already fail-fast on every
   // method. We re-wrap them as an explicit layer here so the runtime layer
   // composition has a concrete `Layer<EventLogService>` to merge.
   const unconfigured: EventLogEffect = {
-    append: () => Effect.die("EventLogService not provided to ARCPRuntimeLayer"),
-    appendBatch: () =>
-      Effect.die("EventLogService not provided to ARCPRuntimeLayer"),
-    replay: () => {
-      throw new Error("EventLogService not provided to ARCPRuntimeLayer");
-    },
-    readSince: () =>
-      Effect.die("EventLogService not provided to ARCPRuntimeLayer"),
-    readSinceSeq: () =>
-      Effect.die("EventLogService not provided to ARCPRuntimeLayer"),
-    count: () => Effect.die("EventLogService not provided to ARCPRuntimeLayer"),
-    getById: () =>
-      Effect.die("EventLogService not provided to ARCPRuntimeLayer"),
-    query: () => Effect.die("EventLogService not provided to ARCPRuntimeLayer"),
+    append: () => Effect.die(UNCONFIGURED_EVENT_LOG),
+    appendBatch: () => Effect.die(UNCONFIGURED_EVENT_LOG),
+    replay: () => Stream.fail(UNCONFIGURED_EVENT_LOG).pipe(Stream.orDie),
+    readSince: () => Effect.die(UNCONFIGURED_EVENT_LOG),
+    readSinceSeq: () => Effect.die(UNCONFIGURED_EVENT_LOG),
+    count: () => Effect.die(UNCONFIGURED_EVENT_LOG),
+    getById: () => Effect.die(UNCONFIGURED_EVENT_LOG),
+    query: () => Effect.die(UNCONFIGURED_EVENT_LOG),
   };
   return Layer.succeed(EventLogService, EventLogService.make(unconfigured));
 }
