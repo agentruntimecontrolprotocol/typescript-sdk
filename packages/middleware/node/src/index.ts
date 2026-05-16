@@ -1,3 +1,43 @@
+// Implementation note (Effect migration, issue #48):
+// `@arcp/node` is a thin adapter (~30 lines of upgrade-handler glue) that
+// hands each accepted WebSocket to a user-supplied `onTransport` callback as
+// a legacy `WebSocketTransport`. The runtime contract — handshake, dispatch
+// loop, back-pressure — lives entirely inside `ARCPServer.accept` and the
+// transport class; this package never owns it. There is no concurrent
+// resource graph, no error pipeline, and no scoped lifecycle that benefits
+// from a dedicated `Effect`/`Layer` twin here. Adding one would force a
+// runtime `effect` dependency on a package whose entire job is a single
+// `server.on('upgrade', ...)` registration.
+//
+// Effect-graph consumers should keep using `attachArcpUpgrade` and dispatch
+// the legacy transport into their `ManagedRuntime` from `onTransport`:
+//
+//   import { ManagedRuntime } from "effect"
+//   import {
+//     ARCPRuntimeLayer,
+//     ARCPServerService,
+//   } from "@arcp/runtime"
+//   import { attachArcpUpgrade } from "@arcp/node"
+//
+//   const runtime = ManagedRuntime.make(ARCPRuntimeLayer({ ... }))
+//   attachArcpUpgrade(httpServer, {
+//     path: "/arcp",
+//     onTransport: (transport) =>
+//       runtime.runFork(
+//         Effect.gen(function* () {
+//           const { server } = yield* ARCPServerService
+//           server?.accept(transport)
+//         }),
+//       ),
+//   })
+//
+// `acceptSessionEffect` (from `@arcp/runtime`) is the right call-site when
+// the consumer is driving sessions from an already-Effect-shape transport
+// (e.g. `websocketTransportEffect` over their own socket); it is NOT a
+// better fit for this adapter's `ws`-server-owned socket — that socket is
+// already inside the legacy `WebSocketTransport` by the time `onTransport`
+// fires.
+
 import type { Server as HttpServer, IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 

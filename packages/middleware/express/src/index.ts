@@ -1,3 +1,13 @@
+// Implementation note (Effect migration, issue #48):
+// `@arcp/express` is a re-export of `attachArcpUpgrade` from `@arcp/node`
+// wrapped with a tiny Host-header guard middleware. The upgrade event is
+// emitted by Node's `http.Server` before Express's request pipeline runs, so
+// nothing here owns runtime state. Effect-graph consumers should keep using
+// `attachArcpToExpress`; see the Effect-integration note in
+// `@arcp/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
+// Adding a dedicated `effect` twin here would only re-wrap the Node helper
+// it already delegates to.
+
 import type { Server as HttpServer } from "node:http";
 
 import {

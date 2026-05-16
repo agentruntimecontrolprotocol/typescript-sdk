@@ -1,3 +1,12 @@
+// Implementation note (Effect migration, issue #48):
+// `@arcp/hono` re-exports `attachArcpUpgrade` from `@arcp/node` against the
+// `http.Server` returned by `@hono/node-server`'s `serve()` — Hono itself is
+// not consulted for the upgrade event. There is no runtime state, no scoped
+// lifecycle, and no concurrent resource graph that an `Effect`/`Layer` twin
+// would help compose. Effect-graph consumers should keep using
+// `attachArcpToHono`; see the Effect-integration note in
+// `@arcp/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
+
 import type { Server as HttpServer } from "node:http";
 
 import {

@@ -1,3 +1,12 @@
+// Implementation note (Effect migration, issue #48):
+// `@arcp/fastify` is a single-line delegation to `attachArcpUpgrade` from
+// `@arcp/node` against `app.server` — Fastify's own request pipeline is not
+// consulted for the upgrade event. There is no runtime state, no scoped
+// lifecycle, and no concurrent resource graph that an `Effect`/`Layer` twin
+// would help compose. Effect-graph consumers should keep using
+// `attachArcpToFastify`; see the Effect-integration note in
+// `@arcp/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
+
 import {
   type ArcpUpgradeHandle,
   type AttachArcpUpgradeOptions,

@@ -1,3 +1,45 @@
+// Implementation note (Effect migration, issue #48):
+// `@arcp/bun` is a single-file `Bun.serve({ websocket })` adapter that
+// terminates ARCP connections on Bun's native WS server (no `ws` dep) and
+// hands each accepted socket to `onTransport` as a `BunWebSocketTransport`.
+// All runtime state — handshake, dispatch loop, back-pressure, resume — is
+// owned by `ARCPServer.accept`; this package never holds it. The Bun socket
+// is only available inside the `websocket.open` callback and is consumed by
+// `BunWebSocketTransport` immediately, leaving no socket-level seam for an
+// Effect-shape `TransportEffect` factory to slot into without rewriting the
+// per-socket state machine. Adding a dedicated `effect` twin here would
+// duplicate the legacy adapter and force a runtime `effect` dependency on
+// the Bun package.
+//
+// Effect-graph consumers should keep using `serveArcp` and dispatch the
+// legacy transport into their `ManagedRuntime` from `onTransport`:
+//
+//   import { Effect, ManagedRuntime } from "effect"
+//   import {
+//     ARCPRuntimeLayer,
+//     ARCPServerService,
+//   } from "@arcp/runtime"
+//   import { serveArcp } from "@arcp/bun"
+//
+//   const runtime = ManagedRuntime.make(ARCPRuntimeLayer({ ... }))
+//   const handle = serveArcp({
+//     port: 7777,
+//     onTransport: (transport) =>
+//       runtime.runFork(
+//         Effect.gen(function* () {
+//           const { server } = yield* ARCPServerService
+//           server?.accept(transport)
+//         }),
+//       ),
+//   })
+//
+// `acceptSessionEffect` (from `@arcp/runtime`) remains the right call-site
+// when the consumer is driving sessions from an already-Effect-shape
+// transport (e.g. their own `TransportEffect` over a stdio pipe); it is not
+// a better fit for the Bun adapter's `ServerWebSocket`-owned socket — that
+// socket is already inside `BunWebSocketTransport` by the time `onTransport`
+// fires.
+
 import { BunWebSocketTransport } from "./transport.js";
 import type { ArcpServeHandle, BunServeArcpOptions } from "./types.js";
 
