@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { monotonicFactory } from "ulid";
 
 import type { JobId, MessageId, SessionId } from "../brands.js";
@@ -34,3 +35,34 @@ export function newMessageId(): MessageId {
 export function nowTimestamp(): string {
   return new Date().toISOString();
 }
+
+/**
+ * Effect-native id generator. Wraps `monotonicFactory()` from `ulid` in a
+ * service so downstream Effect code can depend on `IdGen` and swap in a
+ * deterministic generator under test via `IdGen.Default` replacement.
+ *
+ * The service exposes:
+ *   - `next: Effect<string>` — mint a bare ULID.
+ *   - `prefixed(prefix): Effect<string>` — mint `${prefix}_<ulid>`.
+ *
+ * The factory is constructed once per `Layer` instantiation (see
+ * `IdGen.Default`), preserving monotonicity within a single layer scope.
+ *
+ * @example
+ * ```ts
+ * const program = Effect.gen(function* () {
+ *   const id = yield* (yield* IdGen).next
+ *   return id
+ * }).pipe(Effect.provide(IdGen.Default))
+ * ```
+ */
+export class IdGen extends Effect.Service<IdGen>()("arcp/IdGen", {
+  effect: Effect.sync(() => {
+    const mint = monotonicFactory();
+    return {
+      next: Effect.sync(() => mint()),
+      prefixed: (prefix: string): Effect.Effect<string> =>
+        Effect.sync(() => `${prefix}_${mint()}`),
+    } as const;
+  }),
+}) {}
