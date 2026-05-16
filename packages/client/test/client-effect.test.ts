@@ -24,13 +24,13 @@ import {
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { ARCPClient } from "../src/client.js";
 import {
   ARCPClientLayer,
   ARCPClientService,
   makeARCPClientRuntime,
   subscribeEnvelopes,
 } from "../src/client-effect.js";
+import { ARCPClient } from "../src/client.js";
 import type { ARCPClientOptions } from "../src/types.js";
 
 const TEST_CLIENT: ARCPClientOptions = {
@@ -47,7 +47,7 @@ const TEST_CLIENT: ARCPClientOptions = {
  */
 function assertBound(
   client: ARCPClient | null,
-): Effect.Effect<ARCPClient, never> {
+): Effect.Effect<ARCPClient> {
   return client === null
     ? Effect.die("ARCPClientService is unbound in test")
     : Effect.succeed(client);
@@ -197,7 +197,7 @@ describe("ARCPClientLayer + ARCPClientService", () => {
         );
 
         const collected = yield* collectFiber;
-        return Array.from(collected).map((env) => {
+        return [...collected].map((env) => {
           const ep = env.payload as { kind?: string };
           return ep.kind;
         });
@@ -284,7 +284,7 @@ describe("subscribeEnvelopes fan-out", () => {
 
         const [c1, c2, c3] = yield* Effect.all([f1, f2, f3]);
         return [c1, c2, c3].map((chunk) => {
-          const env = Array.from(chunk)[0];
+          const env = [...chunk][0];
           const ep = env?.payload as { kind?: string } | undefined;
           return ep?.kind;
         });

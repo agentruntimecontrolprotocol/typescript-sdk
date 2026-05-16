@@ -304,7 +304,7 @@ export function subscribeEnvelopes(
     Effect.gen(function* () {
       const { client } = yield* ARCPClientService;
       if (client === null) {
-        return Stream.empty as Stream.Stream<Envelope, never>;
+        return Stream.empty;
       }
       const byType = emitterRegistry(client);
       const emitters = installFanoutHandler(client, type, byType);
