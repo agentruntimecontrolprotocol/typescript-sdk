@@ -1,11 +1,14 @@
+import { Effect, Stream } from "effect";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { TaggedTransportError } from "../errors-tagged.js";
 import { InternalError, InvalidRequestError } from "../errors.js";
 
 import type {
   FrameHandler,
   SendableFrame,
   Transport,
+  TransportEffect,
   WebSocketServerHandle,
   WireFrame,
 } from "./types.js";
@@ -209,4 +212,80 @@ export async function startWebSocketServer(args: {
         });
       }),
   };
+}
+
+/**
+ * Effect-shaped factory for a WebSocket transport. Wraps a raw `ws` socket
+ * (NOT a {@link WebSocketTransport} instance) so the inbound side is a
+ * `Stream<WireFrame, TaggedTransportError>` instead of a callback. The
+ * legacy {@link WebSocketTransport} class is unchanged and is the path
+ * currently used by the runtime / client.
+ *
+ * The socket is expected to be OPEN before this factory is called — see
+ * {@link WebSocketTransport.connect} for the open-handshake helper used on
+ * the client side.
+ */
+export function websocketTransportEffect(socket: WebSocket): TransportEffect {
+  const state = { closed: false };
+  return {
+    incoming: makeIncoming(socket, state),
+    send: (frame) => makeSend(socket, frame),
+    close: Effect.sync(() => {
+      if (state.closed) return;
+      state.closed = true;
+      if (
+        socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING
+      ) {
+        socket.close();
+      }
+    }),
+    isClosed: () => state.closed || socket.readyState === WebSocket.CLOSED,
+  };
+}
+
+function makeIncoming(
+  socket: WebSocket,
+  state: { closed: boolean },
+): Stream.Stream<WireFrame, TaggedTransportError> {
+  return Stream.async<WireFrame, TaggedTransportError>((emit) => {
+    const onMessage = (data: unknown, isBinary: boolean): void => {
+      if (isBinary) return;
+      const frame = parseWireFrame(data);
+      if (frame === null) return;
+      void emit.single(frame);
+    };
+    const onClose = (): void => {
+      state.closed = true;
+      void emit.end();
+    };
+    const onError = (err: Error): void => {
+      state.closed = true;
+      void emit.fail(new TaggedTransportError({ cause: err, kind: "receive" }));
+    };
+    socket.on("message", onMessage);
+    socket.on("close", onClose);
+    socket.on("error", onError);
+    return Effect.sync(() => {
+      socket.off("message", onMessage);
+      socket.off("close", onClose);
+      socket.off("error", onError);
+    });
+  });
+}
+
+function makeSend(
+  socket: WebSocket,
+  frame: SendableFrame,
+): Effect.Effect<void, TaggedTransportError> {
+  return Effect.tryPromise({
+    try: () =>
+      new Promise<void>((resolve, reject) => {
+        socket.send(JSON.stringify(frame), (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      }),
+    catch: (cause) => new TaggedTransportError({ cause, kind: "send" }),
+  });
 }

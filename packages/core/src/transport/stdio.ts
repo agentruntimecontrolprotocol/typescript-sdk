@@ -1,12 +1,16 @@
 import { createInterface, type Interface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 
+import { Effect, Stream } from "effect";
+
+import { TaggedTransportError } from "../errors-tagged.js";
 import { InvalidRequestError } from "../errors.js";
 
 import type {
   FrameHandler,
   SendableFrame,
   Transport,
+  TransportEffect,
   WireFrame,
 } from "./types.js";
 
@@ -129,4 +133,40 @@ export class StdioTransport implements Transport {
       handler(err);
     }
   }
+}
+
+/**
+ * Effect-shaped factory that adapts a {@link StdioTransport} to a
+ * {@link TransportEffect}. The legacy class is unchanged; this wrapper
+ * exposes `incoming` as a {@link Stream.Stream} and returns `Effect`s for
+ * `send` and `close` so Effect-native pipelines can consume stdio frames.
+ */
+export function stdioTransportEffect(
+  transport: StdioTransport,
+): TransportEffect {
+  const incoming = Stream.async<WireFrame, TaggedTransportError>((emit) => {
+    transport.onFrame((frame) => {
+      void emit.single(frame);
+    });
+    transport.onClose((err) => {
+      if (err === undefined) {
+        void emit.end();
+      } else {
+        void emit.fail(
+          new TaggedTransportError({ cause: err, kind: "closed" }),
+        );
+      }
+    });
+  });
+  const send = (frame: SendableFrame): Effect.Effect<void, TaggedTransportError> =>
+    Effect.tryPromise({
+      try: () => transport.send(frame),
+      catch: (cause) => new TaggedTransportError({ cause, kind: "send" }),
+    });
+  return {
+    incoming,
+    send,
+    close: Effect.promise(() => transport.close()),
+    isClosed: () => transport.closed,
+  };
 }

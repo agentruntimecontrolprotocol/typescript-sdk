@@ -68,6 +68,7 @@ export {
   TaggedResumeWindowExpired,
   type TaggedSdkError,
   TaggedTimeout,
+  TaggedTransportError,
   TaggedUnauthenticated,
 } from "./errors-tagged.js";
 export {

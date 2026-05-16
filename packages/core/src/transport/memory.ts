@@ -1,6 +1,15 @@
+import { Effect, Stream } from "effect";
+
+import { TaggedTransportError } from "../errors-tagged.js";
 import { InvalidRequestError } from "../errors.js";
 
-import type { FrameHandler, SendableFrame, Transport } from "./types.js";
+import type {
+  FrameHandler,
+  SendableFrame,
+  Transport,
+  TransportEffect,
+  WireFrame,
+} from "./types.js";
 
 /**
  * Two transports sharing a Promise-coupled queue. Used by tests to drive a
@@ -98,4 +107,56 @@ export function pairMemoryTransports(): [MemoryTransport, MemoryTransport] {
   a.connect(b);
   b.connect(a);
   return [a, b];
+}
+
+/**
+ * Effect-shaped factory that wraps a legacy {@link MemoryTransport} as a
+ * {@link TransportEffect}. The legacy class API is unchanged; this adapter
+ * exposes an `incoming` {@link Stream.Stream} and an `Effect`-returning
+ * `send`/`close` for Effect-native call sites.
+ *
+ * Use {@link pairMemoryTransportsEffect} to get a wired pair. This factory
+ * is exposed standalone for callers that already own a `MemoryTransport`.
+ */
+export function memoryTransportEffect(
+  transport: MemoryTransport,
+): TransportEffect {
+  const incoming = Stream.async<WireFrame, TaggedTransportError>((emit) => {
+    transport.onFrame((frame) => {
+      void emit.single(frame);
+    });
+    transport.onClose((err) => {
+      if (err === undefined) {
+        void emit.end();
+      } else {
+        void emit.fail(
+          new TaggedTransportError({ cause: err, kind: "closed" }),
+        );
+      }
+    });
+  });
+  const send = (frame: SendableFrame): Effect.Effect<void, TaggedTransportError> =>
+    Effect.tryPromise({
+      try: () => transport.send(frame),
+      catch: (cause) => new TaggedTransportError({ cause, kind: "send" }),
+    });
+  return {
+    incoming,
+    send,
+    close: Effect.promise(() => transport.close()),
+    isClosed: () => transport.closed,
+  };
+}
+
+/**
+ * Effect-shaped twin of {@link pairMemoryTransports}. Returns
+ * `[clientSideEffect, serverSideEffect]` — two cross-wired
+ * {@link TransportEffect}s suitable for Effect-native tests.
+ */
+export function pairMemoryTransportsEffect(): readonly [
+  TransportEffect,
+  TransportEffect,
+] {
+  const [a, b] = pairMemoryTransports();
+  return [memoryTransportEffect(a), memoryTransportEffect(b)];
 }

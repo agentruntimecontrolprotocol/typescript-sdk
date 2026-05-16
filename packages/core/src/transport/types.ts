@@ -11,7 +11,10 @@
  * guarantee the protocol relies on.
  */
 
+import type { Effect, Stream } from "effect";
+
 import type { BaseEnvelope } from "../envelope.js";
+import type { TaggedTransportError } from "../errors-tagged.js";
 
 /** Raw message frame: a JSON-encodable object. */
 export type WireFrame = Record<string, unknown>;
@@ -52,6 +55,33 @@ export interface Transport {
 
   /** Whether the transport has been closed. */
   readonly closed: boolean;
+}
+
+/**
+ * Effect-shaped twin of {@link Transport}. Returned by the
+ * `*TransportEffect` factories (`memoryTransportEffect`,
+ * `stdioTransportEffect`, `websocketTransportEffect`).
+ *
+ * The legacy {@link Transport} class API is preserved for downstream
+ * consumers; this interface exists alongside it so Effect-native call sites
+ * can compose `incoming` with the rest of an Effect pipeline without an
+ * intermediary callback.
+ *
+ * `incoming` MUST emit frames in receive order. Backpressure is delegated
+ * to Stream consumers (each `Stream.async` factory uses an unbounded queue
+ * by default, matching the legacy class's buffering behavior).
+ */
+export interface TransportEffect {
+  /** Stream of inbound frames; terminates on peer close. */
+  readonly incoming: Stream.Stream<WireFrame, TaggedTransportError>;
+  /** Send a frame to the peer. Fails with `TaggedTransportError` on I/O error or after close. */
+  readonly send: (
+    frame: SendableFrame,
+  ) => Effect.Effect<void, TaggedTransportError>;
+  /** Close the transport. Idempotent; never fails. */
+  readonly close: Effect.Effect<void>;
+  /** Synchronous closed-state check, mirroring the legacy `closed` getter. */
+  readonly isClosed: () => boolean;
 }
 
 /** Resolved handle returned by `startWebSocketServer`. */
