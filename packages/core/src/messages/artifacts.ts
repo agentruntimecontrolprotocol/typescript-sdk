@@ -1,5 +1,4 @@
 import { Schema } from "effect";
-import { z } from "zod";
 
 // ARCP v1.0 §8.2 — `artifact_ref` event kind body shape only. There is no
 // top-level artifact envelope in v1.0; agents emit a `job.event` with
@@ -26,19 +25,6 @@ export const ArtifactRefSchema = Schema.Struct({
   sha256: Schema.optional(Schema.String),
 });
 export type ArtifactRef = Schema.Schema.Type<typeof ArtifactRefSchema>;
-
-/**
- * Legacy zod twin of `ArtifactRefSchema`. Retained for call-sites that have
- * not yet been migrated to Effect `Schema` (notably the
- * `RESERVED_EVENT_SCHEMAS` discriminated-union map in `events.ts`, which is
- * still a `z.discriminatedUnion`). Slice #36 removes this export.
- */
-export const ArtifactRefZodSchema = z.object({
-  uri: z.string().min(1),
-  content_type: z.string().min(1),
-  byte_size: z.number().int().nonnegative().optional(),
-  sha256: z.string().optional(),
-});
 
 /** No top-level artifact envelopes in v1.0. */
 export const ARTIFACT_ENVELOPES = [] as const;

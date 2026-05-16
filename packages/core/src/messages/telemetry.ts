@@ -1,5 +1,4 @@
 import { Schema } from "effect";
-import { z } from "zod";
 
 // ARCP v1.0 §8.2 — body shapes used by `job.event` payloads for `kind=log`
 // and `kind=metric`. There are no top-level telemetry envelopes in v1.0.
@@ -44,26 +43,5 @@ export const MetricPayloadSchema = Schema.Struct({
   ),
 });
 export type MetricPayload = Schema.Schema.Type<typeof MetricPayloadSchema>;
-
-/**
- * Legacy zod twins of the telemetry schemas. Kept solely so the
- * `RESERVED_EVENT_SCHEMAS` discriminated-union table in `events.ts` can stay
- * on its existing zod machinery until slice #36 migrates the job-event
- * dispatch. Field-for-field identical to the Effect schemas above.
- */
-export const LogLevelZodSchema = z.enum(LOG_LEVELS);
-
-export const LogPayloadZodSchema = z.object({
-  level: LogLevelZodSchema,
-  message: z.string().min(1),
-  attributes: z.record(z.string(), z.unknown()).optional(),
-});
-
-export const MetricPayloadZodSchema = z.object({
-  name: z.string().min(1),
-  value: z.number(),
-  unit: z.string().min(1).optional(),
-  dims: z.record(z.string(), z.string()).optional(),
-});
 
 export const TELEMETRY_ENVELOPES = [] as const;

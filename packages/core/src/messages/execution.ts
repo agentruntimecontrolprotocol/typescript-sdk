@@ -1,13 +1,15 @@
+import { Schema } from "effect";
 import { z } from "zod";
 
 import { messageEnvelope } from "../envelope.js";
 import {
+  ERROR_CODES,
   type ErrorPayload,
   ErrorPayloadSchema,
   InvalidRequestError,
 } from "../errors.js";
 
-import { JobEventPayloadSchema } from "./events.js";
+import { JobEventPayloadZodSchema } from "./events.js";
 import {
   LeaseConstraintsSchema,
   LeaseSchema,
@@ -28,10 +30,12 @@ export {
 export {
   type ArtifactRefBody,
   type DelegateBody,
+  DelegateBodySchema,
   isReservedEventKind,
   isVendorEventKind,
   type JobEventPayload,
   JobEventPayloadSchema,
+  JobEventPayloadZodSchema,
   type LogBody,
   type MetricBody,
   parseJobEventBody,
@@ -43,9 +47,13 @@ export {
   type ResultChunkBody,
   ResultChunkBodySchema,
   type StatusBody,
+  StatusBodySchema,
   type ThoughtBody,
+  ThoughtBodySchema,
   type ToolCallBody,
+  ToolCallBodySchema,
   type ToolResultBody,
+  ToolResultBodySchema,
 } from "./events.js";
 
 // v1.1 §7.5 agent versioning helpers.
@@ -129,27 +137,53 @@ export function parseBudgetAmount(input: string): ParsedBudgetAmount {
 }
 
 // Job submit / accepted (§7.1)
+//
+// Effect-`Schema` payloads define the canonical wire shape. Zod twins
+// (`*ZodSchema`) feed `messageEnvelope()` because the envelope layer is
+// still zod-typed (slice #50). Branded fields stay zod-typed because the
+// brands defined in `brands.ts` mirror `z.BRAND<B>`; an Effect brand would
+// not be assignable to those aliases until the brands themselves migrate.
 
-export const JobSubmitPayloadSchema = z.object({
+export const JobSubmitPayloadSchema = Schema.Struct({
+  agent: Schema.String.pipe(Schema.nonEmptyString()),
+  input: Schema.Unknown,
+  lease_request: Schema.optional(Schema.Unknown),
+  /** v1.1 §9.5 — time bound for the lease. */
+  lease_constraints: Schema.optional(Schema.Unknown),
+  idempotency_key: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
+  max_runtime_sec: Schema.optional(
+    Schema.Number.pipe(Schema.int(), Schema.positive()),
+  ),
+});
+
+export const JobSubmitPayloadZodSchema = z.object({
   agent: z.string().min(1),
   input: z.unknown(),
   lease_request: LeaseSchema.optional(),
-  /** v1.1 §9.5 — time bound for the lease. */
   lease_constraints: LeaseConstraintsSchema.optional(),
   idempotency_key: z.string().min(1).optional(),
   max_runtime_sec: z.number().int().positive().optional(),
 });
-export type JobSubmitPayload = z.infer<typeof JobSubmitPayloadSchema>;
+export type JobSubmitPayload = z.infer<typeof JobSubmitPayloadZodSchema>;
 
 /**
  * Initial per-currency budget counters echoed in `job.accepted` when the
  * lease includes `cost.budget`. Keys are currency identifiers (e.g., `USD`);
  * values are positive decimals (§9.6).
  */
-export const JobBudgetSchema = z.record(z.string().min(1), z.number());
-export type JobBudget = z.infer<typeof JobBudgetSchema>;
+// Note: Effect's `Schema.Record` silently drops keys that fail the key
+// schema (so `{ "": 1 }` decodes to `{}`), whereas the zod twin rejects
+// outright via `.min(1)` on the key. The wire-level rejection is preserved
+// by the zod twin in `messageEnvelope()`; the Effect schema is the typed
+// surface for in-process consumers, which do not produce empty-key records.
+export const JobBudgetSchema = Schema.Record({
+  key: Schema.String.pipe(Schema.nonEmptyString()),
+  value: Schema.Number,
+});
+export const JobBudgetZodSchema = z.record(z.string().min(1), z.number());
+export type JobBudget = z.infer<typeof JobBudgetZodSchema>;
 
-export const JobAcceptedPayloadSchema = z.object({
+export const JobAcceptedPayloadZodSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),
   /** Resolved `name@version` when v1.1 agent_versions is in use; bare name otherwise. */
   agent: z.string().min(1).optional(),
@@ -157,20 +191,23 @@ export const JobAcceptedPayloadSchema = z.object({
   /** v1.1 §9.5 — echoed lease constraints. */
   lease_constraints: LeaseConstraintsSchema.optional(),
   /** v1.1 §9.6 — initial budget counters, when `cost.budget` is in the lease. */
-  budget: JobBudgetSchema.optional(),
+  budget: JobBudgetZodSchema.optional(),
   accepted_at: z.string().min(1),
   parent_job_id: z.string().brand<"JobId">().optional(),
   delegate_id: z.string().optional(),
   trace_id: z.string().brand<"TraceId">().optional(),
 });
-export type JobAcceptedPayload = z.infer<typeof JobAcceptedPayloadSchema>;
+export type JobAcceptedPayload = z.infer<typeof JobAcceptedPayloadZodSchema>;
 
 // Job cancel (§7.4)
 
-export const JobCancelPayloadSchema = z.object({
+export const JobCancelPayloadSchema = Schema.Struct({
+  reason: Schema.optional(Schema.String),
+});
+export const JobCancelPayloadZodSchema = z.object({
   reason: z.string().optional(),
 });
-export type JobCancelPayload = z.infer<typeof JobCancelPayloadSchema>;
+export type JobCancelPayload = z.infer<typeof JobCancelPayloadZodSchema>;
 
 // Job lifecycle states (§7.3)
 
@@ -182,8 +219,9 @@ export const JOB_STATES = [
   "cancelled",
   "timed_out",
 ] as const;
-export const JobStateSchema = z.enum(JOB_STATES);
-export type JobStateName = z.infer<typeof JobStateSchema>;
+export const JobStateSchema = Schema.Literal(...JOB_STATES);
+export const JobStateZodSchema = z.enum(JOB_STATES);
+export type JobStateName = Schema.Schema.Type<typeof JobStateSchema>;
 
 export const TERMINAL_JOB_STATES = [
   "success",
@@ -201,28 +239,51 @@ export type TerminalJobState = (typeof TERMINAL_JOB_STATES)[number];
  * `result_id`/`result_size` when the result was streamed via
  * `result_chunk` events. The two modes MUST NOT mix in the same job.
  */
-export const JobResultPayloadSchema = z.object({
+export const JobResultPayloadSchema = Schema.Struct({
+  final_status: Schema.Literal("success"),
+  summary: Schema.optional(Schema.String),
+  result: Schema.optional(Schema.Unknown),
+  /** v1.1 §8.4 — references the assembled streamed result. */
+  result_id: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
+  /** v1.1 §8.4 — byte length of the streamed result. */
+  result_size: Schema.optional(
+    Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  ),
+});
+export const JobResultPayloadZodSchema = z.object({
   final_status: z.literal("success"),
   summary: z.string().optional(),
   result: z.unknown().optional(),
-  /** v1.1 §8.4 — references the assembled streamed result. */
   result_id: z.string().min(1).optional(),
-  /** v1.1 §8.4 — byte length of the streamed result. */
   result_size: z.number().int().nonnegative().optional(),
 });
-export type JobResultPayload = z.infer<typeof JobResultPayloadSchema>;
+export type JobResultPayload = z.infer<typeof JobResultPayloadZodSchema>;
 
+export const JobErrorFinalStatusSchema = Schema.Literal(
+  "error",
+  "cancelled",
+  "timed_out",
+);
 export const JobErrorFinalStatus = z.enum(["error", "cancelled", "timed_out"]);
 export type JobErrorFinalStatus = z.infer<typeof JobErrorFinalStatus>;
 
-export const JobErrorPayloadSchema = z.object({
+export const JobErrorPayloadSchema = Schema.Struct({
+  final_status: JobErrorFinalStatusSchema,
+  code: Schema.Literal(...ERROR_CODES),
+  message: Schema.String.pipe(Schema.nonEmptyString()),
+  retryable: Schema.optional(Schema.Boolean),
+  details: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  ),
+});
+export const JobErrorPayloadZodSchema = z.object({
   final_status: JobErrorFinalStatus,
   code: ErrorPayloadSchema.shape.code,
   message: ErrorPayloadSchema.shape.message,
   retryable: ErrorPayloadSchema.shape.retryable,
   details: ErrorPayloadSchema.shape.details,
 });
-export type JobErrorPayload = z.infer<typeof JobErrorPayloadSchema>;
+export type JobErrorPayload = z.infer<typeof JobErrorPayloadZodSchema>;
 
 /** Convenience: extract the error portion of a {@link JobErrorPayload}. */
 export function jobErrorToErrorPayload(p: JobErrorPayload): ErrorPayload {
@@ -234,16 +295,16 @@ export function jobErrorToErrorPayload(p: JobErrorPayload): ErrorPayload {
   };
 }
 
-// Envelopes
+// Envelopes — built with `messageEnvelope()` (zod-typed; slice #50).
 
 export const JobSubmitEnvelopeSchema = messageEnvelope(
   "job.submit",
-  JobSubmitPayloadSchema,
+  JobSubmitPayloadZodSchema,
 ).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const JobAcceptedEnvelopeSchema = messageEnvelope(
   "job.accepted",
-  JobAcceptedPayloadSchema,
+  JobAcceptedPayloadZodSchema,
 ).extend({
   session_id: z.string().min(1).brand<"SessionId">(),
   job_id: z.string().min(1).brand<"JobId">(),
@@ -251,7 +312,7 @@ export const JobAcceptedEnvelopeSchema = messageEnvelope(
 
 export const JobCancelEnvelopeSchema = messageEnvelope(
   "job.cancel",
-  JobCancelPayloadSchema,
+  JobCancelPayloadZodSchema,
 ).extend({
   session_id: z.string().min(1).brand<"SessionId">(),
   job_id: z.string().min(1).brand<"JobId">(),
@@ -259,7 +320,7 @@ export const JobCancelEnvelopeSchema = messageEnvelope(
 
 export const JobEventEnvelopeSchema = messageEnvelope(
   "job.event",
-  JobEventPayloadSchema,
+  JobEventPayloadZodSchema,
 ).extend({
   session_id: z.string().min(1).brand<"SessionId">(),
   job_id: z.string().min(1).brand<"JobId">(),
@@ -268,7 +329,7 @@ export const JobEventEnvelopeSchema = messageEnvelope(
 
 export const JobResultEnvelopeSchema = messageEnvelope(
   "job.result",
-  JobResultPayloadSchema,
+  JobResultPayloadZodSchema,
 ).extend({
   session_id: z.string().min(1).brand<"SessionId">(),
   job_id: z.string().min(1).brand<"JobId">(),
@@ -277,7 +338,7 @@ export const JobResultEnvelopeSchema = messageEnvelope(
 
 export const JobErrorEnvelopeSchema = messageEnvelope(
   "job.error",
-  JobErrorPayloadSchema,
+  JobErrorPayloadZodSchema,
 ).extend({
   session_id: z.string().min(1).brand<"SessionId">(),
   job_id: z.string().min(1).brand<"JobId">(),
@@ -286,40 +347,47 @@ export const JobErrorEnvelopeSchema = messageEnvelope(
 
 // v1.1 §7.6 subscribe / subscribed / unsubscribe envelopes.
 
-export const JobSubscribePayloadSchema = z.object({
+export const JobSubscribePayloadZodSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),
   from_event_seq: z.number().int().nonnegative().brand<"EventSeq">().optional(),
   history: z.boolean().optional(),
 });
-export type JobSubscribePayload = z.infer<typeof JobSubscribePayloadSchema>;
+export type JobSubscribePayload = z.infer<typeof JobSubscribePayloadZodSchema>;
 
-export const JobSubscribedPayloadSchema = z.object({
+export const JobSubscribedPayloadZodSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),
-  current_status: JobStateSchema,
+  current_status: JobStateZodSchema,
   agent: z.string().min(1),
   lease: LeaseSchema,
   lease_constraints: LeaseConstraintsSchema.optional(),
-  budget: JobBudgetSchema.optional(),
+  budget: JobBudgetZodSchema.optional(),
   parent_job_id: z.string().brand<"JobId">().nullable().optional(),
   trace_id: z.string().brand<"TraceId">().optional(),
   subscribed_from: z.number().int().nonnegative().brand<"EventSeq">(),
   replayed: z.boolean(),
 });
-export type JobSubscribedPayload = z.infer<typeof JobSubscribedPayloadSchema>;
+export type JobSubscribedPayload = z.infer<
+  typeof JobSubscribedPayloadZodSchema
+>;
 
-export const JobUnsubscribePayloadSchema = z.object({
+export const JobUnsubscribePayloadSchema = Schema.Struct({
+  job_id: Schema.String.pipe(Schema.nonEmptyString()),
+});
+export const JobUnsubscribePayloadZodSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),
 });
-export type JobUnsubscribePayload = z.infer<typeof JobUnsubscribePayloadSchema>;
+export type JobUnsubscribePayload = z.infer<
+  typeof JobUnsubscribePayloadZodSchema
+>;
 
 export const JobSubscribeEnvelopeSchema = messageEnvelope(
   "job.subscribe",
-  JobSubscribePayloadSchema,
+  JobSubscribePayloadZodSchema,
 ).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const JobSubscribedEnvelopeSchema = messageEnvelope(
   "job.subscribed",
-  JobSubscribedPayloadSchema,
+  JobSubscribedPayloadZodSchema,
 ).extend({
   session_id: z.string().min(1).brand<"SessionId">(),
   job_id: z.string().min(1).brand<"JobId">(),
@@ -327,7 +395,7 @@ export const JobSubscribedEnvelopeSchema = messageEnvelope(
 
 export const JobUnsubscribeEnvelopeSchema = messageEnvelope(
   "job.unsubscribe",
-  JobUnsubscribePayloadSchema,
+  JobUnsubscribePayloadZodSchema,
 ).extend({ session_id: z.string().min(1).brand<"SessionId">() });
 
 export const EXECUTION_ENVELOPES = [

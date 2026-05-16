@@ -1,17 +1,19 @@
+import { Schema } from "effect";
 import { z } from "zod";
 
-import { ErrorPayloadSchema } from "../errors.js";
+import { ERROR_CODES } from "../errors.js";
 
+import { ArtifactRefSchema } from "./artifacts.js";
 import { LeaseConstraintsSchema, LeaseSchema } from "./lease-schema.js";
-// telemetry.ts now exports Effect `Schema` for `LogPayloadSchema` /
-// `MetricPayloadSchema`. `RESERVED_EVENT_SCHEMAS` below is still a
-// `z.discriminatedUnion`-style map keyed by `z.ZodTypeAny`, so we consume
-// the legacy zod twins here until slice #36 migrates the event-body
-// dispatch to Effect.
-import {
-  LogPayloadZodSchema,
-  MetricPayloadZodSchema,
-} from "./telemetry.js";
+import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
+import { fromZod } from "./zod-adapter.js";
+
+// ARCP v1.0 §8 + v1.1 §8.2/§8.4 — `job.event` body schemas.
+//
+// This module owns the per-kind body schemas and the `parseJobEventBody`
+// dispatch over the reserved-kind set. Bodies for `log`, `metric`, and
+// `artifact_ref` are imported from their owning modules (slice #35 migrated
+// them); the remaining bodies are defined here as native Effect `Schema`.
 
 export const RESERVED_EVENT_KINDS = [
   "log",
@@ -22,7 +24,7 @@ export const RESERVED_EVENT_KINDS = [
   "metric",
   "artifact_ref",
   "delegate",
-  // v1.1 §8.2
+  // v1.1 §8.2.1 / §8.4
   "progress",
   "result_chunk",
 ] as const;
@@ -36,55 +38,77 @@ export function isVendorEventKind(value: string): boolean {
   return /^x-vendor\.[a-z0-9_.-]+$/.test(value);
 }
 
-const ThoughtBodySchema = z.object({
-  text: z.string(),
+// Internal Effect mirror of `ErrorPayloadSchema` (zod, in `errors.ts`).
+// Used by the `tool_result` body where the optional `error` field carries
+// a §12 error payload. Field-for-field equivalent.
+const ErrorPayloadEffectSchema = Schema.Struct({
+  code: Schema.Literal(...ERROR_CODES),
+  message: Schema.String.pipe(Schema.nonEmptyString()),
+  retryable: Schema.optional(Schema.Boolean),
+  details: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  ),
 });
 
-const ToolCallBodySchema = z.object({
-  tool: z.string().min(1),
-  args: z.record(z.string(), z.unknown()).optional(),
-  call_id: z.string().min(1),
+/** §8.2 `thought` event-kind body. */
+export const ThoughtBodySchema = Schema.Struct({
+  text: Schema.String,
 });
+export type ThoughtBody = Schema.Schema.Type<typeof ThoughtBodySchema>;
 
-const ToolResultBodySchema = z
-  .object({
-    call_id: z.string().min(1),
-    result: z.unknown().optional(),
-    error: ErrorPayloadSchema.optional(),
-  })
-  .superRefine((b, ctx) => {
-    if (b.result === undefined && b.error === undefined) {
-      // empty result for void tools is allowed
-      return;
-    }
-    if (b.result !== undefined && b.error !== undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "tool_result body must not carry both `result` and `error`",
-      });
-    }
-  });
-
-const StatusBodySchema = z.object({
-  phase: z.string().min(1),
-  message: z.string().optional(),
+/** §8.2 `tool_call` event-kind body. */
+export const ToolCallBodySchema = Schema.Struct({
+  tool: Schema.String.pipe(Schema.nonEmptyString()),
+  args: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  ),
+  call_id: Schema.String.pipe(Schema.nonEmptyString()),
 });
+export type ToolCallBody = Schema.Schema.Type<typeof ToolCallBodySchema>;
 
-const ArtifactRefBodySchema = z.object({
-  uri: z.string().min(1),
-  content_type: z.string().min(1),
-  byte_size: z.number().int().nonnegative().optional(),
-  sha256: z.string().optional(),
+/**
+ * §8.2 `tool_result` event-kind body.
+ *
+ * Carries either `result` (success) or `error` (failure) but not both. An
+ * empty body (neither field) is allowed for void tools. The mutual exclusion
+ * is enforced via `Schema.filter` (zod parity: `superRefine`).
+ */
+export const ToolResultBodySchema = Schema.Struct({
+  call_id: Schema.String.pipe(Schema.nonEmptyString()),
+  result: Schema.optional(Schema.Unknown),
+  error: Schema.optional(ErrorPayloadEffectSchema),
+}).pipe(
+  Schema.filter((b) =>
+    b.result !== undefined && b.error !== undefined
+      ? "tool_result body must not carry both `result` and `error`"
+      : undefined,
+  ),
+);
+export type ToolResultBody = Schema.Schema.Type<typeof ToolResultBodySchema>;
+
+/** §8.2 `status` event-kind body. */
+export const StatusBodySchema = Schema.Struct({
+  phase: Schema.String.pipe(Schema.nonEmptyString()),
+  message: Schema.optional(Schema.String),
 });
+export type StatusBody = Schema.Schema.Type<typeof StatusBodySchema>;
 
-const DelegateBodySchema = z.object({
-  delegate_id: z.string().min(1),
-  agent: z.string().min(1),
-  input: z.unknown(),
-  lease_request: LeaseSchema.optional(),
+// `lease_request` / `lease_constraints` still live as zod (slice-boundary;
+// `lease-schema.ts` migration is its own future slice). Bridge through
+// `fromZod` so the surrounding Effect `Schema.Struct` can compose them.
+const LeaseEffectSchema = fromZod(LeaseSchema);
+const LeaseConstraintsEffectSchema = fromZod(LeaseConstraintsSchema);
+
+/** §8.2 `delegate` event-kind body. */
+export const DelegateBodySchema = Schema.Struct({
+  delegate_id: Schema.String.pipe(Schema.nonEmptyString()),
+  agent: Schema.String.pipe(Schema.nonEmptyString()),
+  input: Schema.Unknown,
+  lease_request: Schema.optional(LeaseEffectSchema),
   /** v1.1 §9.4/§9.5 — child lease bound; MUST NOT exceed parent's. */
-  lease_constraints: LeaseConstraintsSchema.optional(),
+  lease_constraints: Schema.optional(LeaseConstraintsEffectSchema),
 });
+export type DelegateBody = Schema.Schema.Type<typeof DelegateBodySchema>;
 
 /**
  * v1.1 §8.2.1 `progress` body.
@@ -92,48 +116,66 @@ const DelegateBodySchema = z.object({
  * `current` MUST be non-negative; `total` (if present) is the upper bound.
  * Advisory; the protocol does not act on progress events.
  */
-export const ProgressBodySchema = z.object({
-  current: z.number().nonnegative(),
-  total: z.number().nonnegative().optional(),
-  units: z.string().min(1).optional(),
-  message: z.string().optional(),
+export const ProgressBodySchema = Schema.Struct({
+  current: Schema.Number.pipe(Schema.nonNegative()),
+  total: Schema.optional(Schema.Number.pipe(Schema.nonNegative())),
+  units: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
+  message: Schema.optional(Schema.String),
 });
-export type ProgressBody = z.infer<typeof ProgressBodySchema>;
+export type ProgressBody = Schema.Schema.Type<typeof ProgressBodySchema>;
 
 /**
  * v1.1 §8.4 `result_chunk` body. Chunks for one `result_id` are emitted in
  * order; `more: false` marks the final chunk. The terminating `job.result`
  * MUST carry `result_id`.
  */
-export const ResultChunkBodySchema = z.object({
-  result_id: z.string().min(1),
-  chunk_seq: z.number().int().nonnegative(),
-  data: z.string(),
-  encoding: z.enum(["utf8", "base64"]),
-  more: z.boolean(),
+export const ResultChunkBodySchema = Schema.Struct({
+  result_id: Schema.String.pipe(Schema.nonEmptyString()),
+  chunk_seq: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  data: Schema.String,
+  encoding: Schema.Literal("utf8", "base64"),
+  more: Schema.Boolean,
 });
-export type ResultChunkBody = z.infer<typeof ResultChunkBodySchema>;
+export type ResultChunkBody = Schema.Schema.Type<typeof ResultChunkBodySchema>;
+
+// Re-exported body type aliases for the telemetry + artifact bodies, so
+// `messages/types.ts` keeps a single import path for the body type surface.
+export type LogBody = Schema.Schema.Type<typeof LogPayloadSchema>;
+export type MetricBody = Schema.Schema.Type<typeof MetricPayloadSchema>;
+export type ArtifactRefBody = Schema.Schema.Type<typeof ArtifactRefSchema>;
 
 /**
- * Job event payload shape. `kind` is one of the eight reserved values OR a
- * vendor-prefixed string. `body` is validated when the kind matches a
- * reserved schema; vendor and unknown kinds get a permissive object body.
+ * Job event payload shape (top-level `payload` for `job.event` envelopes).
+ *
+ * `kind` is one of the eight v1.0 reserved values, one of the two v1.1
+ * additions, OR a vendor-prefixed string. `body` is `unknown` at the
+ * envelope layer; reserved kinds are validated against their specific
+ * schemas via {@link parseJobEventBody}; vendor (`x-vendor.*`) and unknown
+ * kinds pass through unchanged (caller MUST treat them as opaque per §15).
  */
-export const JobEventPayloadSchema = z.object({
+export const JobEventPayloadSchema = Schema.Struct({
+  kind: Schema.String.pipe(Schema.nonEmptyString()),
+  ts: Schema.String.pipe(Schema.nonEmptyString()),
+  body: Schema.Unknown,
+});
+
+/**
+ * Zod twin of {@link JobEventPayloadSchema}.
+ *
+ * `messageEnvelope()` in `envelope.ts` is still zod-typed (slice #50). Until
+ * the envelope layer migrates, the envelope wrapper for `job.event` consumes
+ * this zod twin. Shape parity with `JobEventPayloadSchema` is verified by
+ * the test suite. `JobEventPayload` is the zod-inferred type so wire-shape
+ * consumers (e.g. `client-dispatch.ts`) keep their existing TS contract —
+ * notably `body` is an optional property because zod's `z.unknown()` infers
+ * as `body?: unknown`.
+ */
+export const JobEventPayloadZodSchema = z.object({
   kind: z.string().min(1),
   ts: z.string().min(1),
   body: z.unknown(),
 });
-export type JobEventPayload = z.infer<typeof JobEventPayloadSchema>;
-
-export type LogBody = z.infer<typeof LogPayloadZodSchema>;
-export type ThoughtBody = z.infer<typeof ThoughtBodySchema>;
-export type ToolCallBody = z.infer<typeof ToolCallBodySchema>;
-export type ToolResultBody = z.infer<typeof ToolResultBodySchema>;
-export type StatusBody = z.infer<typeof StatusBodySchema>;
-export type MetricBody = z.infer<typeof MetricPayloadZodSchema>;
-export type ArtifactRefBody = z.infer<typeof ArtifactRefBodySchema>;
-export type DelegateBody = z.infer<typeof DelegateBodySchema>;
+export type JobEventPayload = z.infer<typeof JobEventPayloadZodSchema>;
 
 /**
  * Map a reserved event kind to its strongly-typed body.
@@ -156,28 +198,37 @@ export interface ReservedEventBodyMap {
   result_chunk: ResultChunkBody;
 }
 
-// Exhaustiveness guard: every ReservedEventKind member MUST have a schema
-// entry below. Adding a new kind to RESERVED_EVENT_KINDS without extending
-// this map is a compile-time error (the `satisfies` clause enforces it).
-const RESERVED_EVENT_SCHEMAS = {
-  log: LogPayloadZodSchema,
-  thought: ThoughtBodySchema,
-  tool_call: ToolCallBodySchema,
-  tool_result: ToolResultBodySchema,
-  status: StatusBodySchema,
-  metric: MetricPayloadZodSchema,
-  artifact_ref: ArtifactRefBodySchema,
-  delegate: DelegateBodySchema,
-  progress: ProgressBodySchema,
-  result_chunk: ResultChunkBodySchema,
-} as const satisfies Record<ReservedEventKind, z.ZodTypeAny>;
+// Per-kind sync decoders, keyed by reserved kind. `Schema.decodeUnknownSync`
+// throws a `ParseError` on bad input — matches the throw semantics of the
+// legacy `zodSchema.parse(body)` call site.
+//
+// `satisfies Record<ReservedEventKind, ...>` is the exhaustiveness guard:
+// adding a new kind to `RESERVED_EVENT_KINDS` without a corresponding
+// decoder here is a compile-time error.
+const RESERVED_EVENT_DECODERS = {
+  log: Schema.decodeUnknownSync(LogPayloadSchema),
+  thought: Schema.decodeUnknownSync(ThoughtBodySchema),
+  tool_call: Schema.decodeUnknownSync(ToolCallBodySchema),
+  tool_result: Schema.decodeUnknownSync(ToolResultBodySchema),
+  status: Schema.decodeUnknownSync(StatusBodySchema),
+  metric: Schema.decodeUnknownSync(MetricPayloadSchema),
+  artifact_ref: Schema.decodeUnknownSync(ArtifactRefSchema),
+  delegate: Schema.decodeUnknownSync(DelegateBodySchema),
+  progress: Schema.decodeUnknownSync(ProgressBodySchema),
+  result_chunk: Schema.decodeUnknownSync(ResultChunkBodySchema),
+} as const satisfies Record<
+  ReservedEventKind,
+  (body: unknown) => ReservedEventBodyMap[ReservedEventKind]
+>;
 
 function parseReservedEventBody<K extends ReservedEventKind>(
   kind: K,
   body: unknown,
 ): ReservedEventBodyMap[K] {
-  const schema = RESERVED_EVENT_SCHEMAS[kind];
-  return schema.parse(body) as ReservedEventBodyMap[K];
+  // The per-kind decoder return type is the union of all body types; cast
+  // back to the discriminated branch keyed by `K`.
+  const decode = RESERVED_EVENT_DECODERS[kind];
+  return decode(body) as ReservedEventBodyMap[K];
 }
 
 /**
@@ -185,7 +236,7 @@ function parseReservedEventBody<K extends ReservedEventKind>(
  *
  * Reserved kinds (§8.2) are validated against their schemas via the
  * exhaustively-checked {@link parseReservedEventBody}; vendor (`x-vendor.*`)
- * and unknown kinds pass through unchanged (caller MUST treat them as
+ * and unknown kinds pass through unchecked (caller MUST treat them as
  * opaque per §15).
  */
 export function parseJobEventBody<K extends ReservedEventKind>(
