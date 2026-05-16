@@ -51,6 +51,26 @@ export {
   UnauthenticatedError,
 } from "./errors.js";
 export {
+  arcpFromTagged,
+  TaggedAgentNotAvailable,
+  TaggedAgentVersionNotAvailable,
+  TaggedBudgetExhausted,
+  TaggedCancelled,
+  TaggedDuplicateKey,
+  taggedFromARCP,
+  TaggedHeartbeatLost,
+  TaggedInternal,
+  TaggedInvalidRequest,
+  TaggedJobNotFound,
+  TaggedLeaseExpired,
+  TaggedLeaseSubsetViolation,
+  TaggedPermissionDenied,
+  TaggedResumeWindowExpired,
+  type TaggedSdkError,
+  TaggedTimeout,
+  TaggedUnauthenticated,
+} from "./errors-tagged.js";
+export {
   CORE_MESSAGE_TYPES,
   type CoreMessageType,
   classifyUnknownType,
