@@ -1,6 +1,19 @@
 #!/usr/bin/env node
 /**
  * `arcp` — small CLI for serving and replaying an ARCP v1.0 runtime.
+ *
+ * Implementation note (Effect migration, issue #47):
+ * This CLI deliberately remains a thin Commander → Promise orchestration over
+ * the legacy `ARCPServer` / `ARCPClient` / `EventLog` classes. Each command is
+ * a single-step Promise call with no concurrent resource graph, no
+ * cross-command shared state, and no error pipeline that benefits from
+ * `Effect`'s structured concurrency or Layer composition. Wrapping these in
+ * `ManagedRuntime.make(MainLayer)` + `runtime.runPromise(...)` would add a
+ * boot-time Effect dependency to a published binary without changing any
+ * observable behavior, so #47 was scoped out. Consumers who want an
+ * Effect-native entry point should compose `makeARCPServerRuntime` (from
+ * `@arcp/runtime`) and `makeARCPClientRuntime` (from `@arcp/client`)
+ * themselves; the building blocks are public.
  */
 import { readFileSync } from "node:fs";
 import process from "node:process";
