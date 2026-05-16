@@ -1,9 +1,6 @@
 // EventLog wraps better-sqlite3 (sync) but exposes an async API so consumers
 // can swap in a network-backed event log without changing call sites.
 /* eslint-disable @typescript-eslint/require-await */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import Database from "better-sqlite3";
 import type { z } from "zod";
 
@@ -17,12 +14,10 @@ import {
   projectIndexedFields,
   rowToEnvelope,
 } from "./eventlog-query.js";
+import { SCHEMA_SQL } from "./schema.js";
 import type { EventLogFilter, EventLogOptions } from "./types.js";
 
 type DatabaseInstance = InstanceType<typeof Database>;
-
-const SCHEMA_PATH = fileURLToPath(new URL("schema.sql", import.meta.url));
-const SCHEMA_SQL = readFileSync(SCHEMA_PATH, "utf8");
 
 // ARCP v1.0 event-log indexed columns: session_id, id, type, trace_id,
 // job_id, event_seq. Replay is by (session_id, event_seq).
