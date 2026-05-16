@@ -83,8 +83,12 @@ export {
 } from "./extensions.js";
 export {
   type Logger,
+  LoggerLayer,
+  makePinoEffectLogger,
+  PinoLogger,
   rootLogger,
   sessionLogger,
+  sessionLoggerEffect,
   silentLogger,
 } from "./logger.js";
 export * from "./messages/index.js";
