@@ -1,41 +1,42 @@
 import { randomBytes } from "node:crypto";
 
-import type { JobId, TraceId } from "@arcp/core";
+import type { JobId, SessionId } from "@arcp/core";
+import { type BaseEnvelope, buildEnvelope } from "@arcp/core/envelope";
 import {
-  type BaseEnvelope,
-  buildEnvelope,
-  RoundTripEnvelopeSchema,
-} from "@arcp/core/envelope";
-import {
-  ARCPError,
   CancelledError,
   InvalidRequestError,
   UnauthenticatedError,
 } from "@arcp/core/errors";
 import { type Logger, rootLogger } from "@arcp/core/logger";
-import {
-  type Capabilities,
-  type Envelope,
-  EnvelopeSchema,
-  type JobAcceptedPayload,
-  type JobEventPayload,
-  type JobListEntry,
-  type JobResultPayload,
-  type JobSubscribedPayload,
-  jobErrorToErrorPayload,
-  type Lease,
-  type LeaseConstraints,
-  type ResultChunkBody,
-  type SessionJobsPayload,
-  type SessionListJobsFilter,
-  type SessionResume,
-  type SessionWelcomePayload,
+import type {
+  Capabilities,
+  Envelope,
+  JobAcceptedPayload,
+  JobListEntry,
+  JobResultPayload,
+  JobSubscribedPayload,
+  SessionJobsPayload,
+  SessionListJobsFilter,
+  SessionResume,
+  SessionWelcomePayload,
 } from "@arcp/core/messages";
 import { PendingRegistry, SessionState } from "@arcp/core/state";
 import type { Transport, WireFrame } from "@arcp/core/transport";
 import { Deferred, newMessageId } from "@arcp/core/util";
 import { intersectFeatures, V1_1_FEATURES } from "@arcp/core/version";
 
+import { dispatchEnvelope } from "./client-dispatch.js";
+import {
+  buildByeEnvelope,
+  buildHelloEnvelope,
+  buildSubmitEnvelope,
+  buildSubscribeEnvelope,
+  buildUnsubscribeEnvelope,
+} from "./client-envelopes.js";
+import {
+  type InvocationState,
+  makeHandleFromInvocation,
+} from "./client-handle.js";
 import type {
   ARCPClientOptions,
   ClientHandler,
@@ -53,19 +54,6 @@ import type {
 //   - `close(reason?)`                → sends session.bye then closes transport.
 //   - v1.1: `ack(seq)`, `listJobs(filter, opts)`, `subscribe(jobId, opts)`.
 
-interface InvocationState {
-  jobId: JobId | null;
-  lease: Lease | null;
-  agent: string | undefined;
-  leaseConstraints: LeaseConstraints | undefined;
-  budget: Record<string, number> | undefined;
-  traceId: TraceId | undefined;
-  events: JobEventPayload[];
-  acceptance: Deferred<JobAcceptedPayload>;
-  completion: Deferred<JobResultPayload>;
-  /** v1.1 §8.4 — accumulated result chunks, keyed by result_id. */
-  chunks: Map<string, ResultChunkBody[]>;
-}
 
 /**
  * Client-side driver for an ARCP v1.1 session (§6).
@@ -182,72 +170,76 @@ export class ARCPClient {
     }
     this.transport = transport;
     this.handshake = new Deferred<SessionWelcomePayload>();
+    this.wireTransport(transport);
+    const advertisedFeatures = this.options.features ?? V1_1_FEATURES;
+    const baseCaps = this.buildAdvertisedCapabilities(advertisedFeatures);
+    await transport.send(this.buildHelloEnvelope(baseCaps, resume));
+    return this.awaitHandshake(advertisedFeatures, signal);
+  }
 
+  private wireTransport(transport: Transport): void {
     transport.onFrame((frame) => this.dispatchRaw(frame));
     transport.onClose((err) => {
       if (this.handshake !== null && !this.handshake.settled) {
         this.handshake.reject(
           new InvalidRequestError(
             "Transport closed before handshake completed",
-            {
-              cause: err,
-            },
+            { cause: err },
           ),
         );
       }
     });
+  }
 
+  private buildAdvertisedCapabilities(
+    advertisedFeatures: readonly string[],
+  ): Capabilities {
     // v1.1 §6.2 — advertise features. If the consumer didn't supply a
     // `capabilities` block, build one with our default features. If they
     // did, augment with `features` (unless they explicitly set it).
-    const advertisedFeatures = this.options.features ?? V1_1_FEATURES;
     const baseCaps: Capabilities = { ...this.options.capabilities };
     if (baseCaps.features === undefined && advertisedFeatures.length > 0) {
       baseCaps.features = [...advertisedFeatures];
     }
     baseCaps.encodings ??= ["json"];
+    return baseCaps;
+  }
 
-    const helloId = newMessageId();
-    const helloEnv = buildEnvelope({
-      id: helloId,
-      type: "session.hello" as const,
-      payload: {
-        client: this.options.client,
-        auth: {
-          scheme: this.options.authScheme,
-          ...(this.options.token === undefined
-            ? {}
-            : { token: this.options.token }),
-        },
-        capabilities: baseCaps,
-        ...(resume === undefined ? {} : { resume }),
-      },
+  private buildHelloEnvelope(
+    baseCaps: Capabilities,
+    resume: SessionResume | undefined,
+  ): BaseEnvelope {
+    return buildHelloEnvelope({
+      id: newMessageId(),
+      options: this.options,
+      capabilities: baseCaps,
+      resume,
     });
-    await transport.send(helloEnv);
+  }
 
+  private async awaitHandshake(
+    advertisedFeatures: readonly string[],
+    signal: AbortSignal | undefined,
+  ): Promise<SessionWelcomePayload> {
     const timeout = setTimeout(() => {
       if (this.handshake !== null && !this.handshake.settled) {
         this.handshake.reject(new InvalidRequestError("Handshake timed out"));
       }
     }, this.handshakeTimeoutMs);
     timeout.unref();
-    const onAbort = () => {
-      if (this.handshake !== null && !this.handshake.settled) {
-        const reason = signal?.reason;
-        this.handshake.reject(
-          new CancelledError("Handshake aborted by caller", {
-            cause: reason instanceof Error ? reason : undefined,
-          }),
-        );
-      }
+    const onAbort = (): void => {
+      this.rejectHandshakeForAbort(signal);
     };
     signal?.addEventListener("abort", onAbort, { once: true });
+    const handshake = this.handshake;
+    if (handshake === null) {
+      throw new InvalidRequestError("Handshake state was cleared");
+    }
     try {
-      const welcome = await this.handshake.promise;
+      const welcome = await handshake.promise;
       this.welcome = welcome;
       this.state.assignCapabilities(welcome.capabilities);
       this.state.transition("accepted");
-      // v1.1 — store the negotiated feature set (intersection).
       this._negotiatedFeatures = intersectFeatures(
         advertisedFeatures,
         welcome.capabilities.features,
@@ -257,6 +249,16 @@ export class ARCPClient {
       clearTimeout(timeout);
       signal?.removeEventListener("abort", onAbort);
     }
+  }
+
+  private rejectHandshakeForAbort(signal: AbortSignal | undefined): void {
+    if (this.handshake === null || this.handshake.settled) return;
+    const reason: unknown = signal?.reason;
+    this.handshake.reject(
+      new CancelledError("Handshake aborted by caller", {
+        cause: reason instanceof Error ? reason : undefined,
+      }),
+    );
   }
 
   /** Register a handler for a specific message type. */
@@ -280,43 +282,44 @@ export class ARCPClient {
 
   /** Close the underlying transport, optionally sending session.bye. */
   public async close(reason?: string): Promise<void> {
-    this.pending.rejectAll(new CancelledError("Client closing"));
+    this.rejectAllPending(new CancelledError("Client closing"));
+    this.clearAutoAckTimer();
+    if (this.transport === null) return;
+    await this.sendBye(reason);
+    await this.transport.close(reason);
+    this.transport = null;
+  }
+
+  private rejectAllPending(error: CancelledError): void {
+    this.pending.rejectAll(error);
     for (const inv of this.invocationsByOriginId.values()) {
-      inv.acceptance.reject(new CancelledError("Client closing"));
-      inv.completion.reject(new CancelledError("Client closing"));
+      inv.acceptance.reject(error);
+      inv.completion.reject(error);
     }
     this.invocationsByOriginId.clear();
     this.invocationsByJobId.clear();
     this.pendingAccepts.length = 0;
-    for (const d of this.pendingLists.values()) {
-      d.reject(new CancelledError("Client closing"));
-    }
+    for (const d of this.pendingLists.values()) d.reject(error);
     this.pendingLists.clear();
-    for (const d of this.pendingSubscribes.values()) {
-      d.reject(new CancelledError("Client closing"));
-    }
+    for (const d of this.pendingSubscribes.values()) d.reject(error);
     this.pendingSubscribes.clear();
-    if (this.autoAckTimer !== null) {
-      clearTimeout(this.autoAckTimer);
-      this.autoAckTimer = null;
-    }
+  }
+
+  private clearAutoAckTimer(): void {
+    if (this.autoAckTimer === null) return;
+    clearTimeout(this.autoAckTimer);
+    this.autoAckTimer = null;
+  }
+
+  private async sendBye(reason: string | undefined): Promise<void> {
     if (this.transport === null) return;
     const sessionId = this.state.id;
-    if (sessionId !== undefined && this.state.isAccepted) {
-      try {
-        const env = buildEnvelope({
-          id: newMessageId(),
-          type: "session.bye" as const,
-          payload: reason === undefined ? {} : { reason },
-          optional: { session_id: sessionId },
-        });
-        await this.transport.send(env);
-      } catch {
-        // best-effort
-      }
+    if (sessionId === undefined || !this.state.isAccepted) return;
+    try {
+      await this.transport.send(buildByeEnvelope(sessionId, reason));
+    } catch {
+      // best-effort
     }
-    await this.transport.close(reason);
-    this.transport = null;
   }
 
   /**
@@ -324,39 +327,35 @@ export class ARCPClient {
    * exposes `done` for the terminal `job.result` / `job.error`.
    */
   public async submit(opts: SubmitOptions): Promise<JobHandle> {
-    if (this.transport === null)
+    if (this.transport === null) {
       throw new InvalidRequestError("Client not connected");
+    }
     if (!this.state.isAccepted) {
       throw new UnauthenticatedError("Cannot submit: session not accepted");
     }
     const sessionId = this.state.id;
-    if (sessionId === undefined)
+    if (sessionId === undefined) {
       throw new InvalidRequestError("session has no id");
-
+    }
     const id = newMessageId();
-    const env = buildEnvelope({
-      id,
-      type: "job.submit" as const,
-      payload: {
-        agent: opts.agent,
-        input: opts.input,
-        ...(opts.lease === undefined ? {} : { lease_request: opts.lease }),
-        ...(opts.leaseConstraints === undefined
-          ? {}
-          : { lease_constraints: opts.leaseConstraints }),
-        ...(opts.idempotencyKey === undefined
-          ? {}
-          : { idempotency_key: opts.idempotencyKey }),
-        ...(opts.maxRuntimeSec === undefined
-          ? {}
-          : { max_runtime_sec: opts.maxRuntimeSec }),
-      },
-      optional: {
-        session_id: sessionId,
-        ...(opts.traceId === undefined ? {} : { trace_id: opts.traceId }),
-      },
-    });
+    const env = buildSubmitEnvelope({ id, sessionId, opts });
+    const invocation = this.registerSubmitInvocation(id, opts);
+    const abortHandled = this.wireSubmitAbort(invocation, opts.signal);
+    if (abortHandled === "aborted-before-submit") {
+      return makeHandleFromInvocation(invocation);
+    }
+    await this.transport.send(env);
+    // The routeJobEvent path resolves `acceptance` *and* registers the
+    // invocation in `invocationsByJobId` before this await returns, so any
+    // subsequent events arriving in the same tick will still route.
+    await invocation.acceptance.promise;
+    return makeHandleFromInvocation(invocation);
+  }
 
+  private registerSubmitInvocation(
+    id: string,
+    opts: SubmitOptions,
+  ): InvocationState {
     const invocation: InvocationState = {
       jobId: null,
       lease: null,
@@ -370,38 +369,35 @@ export class ARCPClient {
       chunks: new Map(),
     };
     // Mute unhandled-rejection on `completion` — callers consume it via
-    // `handle.done`. If the submit rejects pre-handle (e.g. AGENT_NOT_AVAILABLE
-    // arriving before any `job.accepted`), this prevents a spurious unhandled
-    // promise rejection.
+    // `handle.done`. If the submit rejects pre-handle (e.g.
+    // AGENT_NOT_AVAILABLE before any `job.accepted`), this prevents a
+    // spurious unhandled promise rejection.
     invocation.completion.promise.catch(() => undefined);
     this.invocationsByOriginId.set(id, invocation);
     this.pendingAccepts.push(invocation);
+    return invocation;
+  }
 
-    if (opts.signal !== undefined) {
-      const sig = opts.signal;
-      const onAbort = (): void => {
-        if (invocation.jobId !== null) {
-          void this.cancelJob(invocation.jobId, {
-            reason: String(sig.reason ?? "abort"),
-          });
-        }
-      };
-      if (sig.aborted) {
-        invocation.acceptance.reject(
-          new CancelledError("aborted before submit"),
-        );
-        return makeHandleFromInvocation(invocation);
-      }
-      sig.addEventListener("abort", onAbort, { once: true });
+  private wireSubmitAbort(
+    invocation: InvocationState,
+    signal: AbortSignal | undefined,
+  ): "aborted-before-submit" | null {
+    if (signal === undefined) return null;
+    if (signal.aborted) {
+      invocation.acceptance.reject(
+        new CancelledError("aborted before submit"),
+      );
+      return "aborted-before-submit";
     }
-
-    await this.transport.send(env);
-
-    // The routeJobEvent path resolves `acceptance` *and* registers the
-    // invocation in `invocationsByJobId` before this await returns, so any
-    // subsequent events arriving in the same tick will still route.
-    await invocation.acceptance.promise;
-    return makeHandleFromInvocation(invocation);
+    const onAbort = (): void => {
+      if (invocation.jobId !== null) {
+        void this.cancelJob(invocation.jobId, {
+          reason: String(signal.reason ?? "abort"),
+        });
+      }
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    return null;
   }
 
   /** Send a `job.cancel` envelope. */
@@ -513,184 +509,60 @@ export class ARCPClient {
         "job.subscribe requires the 'subscribe' feature to be negotiated",
       );
     }
-    if (this.transport === null)
+    if (this.transport === null) {
       throw new InvalidRequestError("Client not connected");
+    }
     const sessionId = this.state.id;
-    if (sessionId === undefined)
+    if (sessionId === undefined) {
       throw new InvalidRequestError("session has no id");
+    }
     const deferred = new Deferred<JobSubscribedPayload>();
     this.pendingSubscribes.set(jobId, deferred);
-    const id = newMessageId();
-    const env = buildEnvelope({
-      id,
-      type: "job.subscribe" as const,
-      payload: {
-        job_id: jobId,
-        ...(opts.history === undefined ? {} : { history: opts.history }),
-        ...(opts.fromEventSeq === undefined
-          ? {}
-          : { from_event_seq: opts.fromEventSeq }),
-      },
-      optional: { session_id: sessionId },
-    });
-    await this.transport.send(env);
+    await this.transport.send(buildSubscribeEnvelope(jobId, sessionId, opts));
     const ack = await deferred.promise;
     return {
       jobId,
       subscribedFrom: ack.subscribed_from,
       replayed: ack.replayed,
-      unsubscribe: async () => {
-        if (this.transport === null) return;
-        const env = buildEnvelope({
-          id: newMessageId(),
-          type: "job.unsubscribe" as const,
-          payload: { job_id: jobId },
-          optional: { session_id: sessionId },
-        });
-        try {
-          await this.transport.send(env);
-        } catch {
-          // best-effort
-        }
-      },
+      unsubscribe: () => this.unsubscribe(jobId, sessionId),
     };
+  }
+
+  private async unsubscribe(jobId: JobId, sessionId: SessionId): Promise<void> {
+    if (this.transport === null) return;
+    try {
+      await this.transport.send(buildUnsubscribeEnvelope(jobId, sessionId));
+    } catch {
+      // best-effort
+    }
   }
 
   // -------------------------------------------------------------------
 
   private async dispatchRaw(frame: WireFrame): Promise<void> {
-    let parsed: BaseEnvelope;
-    try {
-      parsed = RoundTripEnvelopeSchema.parse(frame);
-    } catch (error) {
-      this.logger.warn({ err: error }, "client received malformed frame");
-      return;
-    }
-
-    // Handshake.
-    if (parsed.type === "session.welcome") {
-      const result = EnvelopeSchema.safeParse(parsed);
-      if (result.success && result.data.type === "session.welcome") {
-        // Assign session id from the envelope itself.
-        // session_id is typed as required by the schema, but we keep the runtime
-        // check in case the server omits it on the wire.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (result.data.session_id !== undefined) {
-          try {
-            this.state.assignId(result.data.session_id);
-          } catch {
-            // ignore — likely a resume on the same id
+    await dispatchEnvelope(
+      {
+        logger: this.logger,
+        state: this.state,
+        handshake: this.handshake as Deferred<unknown> | null,
+        invocationsByOriginId: this.invocationsByOriginId,
+        invocationsByJobId: this.invocationsByJobId,
+        pendingAccepts: this.pendingAccepts,
+        pendingLists: this.pendingLists as Map<string, Deferred<unknown>>,
+        pendingSubscribes: this.pendingSubscribes as Map<
+          string,
+          Deferred<unknown>
+        >,
+        handlers: this.handlers as Map<string, (env: Envelope) => Promise<void>>,
+        transport: this.transport,
+        observeEventSeq: (env) => {
+          if (env.event_seq !== undefined && env.event_seq > this.lastEventSeq) {
+            this.lastEventSeq = env.event_seq;
+            this.scheduleAutoAck();
           }
-        }
-        this.handshake?.resolve(result.data.payload);
-      }
-      return;
-    }
-    if (parsed.type === "session.error") {
-      const result = EnvelopeSchema.safeParse(parsed);
-      if (result.success && result.data.type === "session.error") {
-        const err = ARCPError.fromPayload(result.data.payload);
-        if (this.handshake !== null && !this.handshake.settled) {
-          this.handshake.reject(err);
-        }
-        // Reject all in-flight submissions.
-        for (const inv of this.invocationsByOriginId.values()) {
-          if (!inv.acceptance.settled) inv.acceptance.reject(err);
-          if (!inv.completion.settled) inv.completion.reject(err);
-        }
-        for (const d of this.pendingLists.values()) {
-          if (!d.settled) d.reject(err);
-        }
-        for (const d of this.pendingSubscribes.values()) {
-          if (!d.settled) d.reject(err);
-        }
-      }
-      return;
-    }
-
-    // v1.1 §6.4 — respond to inbound session.ping with session.pong.
-    if (parsed.type === "session.ping") {
-      const result = EnvelopeSchema.safeParse(parsed);
-      if (result.success && result.data.type === "session.ping") {
-        const sessionId = this.state.id;
-        if (sessionId !== undefined && this.transport !== null) {
-          const pongEnv = buildEnvelope({
-            id: newMessageId(),
-            type: "session.pong" as const,
-            payload: {
-              ping_nonce: result.data.payload.nonce,
-              received_at: new Date().toISOString(),
-            },
-            optional: { session_id: sessionId },
-          });
-          try {
-            await this.transport.send(pongEnv);
-          } catch {
-            // best-effort
-          }
-        }
-      }
-      return;
-    }
-    if (parsed.type === "session.pong") {
-      // No-op on the client side beyond updating activity.
-      return;
-    }
-
-    // Validate, then route.
-    const result = EnvelopeSchema.safeParse(parsed);
-    if (!result.success) {
-      const issue = result.error.issues[0];
-      this.logger.warn(
-        { type: parsed.type, code: issue?.code, message: issue?.message },
-        "client received unparseable envelope",
-      );
-      return;
-    }
-    const env = result.data;
-    // Track event_seq for resume.
-    if (env.event_seq !== undefined && env.event_seq > this.lastEventSeq) {
-      this.lastEventSeq = env.event_seq;
-      this.scheduleAutoAck();
-    }
-    // v1.1 §6.6 — session.jobs (response to list_jobs).
-    if (env.type === "session.jobs") {
-      const reqId = env.payload.request_id;
-      const deferred = this.pendingLists.get(reqId);
-      if (deferred !== undefined) {
-        this.pendingLists.delete(reqId);
-        deferred.resolve(env.payload);
-        return;
-      }
-    }
-    // v1.1 §7.6 — job.subscribed (response to subscribe).
-    // job_id is required by the schema, but we keep the runtime check.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (env.type === "job.subscribed" && env.job_id !== undefined) {
-      const d = this.pendingSubscribes.get(env.job_id);
-      if (d !== undefined) {
-        this.pendingSubscribes.delete(env.job_id);
-        d.resolve(env.payload);
-        return;
-      }
-    }
-
-    this.routeJobEvent(env);
-    const handler = this.handlers.get(env.type);
-    if (handler !== undefined) {
-      try {
-        await handler(env);
-      } catch (error) {
-        this.logger.error(
-          { err: error, type: env.type },
-          "client handler threw",
-        );
-      }
-      return;
-    }
-    this.logger.debug(
-      { type: env.type },
-      "no client handler registered for type",
+        },
+      },
+      frame,
     );
   }
 
@@ -722,124 +594,8 @@ export class ARCPClient {
     }
   }
 
-  private routeJobEvent(env: Envelope): void {
-    if (env.type === "job.accepted") {
-      // Bind to the oldest still-pending submit. Register the invocation in
-      // the by-job-id map synchronously here so that the very-next inbound
-      // frame (status / result / error) can still be routed even if the
-      // submit() continuation hasn't yet run from the microtask queue.
-      const inv = this.pendingAccepts.shift();
-      if (inv !== undefined && !inv.acceptance.settled) {
-        const payload = env.payload;
-        inv.jobId = payload.job_id;
-        inv.lease = payload.lease;
-        inv.agent = payload.agent;
-        inv.leaseConstraints = payload.lease_constraints;
-        inv.budget = payload.budget;
-        inv.traceId = payload.trace_id ?? inv.traceId;
-        this.invocationsByJobId.set(payload.job_id, inv);
-        inv.acceptance.resolve(payload);
-      }
-      return;
-    }
-
-    // job_id is required by the schema, but we keep the runtime check.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (env.type === "job.event" && env.job_id !== undefined) {
-      const inv = this.invocationsByJobId.get(env.job_id);
-      if (inv !== undefined) {
-        const ep = env.payload;
-        inv.events.push(ep);
-        // v1.1 §8.4 — accumulate result_chunk bodies for later assembly.
-        if (ep.kind === "result_chunk") {
-          const body = ep.body as ResultChunkBody;
-          let bucket = inv.chunks.get(body.result_id);
-          if (bucket === undefined) {
-            bucket = [];
-            inv.chunks.set(body.result_id, bucket);
-          }
-          bucket.push(body);
-        }
-      }
-      return;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (env.type === "job.result" && env.job_id !== undefined) {
-      const inv = this.invocationsByJobId.get(env.job_id);
-      if (inv !== undefined) {
-        inv.completion.resolve(env.payload);
-        this.invocationsByJobId.delete(env.job_id);
-      }
-      return;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (env.type === "job.error" && env.job_id !== undefined) {
-      const payload = env.payload;
-      const err = ARCPError.fromPayload(jobErrorToErrorPayload(payload));
-      let inv = this.invocationsByJobId.get(env.job_id);
-      if (inv === undefined) {
-        // No binding yet — this can happen when the runtime rejects the
-        // submit (AGENT_NOT_AVAILABLE, DUPLICATE_KEY, etc) without ever
-        // emitting job.accepted. Bind to the oldest pending submit.
-        inv = this.pendingAccepts.shift();
-        if (inv !== undefined) {
-          inv.jobId = env.job_id;
-          this.invocationsByJobId.set(env.job_id, inv);
-        }
-      }
-      if (inv !== undefined) {
-        if (!inv.acceptance.settled) inv.acceptance.reject(err);
-        inv.completion.reject(err);
-        this.invocationsByJobId.delete(env.job_id);
-      }
-      return;
-    }
-  }
 }
 
-function makeHandleFromInvocation(inv: InvocationState): JobHandle {
-  return {
-    get jobId(): JobId {
-      return inv.jobId ?? ("" as JobId);
-    },
-    get lease() {
-      return inv.lease ?? {};
-    },
-    get agent() {
-      return inv.agent;
-    },
-    get leaseConstraints() {
-      return inv.leaseConstraints;
-    },
-    get budget() {
-      return inv.budget;
-    },
-    get traceId() {
-      return inv.traceId;
-    },
-    done: inv.completion.promise,
-    async collectChunks(): Promise<Buffer | string> {
-      const result = await inv.completion.promise;
-      const resultId = result.result_id;
-      if (resultId === undefined) {
-        throw new InvalidRequestError(
-          "job.result has no result_id; no chunks to collect",
-        );
-      }
-      const chunks = inv.chunks.get(resultId);
-      if (chunks === undefined || chunks.length === 0) {
-        return "";
-      }
-      const sorted = chunks.toSorted((a, b) => a.chunk_seq - b.chunk_seq);
-      const encoding = sorted[0]?.encoding ?? "utf8";
-      if (encoding === "base64") {
-        const buffers = sorted.map((c) => Buffer.from(c.data, "base64"));
-        return Buffer.concat(buffers);
-      }
-      return sorted.map((c) => c.data).join("");
-    },
-  };
-}
 
 /**
  * Lightweight typed assertion used in tests and bridge code: narrow an
