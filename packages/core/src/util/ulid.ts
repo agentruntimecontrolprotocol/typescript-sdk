@@ -18,17 +18,17 @@ export function newId(prefix?: string): string {
 
 /** Mint a session id (`sess_<ulid>`). */
 export function newSessionId(): SessionId {
-  return newId("sess") as SessionId;
+  return newId("sess");
 }
 
 /** Mint a job id (`job_<ulid>`). */
 export function newJobId(): JobId {
-  return newId("job") as JobId;
+  return newId("job");
 }
 
 /** Mint a message id (`msg_<ulid>`). */
 export function newMessageId(): MessageId {
-  return newId("msg") as MessageId;
+  return newId("msg");
 }
 
 /** RFC 3339 timestamp suitable for `payload.ts` on a `job.event`. */

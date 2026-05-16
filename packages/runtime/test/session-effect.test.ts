@@ -50,7 +50,7 @@ function makeFake(opts: { accepted?: boolean; closed?: boolean } = {}): FakeSess
     },
     nextEventSeq() {
       seq += 1;
-      return seq as EventSeq;
+      return seq;
     },
     recordAck(s) {
       acks.push(s);

@@ -8,8 +8,6 @@ import {
   EventLog,
   EventLogService,
   eventLogLayer,
-  type EventSeq,
-  type MessageId,
   type SessionId,
 } from "@arcp/core";
 
@@ -17,12 +15,12 @@ const SESSION = "sess_test" as SessionId;
 
 function envFor(seq: number, sessionId: SessionId = SESSION): BaseEnvelope {
   return buildEnvelope({
-    id: `msg_${String(seq).padStart(5, "0")}` as MessageId,
+    id: `msg_${String(seq).padStart(5, "0")}`,
     type: "job.event",
     payload: { n: seq },
     optional: {
       session_id: sessionId,
-      event_seq: seq as EventSeq,
+      event_seq: seq,
     },
   });
 }

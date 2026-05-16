@@ -6,17 +6,24 @@
  * to prevent silent argument-order mistakes: a function taking `(SessionId,
  * JobId)` won't accept `(jobId, sessionId)` even though both are strings.
  *
- * The brand type mirrors zod's `z.BRAND<B>` shape so values produced by
- * `z.string().brand<"X">().parse(...)` are assignable to the corresponding
- * brand alias defined here.
+ * The brand is a TypeScript-only structural marker (a unique-symbol property
+ * keyed by the brand name). It carries no runtime weight, so values produced
+ * by `as SessionId` / `as JobId` etc. round-trip cleanly through JSON.
  *
  * See ARCP v1.0 §5.1 (envelope `session_id`, `job_id`, `id`, `trace_id`,
  * `event_seq`) and §6.3 (`resume_token`).
  */
-import type { z } from "zod";
 
-/** Structural brand intersection compatible with `z.BRAND<B>` output. */
-export type Brand<T, B extends string> = T & z.BRAND<B>;
+declare const __brand: unique symbol;
+
+/**
+ * Structural brand intersection. Pure type-level — zero runtime cost.
+ *
+ * The brand property is OPTIONAL so plain `T` values are assignable to
+ * `Brand<T, B>` (matching the prior `z.BRAND<B>` behavior), while two brands
+ * with different `B` are still mutually incompatible.
+ */
+export type Brand<T, B extends string> = T & { readonly [__brand]?: B };
 
 /** Session identifier (`sess_<ulid>`); see §6.2. */
 export type SessionId = Brand<string, "SessionId">;

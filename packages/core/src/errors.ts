@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 /**
  * Canonical ARCP error codes.
@@ -58,14 +58,16 @@ export function isRetryableByDefault(code: ErrorCode): boolean {
  * Shape: `{ code, message, retryable, details? }`. Anything implementation-specific
  * goes inside `details`.
  */
-export const ErrorPayloadSchema = z.object({
-  code: z.enum(ERROR_CODES),
-  message: z.string().min(1),
-  retryable: z.boolean().optional(),
-  details: z.record(z.string(), z.unknown()).optional(),
+export const ErrorPayloadSchema = Schema.Struct({
+  code: Schema.Literal(...ERROR_CODES),
+  message: Schema.String.pipe(Schema.nonEmptyString()),
+  retryable: Schema.optional(Schema.Boolean),
+  details: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  ),
 });
 
-export type ErrorPayload = z.infer<typeof ErrorPayloadSchema>;
+export type ErrorPayload = Schema.Schema.Type<typeof ErrorPayloadSchema>;
 
 /** Construction options for {@link ARCPError}. */
 export interface ARCPErrorOptions {

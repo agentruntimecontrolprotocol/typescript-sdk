@@ -21,7 +21,7 @@ export function digest(input: unknown): string {
 }
 
 export function newResumeToken(): ResumeToken {
-  return `rt_${randomBytes(32).toString("hex")}` as ResumeToken;
+  return `rt_${randomBytes(32).toString("hex")}`;
 }
 
 /**

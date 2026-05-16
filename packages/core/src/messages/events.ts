@@ -1,5 +1,4 @@
 import { Schema } from "effect";
-import { z } from "zod";
 
 import { ERROR_CODES } from "../errors.js";
 
@@ -168,23 +167,7 @@ export const JobEventPayloadSchema = Schema.Struct({
   body: Schema.Unknown,
 });
 
-/**
- * Zod twin of {@link JobEventPayloadSchema}.
- *
- * `messageEnvelope()` in `envelope.ts` is still zod-typed (slice #50). Until
- * the envelope layer migrates, the envelope wrapper for `job.event` consumes
- * this zod twin. Shape parity with `JobEventPayloadSchema` is verified by
- * the test suite. `JobEventPayload` is the zod-inferred type so wire-shape
- * consumers (e.g. `client-dispatch.ts`) keep their existing TS contract —
- * notably `body` is an optional property because zod's `z.unknown()` infers
- * as `body?: unknown`.
- */
-export const JobEventPayloadZodSchema = z.object({
-  kind: z.string().min(1),
-  ts: z.string().min(1),
-  body: z.unknown(),
-});
-export type JobEventPayload = z.infer<typeof JobEventPayloadZodSchema>;
+export type JobEventPayload = Schema.Schema.Type<typeof JobEventPayloadSchema>;
 
 /**
  * Map a reserved event kind to its strongly-typed body.

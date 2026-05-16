@@ -146,7 +146,7 @@ describe("PendingRegistryService (Effect)", () => {
       const reg = yield* PendingRegistryService;
       const waiters = yield* Effect.all(
         Array.from({ length: N }, (_, i) =>
-          reg.register<number>(`msg_${i}` as MessageId),
+          reg.register<number>(`msg_${i}`),
         ),
         { concurrency: "unbounded" },
       );
@@ -155,7 +155,7 @@ describe("PendingRegistryService (Effect)", () => {
       // round-trip semantics.
       yield* Effect.all(
         Array.from({ length: N }, (_, i) =>
-          reg.resolve(`msg_${i}` as MessageId, i),
+          reg.resolve(`msg_${i}`, i),
         ),
         { concurrency: "unbounded" },
       );

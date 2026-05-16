@@ -544,15 +544,12 @@ export class ARCPClient {
       {
         logger: this.logger,
         state: this.state,
-        handshake: this.handshake as Deferred<unknown> | null,
+        handshake: this.handshake,
         invocationsByOriginId: this.invocationsByOriginId,
         invocationsByJobId: this.invocationsByJobId,
         pendingAccepts: this.pendingAccepts,
-        pendingLists: this.pendingLists as Map<string, Deferred<unknown>>,
-        pendingSubscribes: this.pendingSubscribes as Map<
-          string,
-          Deferred<unknown>
-        >,
+        pendingLists: this.pendingLists,
+        pendingSubscribes: this.pendingSubscribes,
         handlers: this.handlers as Map<string, (env: Envelope) => Promise<void>>,
         transport: this.transport,
         observeEventSeq: (env) => {

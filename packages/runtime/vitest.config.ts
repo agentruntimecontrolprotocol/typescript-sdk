@@ -4,7 +4,10 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
     environment: "node",
-    pool: "threads",
+    // pool=forks + singleFork: vitest 2 SIGSEGV on thread-pool teardown
+    // under Node 24. Match @arcp/core's config.
+    pool: "forks",
+    poolOptions: { forks: { singleFork: true } },
     testTimeout: 10_000,
     hookTimeout: 10_000,
     coverage: {

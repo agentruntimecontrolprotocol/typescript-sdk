@@ -463,7 +463,7 @@ export class ARCPServer {
   ): Promise<void> {
     if (env.type !== "job.cancel") return;
     const jobId = env.job_id;
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     if (jobId === undefined) {
       await ctx.emitSessionError(
         new InvalidRequestError("job.cancel requires job_id"),

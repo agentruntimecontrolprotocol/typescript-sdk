@@ -6,7 +6,6 @@ import {
   isReservedEventKind,
   isVendorEventKind,
   JobEventPayloadSchema,
-  JobEventPayloadZodSchema,
   parseJobEventBody,
   ProgressBodySchema,
   RESERVED_EVENT_KINDS,
@@ -237,7 +236,7 @@ describe("JobEventPayloadSchema (Effect Schema)", () => {
     ).rejects.toThrow();
   });
 
-  it("matches the zod twin's accept-set on the docs/guides examples", () => {
+  it("decodes the docs/guides examples through the Effect schema", () => {
     const inputs = [
       {
         kind: "log",
@@ -266,7 +265,6 @@ describe("JobEventPayloadSchema (Effect Schema)", () => {
       },
     ];
     for (const input of inputs) {
-      expect(() => JobEventPayloadZodSchema.parse(input)).not.toThrow();
       expect(() =>
         Schema.decodeUnknownSync(JobEventPayloadSchema)(input),
       ).not.toThrow();

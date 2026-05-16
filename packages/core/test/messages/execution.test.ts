@@ -4,21 +4,15 @@ import { describe, expect, it } from "vitest";
 import {
   JobBudgetSchema,
   JobCancelPayloadSchema,
-  JobCancelPayloadZodSchema,
   JobErrorFinalStatusSchema,
   JobErrorPayloadSchema,
-  JobErrorPayloadZodSchema,
   JobResultPayloadSchema,
-  JobResultPayloadZodSchema,
   JobStateSchema,
   JobSubmitPayloadSchema,
-  JobSubmitPayloadZodSchema,
   JobUnsubscribePayloadSchema,
 } from "@arcp/core";
 
-// Pin the JSON shapes accepted/rejected by the migrated Effect schemas in
-// execution.ts. The zod twins (`*ZodSchema`) feed `messageEnvelope()` until
-// slice #50; we spot-check parity on the docs/guides examples.
+// Pin the JSON shapes accepted/rejected by the Effect schemas in execution.ts.
 
 const decode =
   <A, I>(s: Schema.Schema<A, I>) =>
@@ -57,14 +51,6 @@ describe("JobSubmitPayloadSchema (Effect Schema)", () => {
     ).rejects.toThrow();
   });
 
-  it("zod twin accepts the docs example for envelope wiring parity", () => {
-    const input = {
-      agent: "research",
-      input: { q: 1 },
-      idempotency_key: "k-1",
-    };
-    expect(() => JobSubmitPayloadZodSchema.parse(input)).not.toThrow();
-  });
 });
 
 describe("JobBudgetSchema (Effect Schema)", () => {
@@ -100,12 +86,6 @@ describe("JobCancelPayloadSchema (Effect Schema)", () => {
     await expect(decode(JobCancelPayloadSchema)(input)).resolves.toEqual(input);
   });
 
-  it("zod twin accepts the same shapes", () => {
-    expect(() => JobCancelPayloadZodSchema.parse({})).not.toThrow();
-    expect(() =>
-      JobCancelPayloadZodSchema.parse({ reason: "x" }),
-    ).not.toThrow();
-  });
 });
 
 describe("JobStateSchema (Effect Schema)", () => {
@@ -162,15 +142,6 @@ describe("JobResultPayloadSchema (Effect Schema)", () => {
     ).rejects.toThrow();
   });
 
-  it("zod twin accepts the docs streaming example", () => {
-    expect(() =>
-      JobResultPayloadZodSchema.parse({
-        final_status: "success",
-        result_id: "r-1",
-        result_size: 11_482,
-      }),
-    ).not.toThrow();
-  });
 });
 
 describe("JobErrorPayloadSchema (Effect Schema)", () => {
@@ -216,17 +187,6 @@ describe("JobErrorPayloadSchema (Effect Schema)", () => {
     ).rejects.toThrow();
   });
 
-  it("zod twin accepts an error payload with retryable/details", () => {
-    expect(() =>
-      JobErrorPayloadZodSchema.parse({
-        final_status: "error",
-        code: "INTERNAL_ERROR",
-        message: "boom",
-        retryable: true,
-        details: { trace: "abc" },
-      }),
-    ).not.toThrow();
-  });
 });
 
 describe("JobErrorFinalStatusSchema (Effect Schema)", () => {

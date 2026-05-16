@@ -59,7 +59,7 @@ describe("SessionStateService", () => {
     const program = Effect.gen(function* () {
       const s = yield* SessionStateService;
       yield* s.assignId(ID);
-      yield* s.assignId("sess_other" as SessionId);
+      yield* s.assignId("sess_other");
     }).pipe(Effect.provide(SessionStateService.Default));
     const exit = await Effect.runPromiseExit(program);
     expect(exit._tag).toBe("Failure");

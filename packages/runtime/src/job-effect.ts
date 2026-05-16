@@ -296,7 +296,7 @@ function unboundJobStub(): JobEffect {
   const die = (): Effect.Effect<never> =>
     Effect.die("JobService not bound; provide jobLayer");
   return {
-    jobId: "" as JobId,
+    jobId: "",
     emitAccepted: die(),
     emitRunning: die(),
     emitEventKind: () => die(),

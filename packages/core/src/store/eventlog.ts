@@ -2,7 +2,7 @@
 // can swap in a network-backed event log without changing call sites.
 /* eslint-disable @typescript-eslint/require-await */
 import Database from "better-sqlite3";
-import type { z } from "zod";
+import type { Schema } from "effect";
 
 import type { BaseEnvelope } from "../envelope.js";
 import { InvalidRequestError } from "../errors.js";
@@ -200,4 +200,4 @@ export class EventLog {
 
 /** Helper schema (exported for tests): ensures a row's parsed envelope is valid. */
 export const EventRowEnvelopeSchema = ParseEnvelopeFromRow;
-export type ParsedRowEnvelope = z.infer<typeof EventRowEnvelopeSchema>;
+export type ParsedRowEnvelope = Schema.Schema.Type<typeof EventRowEnvelopeSchema>;

@@ -93,7 +93,7 @@ function startFakeRuntime(server: Transport): {
     if (f.type === "job.submit") {
       acceptedJobId = `job_${Math.random()
         .toString(36)
-        .slice(2, 10)}` as JobId;
+        .slice(2, 10)}`;
       await server.send({
         arcp: PROTOCOL_VERSION,
         id: newMessageId(),

@@ -12,19 +12,15 @@ import {
   SessionByePayloadSchema,
   SessionErrorPayloadSchema,
   SessionHelloPayloadSchema,
-  SessionHelloPayloadZodSchema,
   SessionJobsPayloadSchema,
   SessionListJobsPayloadSchema,
   SessionPingPayloadSchema,
   SessionPongPayloadSchema,
   SessionResumeSchema,
   SessionWelcomePayloadSchema,
-  SessionWelcomePayloadZodSchema,
 } from "@arcp/core";
 
-// Pin JSON shapes accepted/rejected by the migrated Effect schemas in
-// session.ts. The zod twins (`*ZodSchema`) feed `messageEnvelope()` until
-// slice #50; we spot-check parity on a couple of the canonical payloads.
+// Pin JSON shapes accepted/rejected by the Effect schemas in session.ts.
 
 const decode =
   <A, I>(s: Schema.Schema<A, I>) =>
@@ -163,14 +159,6 @@ describe("SessionHelloPayloadSchema (Effect Schema)", () => {
     );
   });
 
-  it("zod twin accepts the same docs example for envelope wiring parity", () => {
-    expect(() =>
-      SessionHelloPayloadZodSchema.parse({
-        client: { name: "c", version: "1" },
-        auth: { scheme: "bearer", token: "tok" },
-      }),
-    ).not.toThrow();
-  });
 });
 
 describe("SessionWelcomePayloadSchema (Effect Schema)", () => {
@@ -210,16 +198,6 @@ describe("SessionWelcomePayloadSchema (Effect Schema)", () => {
     ).rejects.toThrow();
   });
 
-  it("zod twin accepts a welcome payload", () => {
-    expect(() =>
-      SessionWelcomePayloadZodSchema.parse({
-        runtime: { name: "rt", version: "1" },
-        resume_token: "rt_01",
-        resume_window_sec: 300,
-        capabilities: { encodings: ["json"] },
-      }),
-    ).not.toThrow();
-  });
 });
 
 describe("SessionErrorPayloadSchema (Effect Schema)", () => {

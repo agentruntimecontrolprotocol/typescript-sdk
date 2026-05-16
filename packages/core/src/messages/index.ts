@@ -1,11 +1,11 @@
 /**
- * Aggregate registry of every core message type defined by ARCP v1.0.
+ * Aggregate registry of every core message type defined by ARCP v1.0/v1.1.
  *
- * `EnvelopeSchema` is the discriminated union over `type`. Parsing an inbound
- * envelope through this schema yields a fully-typed envelope value or a
- * `ZodError` on unknown/invalid types.
+ * `EnvelopeSchema` is the discriminated union over `type` (Effect Schema).
+ * Parsing an inbound envelope through this schema yields a fully-typed
+ * envelope value or a `ParseError` on unknown/invalid types.
  */
-import { z } from "zod";
+import { Schema } from "effect";
 
 import { ARTIFACT_ENVELOPES } from "./artifacts.js";
 import { CONTROL_ENVELOPES } from "./control.js";
@@ -34,9 +34,8 @@ const ALL_ENVELOPES = [
  * either an unknown `type` or a malformed payload.
  */
 type EnvelopeElement = (typeof ALL_ENVELOPES)[number];
-export const EnvelopeSchema = z.discriminatedUnion(
-  "type",
-  ALL_ENVELOPES as readonly [EnvelopeElement, ...EnvelopeElement[]],
+export const EnvelopeSchema = Schema.Union(
+  ...(ALL_ENVELOPES as readonly [EnvelopeElement, ...EnvelopeElement[]]),
 );
 
-export type Envelope = z.infer<typeof EnvelopeSchema>;
+export type Envelope = Schema.Schema.Type<typeof EnvelopeSchema>;

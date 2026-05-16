@@ -259,7 +259,7 @@ export class JobRunner {
 
   private constructJob(input: ConstructJobInput): Job {
     const traceId: TraceId =
-      input.env.trace_id ?? (randomBytes(16).toString("hex") as TraceId);
+      input.env.trace_id ?? (randomBytes(16).toString("hex"));
     const idempotencyHit = input.idempotencyHit;
     const job = new Job({
       options: {

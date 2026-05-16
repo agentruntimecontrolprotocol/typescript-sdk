@@ -1,5 +1,4 @@
 import { Schema } from "effect";
-import { z } from "zod";
 
 /**
  * §9.2 reserved capability namespaces.
@@ -35,31 +34,28 @@ export function isValidCapabilityName(name: string): boolean {
 /**
  * §9.1 lease (Effect Schema): capability → list of glob patterns.
  *
- * Native Effect surface for in-process consumers. The zod twin
- * {@link LeaseZodSchema} still feeds `messageEnvelope()` (slice #50).
+ * Inferred as a mutable `Record<string, string[]>` so the in-process
+ * consumers (`runtime/lease.ts`, `client-handle.ts`, etc.) keep their
+ * existing `Lease` contract.
  *
  * Effect's `Schema.Record` silently drops keys that fail the key schema, so
- * `{ "": [...] }` decodes to `{}`. The zod twin rejects empty keys at the
- * wire layer where it counts.
+ * `{ "": [...] }` decodes to `{}` (zod's twin used to reject at the wire
+ * layer — see migration notes in PR notes for slice #50).
  */
-export const LeaseSchema = Schema.Record({
-  key: Schema.String.pipe(Schema.nonEmptyString()),
-  value: Schema.Array(Schema.String.pipe(Schema.nonEmptyString())),
-});
-
-/** §9.1 lease (zod twin) — drives the zod-typed envelope wrappers. */
-export const LeaseZodSchema = z.record(
-  z.string().min(1),
-  z.array(z.string().min(1)),
+export const LeaseSchema = Schema.mutable(
+  Schema.Record({
+    key: Schema.String.pipe(Schema.nonEmptyString()),
+    value: Schema.mutable(
+      Schema.Array(Schema.String.pipe(Schema.nonEmptyString())),
+    ),
+  }),
 );
+
 /**
- * `Lease` is the zod-inferred type so it stays structurally equivalent to
- * `Record<string, string[]>` for the many in-process consumers
- * (`runtime/lease.ts`, `client-handle.ts`, etc.). The Effect schema infers a
- * `ReadonlyArray<string>` value which would be a non-trivial breaking change
- * to callers — defer that to slice #50.
+ * `Lease` is `Record<string, string[]>` for caller compat with the many
+ * in-process consumers (`runtime/lease.ts`, `client-handle.ts`, etc.).
  */
-export type Lease = z.infer<typeof LeaseZodSchema>;
+export type Lease = Schema.Schema.Type<typeof LeaseSchema>;
 
 /**
  * v1.1 §9.5 lease constraints (Effect Schema). Currently carries only
@@ -72,9 +68,4 @@ export type Lease = z.infer<typeof LeaseZodSchema>;
 export const LeaseConstraintsSchema = Schema.Struct({
   expires_at: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
 });
-
-/** v1.1 §9.5 lease constraints (zod twin). */
-export const LeaseConstraintsZodSchema = z.object({
-  expires_at: z.string().min(1).optional(),
-});
-export type LeaseConstraints = z.infer<typeof LeaseConstraintsZodSchema>;
+export type LeaseConstraints = Schema.Schema.Type<typeof LeaseConstraintsSchema>;

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import type {
   EventSeq,
@@ -16,7 +16,7 @@ import { PROTOCOL_VERSION } from "./version.js";
 //   - `arcp`        MUST be the literal `"1"`.
 //   - `session_id`  REQUIRED on every envelope EXCEPT `session.hello` and
 //                   `session.welcome`. Enforced in `RoundTripEnvelopeSchema`
-//                   via a refine, and per-type by the discriminated union.
+//                   via a filter, and per-type by the discriminated union.
 //   - `trace_id`    OPTIONAL. When present, MUST be 32 lowercase hex chars.
 //   - `event_seq`   REQUIRED on `job.event` / `job.result` / `job.error`.
 //                   At the base envelope level it is OPTIONAL; per-type
@@ -28,18 +28,19 @@ import { PROTOCOL_VERSION } from "./version.js";
  * Carries any extension namespace keys (validated by
  * {@link validateExtensionsObject}) plus a reserved `optional` boolean.
  */
-export const EnvelopeExtensionsSchema = z
-  .record(z.string(), z.unknown())
-  .superRefine((obj, ctx) => {
+export const EnvelopeExtensionsSchema = Schema.Record({
+  key: Schema.String,
+  value: Schema.Unknown,
+}).pipe(
+  Schema.filter((obj) => {
     try {
       validateExtensionsObject(obj);
+      return undefined;
     } catch (error) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: error instanceof Error ? error.message : String(error),
-      });
+      return error instanceof Error ? error.message : String(error);
     }
-  });
+  }),
+);
 
 /** W3C trace-id: 32 lowercase hex characters. */
 const TRACE_ID_PATTERN = /^[0-9a-f]{32}$/;
@@ -49,12 +50,12 @@ export function isValidTraceId(value: string): boolean {
   return TRACE_ID_PATTERN.test(value);
 }
 
-const TraceIdSchema = z
-  .string()
-  .regex(TRACE_ID_PATTERN, {
-    message: "trace_id MUST be 32 lowercase hex characters (W3C Trace Context)",
-  })
-  .brand<"TraceId">();
+const TraceIdSchema: Schema.Schema<TraceId, string> = Schema.String.pipe(
+  Schema.pattern(TRACE_ID_PATTERN, {
+    message: () =>
+      "trace_id MUST be 32 lowercase hex characters (W3C Trace Context)",
+  }),
+);
 
 /**
  * Types where `session_id` is OPTIONAL on the wire (pre-welcome handshake).
@@ -70,38 +71,51 @@ export function isPreSessionType(type: string): boolean {
   return PRE_SESSION_TYPES.has(type);
 }
 
+const MessageIdSchema = Schema.String.pipe(
+  Schema.nonEmptyString(),
+) as unknown as Schema.Schema<MessageId, string>;
+
+const SessionIdInnerSchema = Schema.String as unknown as Schema.Schema<
+  SessionId,
+  string
+>;
+
+const JobIdInnerSchema = Schema.String as unknown as Schema.Schema<
+  JobId,
+  string
+>;
+
+const EventSeqInnerSchema = Schema.Number.pipe(
+  Schema.int(),
+  Schema.nonNegative(),
+) as unknown as Schema.Schema<EventSeq, number>;
+
 /**
- * Base envelope shape per §5.1.
- *
- * `payload` is `unknown`; per-message-type schemas in `messages/` narrow it
- * to a specific shape via `z.discriminatedUnion("type", [...])` and direct
- * extension of this base.
+ * Base envelope shape per §5.1. The base layer is permissive: per-type
+ * schemas in `messages/` narrow `type` to a literal and `payload` to a
+ * specific shape.
  */
-export const BaseEnvelopeSchema = z.object({
-  arcp: z.literal(PROTOCOL_VERSION),
-  id: z.string().min(1).brand<"MessageId">(),
-  type: z.string().min(1),
-  session_id: z.string().brand<"SessionId">().optional(),
-  job_id: z.string().brand<"JobId">().optional(),
-  trace_id: TraceIdSchema.optional(),
-  event_seq: z.number().int().nonnegative().brand<"EventSeq">().optional(),
-  extensions: EnvelopeExtensionsSchema.optional(),
-  payload: z.unknown(),
+export const BaseEnvelopeSchema = Schema.Struct({
+  arcp: Schema.Literal(PROTOCOL_VERSION),
+  id: MessageIdSchema,
+  type: Schema.String.pipe(Schema.nonEmptyString()),
+  session_id: Schema.optional(SessionIdInnerSchema),
+  job_id: Schema.optional(JobIdInnerSchema),
+  trace_id: Schema.optional(TraceIdSchema),
+  event_seq: Schema.optional(EventSeqInnerSchema),
+  extensions: Schema.optional(EnvelopeExtensionsSchema),
+  payload: Schema.Unknown,
 });
 
 /**
  * The base envelope, type-only. Specific message envelopes refine this base
  * by overriding `type` to a literal and `payload` to a typed schema.
  */
-export type BaseEnvelope = z.infer<typeof BaseEnvelopeSchema>;
+export type BaseEnvelope = Schema.Schema.Type<typeof BaseEnvelopeSchema>;
 
 /**
  * Optional fields on the base envelope, used to construct envelopes by
  * spreading only the fields that are defined.
- *
- * Each field uses `| undefined` so callers can pass `{ session_id: x }`
- * where `x` may be undefined (zod's `.optional()` output type) and rely on
- * {@link pickDefined} or {@link buildEnvelope} to strip undefined keys.
  */
 // Kept as a type alias (not interface) so it remains assignable to
 // `Record<string, unknown>` when spread through `pickDefined`.
@@ -132,18 +146,28 @@ export function pickDefined<T extends Record<string, unknown>>(
 }
 
 /**
- * Build a per-type envelope schema. The result is a zod object schema with
+ * Build a per-type envelope schema. Returns an Effect `Schema.Struct` with
  * `type` constrained to the literal `T` and `payload` constrained to `P`.
  *
- * Inference handles the (complex) ZodObject shape better than writing it out.
+ * The full set of base envelope fields (id, session_id, etc.) is included so
+ * the discriminated union over the per-type schemas decodes envelopes
+ * end-to-end.
  */
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function messageEnvelope<T extends string, P extends z.ZodTypeAny>(
-  type: T,
-  payload: P,
-) {
-  return BaseEnvelopeSchema.extend({
-    type: z.literal(type),
+export function messageEnvelope<
+  T extends string,
+  A,
+  I,
+>(type: T, payload: Schema.Schema<A, I>) {
+  return Schema.Struct({
+    arcp: Schema.Literal(PROTOCOL_VERSION),
+    id: MessageIdSchema,
+    type: Schema.Literal(type),
+    session_id: Schema.optional(SessionIdInnerSchema),
+    job_id: Schema.optional(JobIdInnerSchema),
+    trace_id: Schema.optional(TraceIdSchema),
+    event_seq: Schema.optional(EventSeqInnerSchema),
+    extensions: Schema.optional(EnvelopeExtensionsSchema),
     payload,
   });
 }
@@ -171,24 +195,26 @@ export function buildEnvelope<T extends string, P>(args: {
 /**
  * Round-trip a raw JSON value through the base envelope schema.
  *
- * Returns the parsed envelope shape with all unknown fields preserved (since
- * zod's default mode strips, but we want to keep extension fields intact for
- * the runtime dispatcher).
- *
  * Enforces the session_id requirement from §5.1: present on every envelope
- * except `session.hello` / `session.welcome`.
+ * except `session.hello` / `session.welcome`. Unknown fields pass through
+ * via `Schema.Struct`'s default behavior (extra keys are dropped on
+ * decode), so callers that need extensions intact must declare them on the
+ * schema (the `extensions` field is preserved).
  */
-export const RoundTripEnvelopeSchema =
-  BaseEnvelopeSchema.passthrough().superRefine((env, ctx) => {
+export const RoundTripEnvelopeSchema = BaseEnvelopeSchema.pipe(
+  Schema.filter((env) => {
     if (
       !isPreSessionType(env.type) &&
       (env.session_id === undefined || env.session_id === "")
     ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `session_id is REQUIRED on envelopes of type "${env.type}"`,
+      return {
         path: ["session_id"],
-      });
+        message: `session_id is REQUIRED on envelopes of type "${env.type}"`,
+      };
     }
-  });
-export type RoundTripEnvelope = z.infer<typeof RoundTripEnvelopeSchema>;
+    return undefined;
+  }),
+);
+export type RoundTripEnvelope = Schema.Schema.Type<
+  typeof RoundTripEnvelopeSchema
+>;

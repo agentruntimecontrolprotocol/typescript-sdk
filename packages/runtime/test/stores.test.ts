@@ -1,4 +1,4 @@
-import { type JobId, TaggedResumeWindowExpired } from "@arcp/core";
+import { TaggedResumeWindowExpired } from "@arcp/core";
 import { Effect, Exit } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -17,7 +17,7 @@ const FUTURE = Date.now() + 60_000;
 
 function entry(jobId: string, overrides: Partial<IdempotencyEntry> = {}): IdempotencyEntry {
   return {
-    jobId: jobId as JobId,
+    jobId: jobId,
     agent: "echo",
     inputDigest: "{}",
     expiresAt: FUTURE,

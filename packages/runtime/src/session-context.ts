@@ -10,7 +10,10 @@ import {
   InternalError,
   InvalidRequestError,
 } from "@arcp/core/errors";
-import { classifyUnknownType } from "@arcp/core/extensions";
+import {
+  classifyUnknownType,
+  CORE_MESSAGE_TYPES,
+} from "@arcp/core/extensions";
 import type { Logger } from "@arcp/core/logger";
 import {
   type Envelope,
@@ -20,11 +23,17 @@ import {
 import { PendingRegistry, SessionState } from "@arcp/core/state";
 import type { Transport, WireFrame } from "@arcp/core/transport";
 import { newMessageId } from "@arcp/core/util";
-import { z } from "zod";
+import { Either, Schema } from "effect";
 
 import { JobManager } from "./job.js";
 import type { ARCPServer } from "./server.js";
 import type { EventSeqSource, Handler } from "./types.js";
+
+const decodeRoundTripEnvelope = Schema.decodeUnknownSync(
+  RoundTripEnvelopeSchema,
+);
+const decodeEnvelope = Schema.decodeUnknownEither(EnvelopeSchema);
+const KNOWN_CORE_TYPES: ReadonlySet<string> = new Set(CORE_MESSAGE_TYPES);
 
 const HANDSHAKE_TYPES = new Set<string>(["session.hello"]);
 // session.ping/pong/ack are session-control envelopes (not event-seq-bearing),
@@ -86,11 +95,11 @@ export class SessionContext implements EventSeqSource {
 
   public nextEventSeq(): EventSeq {
     this.eventSeq += 1;
-    return this.eventSeq as EventSeq;
+    return this.eventSeq;
   }
 
   public get latestEventSeq(): EventSeq {
-    return this.eventSeq as EventSeq;
+    return this.eventSeq;
   }
 
   public setEventSeq(value: number): void {
@@ -314,7 +323,7 @@ export class SessionContext implements EventSeqSource {
 
   private parseInboundFrame(frame: WireFrame): BaseEnvelope | null {
     try {
-      return RoundTripEnvelopeSchema.parse(frame);
+      return decodeRoundTripEnvelope(frame);
     } catch (error) {
       this.logger.warn(
         { err: error },
@@ -355,16 +364,18 @@ export class SessionContext implements EventSeqSource {
   }
 
   private async validateInbound(parsed: BaseEnvelope): Promise<Envelope | null> {
-    const result = EnvelopeSchema.safeParse(parsed);
-    if (result.success) return result.data;
-    const issue = result.error.issues[0];
-    if (issue?.code === z.ZodIssueCode.invalid_union_discriminator) {
+    const result = decodeEnvelope(parsed);
+    if (Either.isRight(result)) return result.right;
+    // Mirror zod's `invalid_union_discriminator` behavior: if `type` is not a
+    // known core message type, treat as unknown type disposition rather than
+    // a generic schema failure.
+    if (!KNOWN_CORE_TYPES.has(parsed.type)) {
       await this.handleUnknownTypeDisposition(parsed);
       return null;
     }
     await this.emitSessionError(
       new InvalidRequestError(
-        `Invalid envelope: ${issue?.message ?? "schema validation failed"}`,
+        `Invalid envelope: ${result.left.message}`,
       ),
     );
     return null;

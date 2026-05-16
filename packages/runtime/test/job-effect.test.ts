@@ -199,7 +199,7 @@ describe("JobManagerService (Effect)", () => {
 
   it("register/get/has/retire round-trip", async () => {
     const mgr = makeFakeManager();
-    const job = makeFakeJob("job_a" as JobId);
+    const job = makeFakeJob("job_a");
     const result = await Effect.runPromise(
       Effect.gen(function* () {
         const svc = yield* JobManagerService;
@@ -216,7 +216,7 @@ describe("JobManagerService (Effect)", () => {
 
   it("cancelAll forwards the reason", async () => {
     const mgr = makeFakeManager();
-    mgr.register(makeFakeJob("job_a" as JobId));
+    mgr.register(makeFakeJob("job_a"));
     const count = await Effect.runPromise(
       Effect.gen(function* () {
         const svc = yield* JobManagerService;

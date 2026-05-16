@@ -1,8 +1,7 @@
 import { Schema } from "effect";
-import { z } from "zod";
 
 import { messageEnvelope } from "../envelope.js";
-import { ERROR_CODES, ErrorPayloadSchema } from "../errors.js";
+import { ErrorPayloadSchema } from "../errors.js";
 
 // ARCP v1.0 + v1.1 session envelopes (§6):
 //   session.hello     — client → runtime; opens a new or resumed session.
@@ -14,30 +13,17 @@ import { ERROR_CODES, ErrorPayloadSchema } from "../errors.js";
 //   session.ack       — client → runtime; v1.1 flow-control ack (§6.5).
 //   session.list_jobs — client → runtime; v1.1 job inventory request (§6.6).
 //   session.jobs      — runtime → client; v1.1 job inventory response (§6.6).
-//
-// Effect-`Schema` payloads define the canonical wire shape. Zod twins
-// (`*ZodSchema`) feed `messageEnvelope()` because the envelope layer is
-// still zod-typed (slice #50). Where a payload type alias is consumed by
-// in-process callers (e.g. `Capabilities`, `SessionJobsPayload`) we derive
-// it from the zod twin to keep prior structural compatibility (the Effect
-// inferred type has `ReadonlyArray<…>` and `readonly` modifiers which would
-// be a non-trivial caller-side change to roll out in this slice).
 
 /** §6.1 v1.0 supports bearer only. */
 export const AuthSchemeSchema = Schema.Literal("bearer");
-export const AuthSchemeZodSchema = z.enum(["bearer"]);
-export type AuthScheme = z.infer<typeof AuthSchemeZodSchema>;
+export type AuthScheme = Schema.Schema.Type<typeof AuthSchemeSchema>;
 
 /** §6.1 credential block. Token is REQUIRED for the `bearer` scheme. */
 export const AuthCredentialSchema = Schema.Struct({
   scheme: AuthSchemeSchema,
   token: Schema.optional(Schema.String),
 });
-export const AuthCredentialZodSchema = z.object({
-  scheme: AuthSchemeZodSchema,
-  token: z.string().optional(),
-});
-export type AuthCredential = z.infer<typeof AuthCredentialZodSchema>;
+export type AuthCredential = Schema.Schema.Type<typeof AuthCredentialSchema>;
 
 /** §6.2 client identity block. */
 export const ClientIdentitySchema = Schema.Struct({
@@ -46,13 +32,7 @@ export const ClientIdentitySchema = Schema.Struct({
   fingerprint: Schema.optional(Schema.String),
   principal: Schema.optional(Schema.String),
 });
-export const ClientIdentityZodSchema = z.object({
-  name: z.string().min(1),
-  version: z.string().min(1),
-  fingerprint: z.string().optional(),
-  principal: z.string().optional(),
-});
-export type ClientIdentity = z.infer<typeof ClientIdentityZodSchema>;
+export type ClientIdentity = Schema.Schema.Type<typeof ClientIdentitySchema>;
 
 /** §6.2 runtime identity block. */
 export const RuntimeIdentitySchema = Schema.Struct({
@@ -60,33 +40,29 @@ export const RuntimeIdentitySchema = Schema.Struct({
   version: Schema.String.pipe(Schema.nonEmptyString()),
   fingerprint: Schema.optional(Schema.String),
 });
-export const RuntimeIdentityZodSchema = z.object({
-  name: z.string().min(1),
-  version: z.string().min(1),
-  fingerprint: z.string().optional(),
-});
-export type RuntimeIdentity = z.infer<typeof RuntimeIdentityZodSchema>;
+export type RuntimeIdentity = Schema.Schema.Type<typeof RuntimeIdentitySchema>;
 
 /**
  * v1.1 §6.2 / §7.5 rich agent inventory entry. The `default` field declares
  * the version a bare-name `agent` resolves to.
  */
-export const AgentInventoryEntrySchema = Schema.Struct({
-  name: Schema.String.pipe(Schema.nonEmptyString()),
-  versions: Schema.Array(Schema.String.pipe(Schema.nonEmptyString())),
-  default: Schema.optional(Schema.String),
-});
-export const AgentInventoryEntryZodSchema = z.object({
-  name: z.string().min(1),
-  versions: z.array(z.string().min(1)),
-  default: z.string().optional(),
-});
-export type AgentInventoryEntry = z.infer<typeof AgentInventoryEntryZodSchema>;
+export const AgentInventoryEntrySchema = Schema.mutable(
+  Schema.Struct({
+    name: Schema.String.pipe(Schema.nonEmptyString()),
+    versions: Schema.mutable(
+      Schema.Array(Schema.String.pipe(Schema.nonEmptyString())),
+    ),
+    default: Schema.optional(Schema.String),
+  }),
+);
+export type AgentInventoryEntry = Schema.Schema.Type<
+  typeof AgentInventoryEntrySchema
+>;
 
 /**
  * Capability advertisement (§6.2).
  *
- * v1.0 capabilities is a small announcement:
+ * v1.0:
  *   - `encodings` — encoding formats the peer supports (e.g., "json").
  *   - `agents`    — agent identifiers the runtime can serve (runtime-side only).
  *
@@ -95,32 +71,20 @@ export type AgentInventoryEntry = z.infer<typeof AgentInventoryEntryZodSchema>;
  *                   feature set; see §6.2 / `V1_1_FEATURES`).
  *   - `agents` MAY use a richer object shape advertising each agent's
  *                   available versions and default (§7.5).
- *
- * Unknown peer fields round-trip via passthrough on the zod twin (the wire
- * surface that `messageEnvelope()` consumes). The Effect Schema mirrors the
- * declared field set; consumers that need passthrough should keep using the
- * zod twin.
  */
-export const CapabilitiesSchema = Schema.Struct({
-  encodings: Schema.optional(Schema.Array(Schema.String)),
-  agents: Schema.optional(
-    Schema.Union(
-      Schema.Array(Schema.String),
-      Schema.Array(AgentInventoryEntrySchema),
+export const CapabilitiesSchema = Schema.mutable(
+  Schema.Struct({
+    encodings: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+    agents: Schema.optional(
+      Schema.Union(
+        Schema.mutable(Schema.Array(Schema.String)),
+        Schema.mutable(Schema.Array(AgentInventoryEntrySchema)),
+      ),
     ),
-  ),
-  features: Schema.optional(Schema.Array(Schema.String)),
-});
-export const CapabilitiesZodSchema = z
-  .object({
-    encodings: z.array(z.string()).optional(),
-    agents: z
-      .union([z.array(z.string()), z.array(AgentInventoryEntryZodSchema)])
-      .optional(),
-    features: z.array(z.string()).optional(),
-  })
-  .passthrough();
-export type Capabilities = z.infer<typeof CapabilitiesZodSchema>;
+    features: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  }),
+);
+export type Capabilities = Schema.Schema.Type<typeof CapabilitiesSchema>;
 
 /**
  * Normalize an `agents` advertisement to the rich v1.1 shape.
@@ -148,12 +112,7 @@ export const SessionResumeSchema = Schema.Struct({
   resume_token: Schema.String.pipe(Schema.nonEmptyString()),
   last_event_seq: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
 });
-export const SessionResumeZodSchema = z.object({
-  session_id: z.string().min(1).brand<"SessionId">(),
-  resume_token: z.string().min(1).brand<"ResumeToken">(),
-  last_event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
-});
-export type SessionResume = z.infer<typeof SessionResumeZodSchema>;
+export type SessionResume = Schema.Schema.Type<typeof SessionResumeSchema>;
 
 export const SessionHelloPayloadSchema = Schema.Struct({
   client: ClientIdentitySchema,
@@ -161,13 +120,9 @@ export const SessionHelloPayloadSchema = Schema.Struct({
   capabilities: Schema.optional(CapabilitiesSchema),
   resume: Schema.optional(SessionResumeSchema),
 });
-export const SessionHelloPayloadZodSchema = z.object({
-  client: ClientIdentityZodSchema,
-  auth: AuthCredentialZodSchema,
-  capabilities: CapabilitiesZodSchema.optional(),
-  resume: SessionResumeZodSchema.optional(),
-});
-export type SessionHelloPayload = z.infer<typeof SessionHelloPayloadZodSchema>;
+export type SessionHelloPayload = Schema.Schema.Type<
+  typeof SessionHelloPayloadSchema
+>;
 
 /**
  * `session.welcome.payload` — v1.0 fields plus the OPTIONAL v1.1
@@ -184,66 +139,44 @@ export const SessionWelcomePayloadSchema = Schema.Struct({
   ),
   capabilities: CapabilitiesSchema,
 });
-export const SessionWelcomePayloadZodSchema = z.object({
-  runtime: RuntimeIdentityZodSchema,
-  resume_token: z.string().min(1).brand<"ResumeToken">(),
-  resume_window_sec: z.number().int().positive(),
-  heartbeat_interval_sec: z.number().int().positive().optional(),
-  capabilities: CapabilitiesZodSchema,
-});
-export type SessionWelcomePayload = z.infer<
-  typeof SessionWelcomePayloadZodSchema
+export type SessionWelcomePayload = Schema.Schema.Type<
+  typeof SessionWelcomePayloadSchema
 >;
 
-/** Internal Effect mirror of `ErrorPayloadSchema`; matches zod field-for-field. */
-const ErrorPayloadEffectSchema = Schema.Struct({
-  code: Schema.Literal(...ERROR_CODES),
-  message: Schema.String.pipe(Schema.nonEmptyString()),
-  retryable: Schema.optional(Schema.Boolean),
-  details: Schema.optional(
-    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-  ),
-});
-
-export const SessionErrorPayloadSchema = ErrorPayloadEffectSchema;
-export const SessionErrorPayloadZodSchema = ErrorPayloadSchema;
-export type SessionErrorPayload = z.infer<typeof SessionErrorPayloadZodSchema>;
+export const SessionErrorPayloadSchema = ErrorPayloadSchema;
+export type SessionErrorPayload = Schema.Schema.Type<
+  typeof SessionErrorPayloadSchema
+>;
 
 export const SessionByePayloadSchema = Schema.Struct({
   reason: Schema.optional(Schema.String),
 });
-export const SessionByePayloadZodSchema = z.object({
-  reason: z.string().optional(),
-});
-export type SessionByePayload = z.infer<typeof SessionByePayloadZodSchema>;
+export type SessionByePayload = Schema.Schema.Type<
+  typeof SessionByePayloadSchema
+>;
 
 export const SessionPingPayloadSchema = Schema.Struct({
   nonce: Schema.String.pipe(Schema.nonEmptyString()),
   sent_at: Schema.String.pipe(Schema.nonEmptyString()),
 });
-export const SessionPingPayloadZodSchema = z.object({
-  nonce: z.string().min(1),
-  sent_at: z.string().min(1),
-});
-export type SessionPingPayload = z.infer<typeof SessionPingPayloadZodSchema>;
+export type SessionPingPayload = Schema.Schema.Type<
+  typeof SessionPingPayloadSchema
+>;
 
 export const SessionPongPayloadSchema = Schema.Struct({
   ping_nonce: Schema.String.pipe(Schema.nonEmptyString()),
   received_at: Schema.String.pipe(Schema.nonEmptyString()),
 });
-export const SessionPongPayloadZodSchema = z.object({
-  ping_nonce: z.string().min(1),
-  received_at: z.string().min(1),
-});
-export type SessionPongPayload = z.infer<typeof SessionPongPayloadZodSchema>;
+export type SessionPongPayload = Schema.Schema.Type<
+  typeof SessionPongPayloadSchema
+>;
 
 export const SessionAckPayloadSchema = Schema.Struct({
   last_processed_seq: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
 });
-export const SessionAckPayloadZodSchema = z.object({
-  last_processed_seq: z.number().int().nonnegative(),
-});
-export type SessionAckPayload = z.infer<typeof SessionAckPayloadZodSchema>;
+export type SessionAckPayload = Schema.Schema.Type<
+  typeof SessionAckPayloadSchema
+>;
 
 /**
  * Note: `JOB_STATES` lives in `messages/execution.ts`; to avoid an import
@@ -258,14 +191,8 @@ export const SessionListJobsFilterSchema = Schema.Struct({
   created_after: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
   created_before: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
 });
-export const SessionListJobsFilterZodSchema = z.object({
-  status: z.array(z.string().min(1)).optional(),
-  agent: z.string().min(1).optional(),
-  created_after: z.string().min(1).optional(),
-  created_before: z.string().min(1).optional(),
-});
-export type SessionListJobsFilter = z.infer<
-  typeof SessionListJobsFilterZodSchema
+export type SessionListJobsFilter = Schema.Schema.Type<
+  typeof SessionListJobsFilterSchema
 >;
 
 export const SessionListJobsPayloadSchema = Schema.Struct({
@@ -273,13 +200,8 @@ export const SessionListJobsPayloadSchema = Schema.Struct({
   limit: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   cursor: Schema.optional(Schema.NullOr(Schema.String)),
 });
-export const SessionListJobsPayloadZodSchema = z.object({
-  filter: SessionListJobsFilterZodSchema.optional(),
-  limit: z.number().int().positive().optional(),
-  cursor: z.string().nullable().optional(),
-});
-export type SessionListJobsPayload = z.infer<
-  typeof SessionListJobsPayloadZodSchema
+export type SessionListJobsPayload = Schema.Schema.Type<
+  typeof SessionListJobsPayloadSchema
 >;
 
 export const JobListEntrySchema = Schema.Struct({
@@ -295,69 +217,56 @@ export const JobListEntrySchema = Schema.Struct({
   trace_id: Schema.optional(Schema.String),
   last_event_seq: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
 });
-export const JobListEntryZodSchema = z.object({
-  job_id: z.string().min(1).brand<"JobId">(),
-  agent: z.string().min(1),
-  status: z.string().min(1),
-  lease: z.record(z.string(), z.array(z.string())),
-  parent_job_id: z.string().brand<"JobId">().nullable().optional(),
-  created_at: z.string().min(1),
-  trace_id: z.string().brand<"TraceId">().optional(),
-  last_event_seq: z.number().int().nonnegative().brand<"EventSeq">(),
-});
-export type JobListEntry = z.infer<typeof JobListEntryZodSchema>;
+export type JobListEntry = Schema.Schema.Type<typeof JobListEntrySchema>;
 
 export const SessionJobsPayloadSchema = Schema.Struct({
   request_id: Schema.String.pipe(Schema.nonEmptyString()),
-  jobs: Schema.Array(JobListEntrySchema),
+  jobs: Schema.mutable(Schema.Array(JobListEntrySchema)),
   next_cursor: Schema.NullOr(Schema.String),
 });
-export const SessionJobsPayloadZodSchema = z.object({
-  request_id: z.string().min(1),
-  jobs: z.array(JobListEntryZodSchema),
-  next_cursor: z.string().nullable(),
-});
-export type SessionJobsPayload = z.infer<typeof SessionJobsPayloadZodSchema>;
+export type SessionJobsPayload = Schema.Schema.Type<
+  typeof SessionJobsPayloadSchema
+>;
 
-// Envelopes — built with `messageEnvelope()` (zod-typed; slice #50).
+// Envelopes — built with `messageEnvelope()` (Effect Schema).
 
 export const SessionHelloEnvelopeSchema = messageEnvelope(
   "session.hello",
-  SessionHelloPayloadZodSchema,
+  SessionHelloPayloadSchema,
 );
 export const SessionWelcomeEnvelopeSchema = messageEnvelope(
   "session.welcome",
-  SessionWelcomePayloadZodSchema,
-).extend({ session_id: z.string().min(1).brand<"SessionId">() });
+  SessionWelcomePayloadSchema,
+);
 export const SessionErrorEnvelopeSchema = messageEnvelope(
   "session.error",
-  SessionErrorPayloadZodSchema,
+  SessionErrorPayloadSchema,
 );
 export const SessionByeEnvelopeSchema = messageEnvelope(
   "session.bye",
-  SessionByePayloadZodSchema,
-).extend({ session_id: z.string().min(1).brand<"SessionId">() });
+  SessionByePayloadSchema,
+);
 
 export const SessionPingEnvelopeSchema = messageEnvelope(
   "session.ping",
-  SessionPingPayloadZodSchema,
-).extend({ session_id: z.string().min(1).brand<"SessionId">() });
+  SessionPingPayloadSchema,
+);
 export const SessionPongEnvelopeSchema = messageEnvelope(
   "session.pong",
-  SessionPongPayloadZodSchema,
-).extend({ session_id: z.string().min(1).brand<"SessionId">() });
+  SessionPongPayloadSchema,
+);
 export const SessionAckEnvelopeSchema = messageEnvelope(
   "session.ack",
-  SessionAckPayloadZodSchema,
-).extend({ session_id: z.string().min(1).brand<"SessionId">() });
+  SessionAckPayloadSchema,
+);
 export const SessionListJobsEnvelopeSchema = messageEnvelope(
   "session.list_jobs",
-  SessionListJobsPayloadZodSchema,
-).extend({ session_id: z.string().min(1).brand<"SessionId">() });
+  SessionListJobsPayloadSchema,
+);
 export const SessionJobsEnvelopeSchema = messageEnvelope(
   "session.jobs",
-  SessionJobsPayloadZodSchema,
-).extend({ session_id: z.string().min(1).brand<"SessionId">() });
+  SessionJobsPayloadSchema,
+);
 
 export const SESSION_ENVELOPES = [
   SessionHelloEnvelopeSchema,

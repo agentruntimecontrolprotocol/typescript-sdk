@@ -1,3 +1,5 @@
+import { Either, Schema } from "effect";
+
 import { type BaseEnvelope, BaseEnvelopeSchema } from "../envelope.js";
 import { InvalidRequestError } from "../errors.js";
 
@@ -25,7 +27,8 @@ export interface BuiltQuery {
   params: Record<string, unknown>;
 }
 
-export const ParseEnvelopeFromRow = BaseEnvelopeSchema.passthrough();
+export const ParseEnvelopeFromRow = BaseEnvelopeSchema;
+const decodeRowEnvelope = Schema.decodeUnknownEither(ParseEnvelopeFromRow);
 
 export function projectIndexedFields(env: BaseEnvelope): IndexedFields {
   if (env.session_id === undefined) {
@@ -52,17 +55,17 @@ export function rowToEnvelope(row: EventRow): BaseEnvelope {
       cause: error instanceof Error ? error : new Error(String(error)),
     });
   }
-  const result = ParseEnvelopeFromRow.safeParse(parsed);
-  if (!result.success) {
+  const result = decodeRowEnvelope(parsed);
+  if (Either.isLeft(result)) {
     throw new InvalidRequestError("EventLog row failed envelope schema", {
       details: {
         id: row.id,
         session_id: row.session_id,
-        issues: result.error.issues,
+        issue: result.left.message,
       },
     });
   }
-  return result.data;
+  return result.right;
 }
 
 const EQUALITY_COLUMNS: readonly (keyof EventLogFilter)[] = [

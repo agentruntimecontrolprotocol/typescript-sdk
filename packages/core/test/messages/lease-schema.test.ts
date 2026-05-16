@@ -5,14 +5,11 @@ import {
   isReservedCapabilityName,
   isValidCapabilityName,
   LeaseConstraintsSchema,
-  LeaseConstraintsZodSchema,
   LeaseSchema,
-  LeaseZodSchema,
   RESERVED_CAPABILITY_NAMES,
 } from "@arcp/core";
 
-// Pin JSON shapes accepted/rejected by the migrated Effect lease schemas.
-// The zod twins (`*ZodSchema`) feed `messageEnvelope()` until slice #50.
+// Pin JSON shapes accepted/rejected by the Effect lease schemas.
 
 const decode =
   <A, I>(s: Schema.Schema<A, I>) =>
@@ -44,17 +41,12 @@ describe("LeaseSchema (Effect Schema)", () => {
     ).rejects.toThrow();
   });
 
-  it("zod twin rejects empty capability keys", () => {
-    expect(() => LeaseZodSchema.parse({ "": ["x"] })).toThrow();
-  });
-
-  it("zod twin accepts the docs/guides/lease.md example", () => {
-    expect(() =>
-      LeaseZodSchema.parse({
-        "tool.call": ["web.search"],
-        "fs.read": ["/tmp/**"],
-      }),
-    ).not.toThrow();
+  it("accepts the docs/guides/lease.md example via Effect schema", async () => {
+    const input = {
+      "tool.call": ["web.search"],
+      "fs.read": ["/tmp/**"],
+    };
+    await expect(decode(LeaseSchema)(input)).resolves.toEqual(input);
   });
 });
 
@@ -74,11 +66,6 @@ describe("LeaseConstraintsSchema (Effect Schema)", () => {
     ).rejects.toThrow();
   });
 
-  it("zod twin accepts the same body", () => {
-    expect(() =>
-      LeaseConstraintsZodSchema.parse({ expires_at: "2025-12-31T23:59:59Z" }),
-    ).not.toThrow();
-  });
 });
 
 describe("capability name predicates", () => {
