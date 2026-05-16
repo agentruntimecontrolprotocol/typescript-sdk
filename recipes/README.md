@@ -48,6 +48,21 @@ the transport mid-stream, opens a fresh one with `client.resume()`, and
 the runtime replays every envelope past the cutoff so reassembly
 completes seamlessly across the gap.
 
+## [mcp-skill/](mcp-skill/) — MCP bridge
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/mcp-skill-dark.svg">
+  <img alt="mcp-skill architecture" src="diagrams/mcp-skill-light.svg">
+</picture>
+
+An MCP server fronts the [multi-agent-budget](multi-agent-budget/)
+planner so any MCP host (Claude Code, Cursor, Desktop) can call it as a
+single `research` tool. The bridge keeps one long-lived ARCP session;
+each MCP tool invocation submits a fresh planner job and returns the
+terminal result as the tool's text response. A Claude Code skill at
+[skills/research/SKILL.md](mcp-skill/skills/research/SKILL.md) tells the
+model when to reach for the tool.
+
 ---
 
 Diagram sources are in [`diagrams/`](diagrams/) along with the kit used
