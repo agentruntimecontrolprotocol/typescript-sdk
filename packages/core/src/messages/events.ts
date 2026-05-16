@@ -4,7 +4,7 @@ import { z } from "zod";
 import { ERROR_CODES } from "../errors.js";
 
 import { ArtifactRefSchema } from "./artifacts.js";
-import { LeaseConstraintsSchema, LeaseSchema } from "./lease-schema.js";
+import { LeaseConstraintsSchema, LeaseZodSchema } from "./lease-schema.js";
 import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
 import { fromZod } from "./zod-adapter.js";
 
@@ -93,20 +93,22 @@ export const StatusBodySchema = Schema.Struct({
 });
 export type StatusBody = Schema.Schema.Type<typeof StatusBodySchema>;
 
-// `lease_request` / `lease_constraints` still live as zod (slice-boundary;
-// `lease-schema.ts` migration is its own future slice). Bridge through
-// `fromZod` so the surrounding Effect `Schema.Struct` can compose them.
-const LeaseEffectSchema = fromZod(LeaseSchema);
-const LeaseConstraintsEffectSchema = fromZod(LeaseConstraintsSchema);
+// `LeaseSchema` infers `Record<string, ReadonlyArray<string>>`; the rest of
+// the runtime (lease.ts, job-runner.ts) treats `Lease` as the mutable
+// `Record<string, string[]>` shape from the zod twin. Bridge through
+// `fromZod` so the inferred `DelegateBody.lease_request` stays
+// assignment-compatible with the zod-derived `Lease` alias until slice #50
+// migrates the `Lease` consumers to readonly arrays.
+const LeaseMutableEffectSchema = fromZod(LeaseZodSchema);
 
 /** §8.2 `delegate` event-kind body. */
 export const DelegateBodySchema = Schema.Struct({
   delegate_id: Schema.String.pipe(Schema.nonEmptyString()),
   agent: Schema.String.pipe(Schema.nonEmptyString()),
   input: Schema.Unknown,
-  lease_request: Schema.optional(LeaseEffectSchema),
+  lease_request: Schema.optional(LeaseMutableEffectSchema),
   /** v1.1 §9.4/§9.5 — child lease bound; MUST NOT exceed parent's. */
-  lease_constraints: Schema.optional(LeaseConstraintsEffectSchema),
+  lease_constraints: Schema.optional(LeaseConstraintsSchema),
 });
 export type DelegateBody = Schema.Schema.Type<typeof DelegateBodySchema>;
 

@@ -11,8 +11,8 @@ import {
 
 import { JobEventPayloadZodSchema } from "./events.js";
 import {
-  LeaseConstraintsSchema,
-  LeaseSchema,
+  LeaseConstraintsZodSchema,
+  LeaseZodSchema,
 } from "./lease-schema.js";
 
 // ARCP v1.0 §7-§8 job-related envelopes.
@@ -22,8 +22,10 @@ export {
   isValidCapabilityName,
   type Lease,
   LeaseConstraintsSchema,
+  LeaseConstraintsZodSchema,
   type LeaseConstraints,
   LeaseSchema,
+  LeaseZodSchema,
   RESERVED_CAPABILITY_NAMES,
   type ReservedCapabilityName,
 } from "./lease-schema.js";
@@ -159,8 +161,8 @@ export const JobSubmitPayloadSchema = Schema.Struct({
 export const JobSubmitPayloadZodSchema = z.object({
   agent: z.string().min(1),
   input: z.unknown(),
-  lease_request: LeaseSchema.optional(),
-  lease_constraints: LeaseConstraintsSchema.optional(),
+  lease_request: LeaseZodSchema.optional(),
+  lease_constraints: LeaseConstraintsZodSchema.optional(),
   idempotency_key: z.string().min(1).optional(),
   max_runtime_sec: z.number().int().positive().optional(),
 });
@@ -187,9 +189,9 @@ export const JobAcceptedPayloadZodSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),
   /** Resolved `name@version` when v1.1 agent_versions is in use; bare name otherwise. */
   agent: z.string().min(1).optional(),
-  lease: LeaseSchema,
+  lease: LeaseZodSchema,
   /** v1.1 §9.5 — echoed lease constraints. */
-  lease_constraints: LeaseConstraintsSchema.optional(),
+  lease_constraints: LeaseConstraintsZodSchema.optional(),
   /** v1.1 §9.6 — initial budget counters, when `cost.budget` is in the lease. */
   budget: JobBudgetZodSchema.optional(),
   accepted_at: z.string().min(1),
@@ -358,8 +360,8 @@ export const JobSubscribedPayloadZodSchema = z.object({
   job_id: z.string().min(1).brand<"JobId">(),
   current_status: JobStateZodSchema,
   agent: z.string().min(1),
-  lease: LeaseSchema,
-  lease_constraints: LeaseConstraintsSchema.optional(),
+  lease: LeaseZodSchema,
+  lease_constraints: LeaseConstraintsZodSchema.optional(),
   budget: JobBudgetZodSchema.optional(),
   parent_job_id: z.string().brand<"JobId">().nullable().optional(),
   trace_id: z.string().brand<"TraceId">().optional(),
