@@ -13,7 +13,8 @@
       "!**/node_modules",
       "!**/.tsbuildinfo",
       "!pnpm-lock.yaml",
-      "!.refactor"
+      "!.refactor",
+      "!recipes"
     ]
   },
   "formatter": {

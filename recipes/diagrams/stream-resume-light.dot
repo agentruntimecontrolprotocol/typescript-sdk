@@ -1,0 +1,57 @@
+digraph StreamResume {
+  rankdir=TB;
+  bgcolor="transparent";
+  compound=true;
+  fontname="Helvetica";
+  splines=spline;
+  nodesep=0.32;
+  ranksep=0.55;
+  pad="0.35,0.25";
+
+  node [
+    shape=box, style="rounded,filled",
+    fillcolor="white", color="#CBD5E1",
+    fontname="Helvetica", fontsize=11, fontcolor="#1F2937",
+    margin="0.22,0.11", penwidth=1.0
+  ];
+
+  edge [
+    fontname="Helvetica", fontsize=9, fontcolor="#64748B",
+    color="#94A3B8", penwidth=1.1, arrowsize=0.75, arrowhead=vee
+  ];
+
+  Client [
+    label=<<FONT POINT-SIZE="12"><B>ARCPClient</B></FONT>>,
+    fillcolor="#3B82F6", color="#2563EB",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  Writer [
+    label=<<FONT POINT-SIZE="12"><B>Writer Agent</B></FONT>>,
+    fillcolor="#F59E0B", color="#D97706",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  GLM  [label="GLM-5"];
+  Chunks [label="ctx.streamResult()"];
+
+  Log [
+    label=<<FONT POINT-SIZE="10">EventLog</FONT><BR/><FONT POINT-SIZE="8" COLOR="#94A3B8">resume window</FONT>>,
+    shape=cylinder, fillcolor="#FAFBFC"
+  ];
+
+  edge [color="#64748B", penwidth=1.2];
+  Client -> Writer [label="submit  (topic)"];
+  GLM    -> Writer [label="stream deltas"];
+  Writer -> Chunks [label="write per ~200 chars"];
+
+  edge [color="#CBD5E1", penwidth=1.0];
+  Chunks -> Log;
+  Log    -> Client [label="result_chunk envelopes"];
+
+  Client -> Log [
+    style=dashed, color="#F472B6", penwidth=1.1,
+    constraint=false,
+    label=<<FONT COLOR="#DB2777">resume + replay seq &gt; last_event_seq</FONT>>, fontsize=9
+  ];
+}

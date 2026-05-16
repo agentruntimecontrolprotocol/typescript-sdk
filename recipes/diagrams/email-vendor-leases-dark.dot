@@ -1,0 +1,75 @@
+digraph EmailVendorLeases {
+  rankdir=TB;
+  bgcolor="transparent";
+  compound=true;
+  fontname="Helvetica";
+  splines=spline;
+  nodesep=0.32;
+  ranksep=0.55;
+  pad="0.35,0.25";
+
+  node [
+    shape=box, style="rounded,filled",
+    fillcolor="#334155", color="#475569",
+    fontname="Helvetica", fontsize=11, fontcolor="#F1F5F9",
+    margin="0.22,0.11", penwidth=1.0
+  ];
+
+  edge [
+    fontname="Helvetica", fontsize=9, fontcolor="#94A3B8",
+    color="#64748B", penwidth=1.1, arrowsize=0.75, arrowhead=vee
+  ];
+
+  Client [
+    label=<<FONT POINT-SIZE="12"><B>ARCPClient</B></FONT>>,
+    fillcolor="#3B82F6", color="#2563EB",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  Triage [
+    label=<<FONT POINT-SIZE="12"><B>Triage Agent</B></FONT>>,
+    fillcolor="#F59E0B", color="#D97706",
+    fontcolor="white", penwidth=1.4
+  ];
+
+  Claude [label="Claude"];
+  Lease  [label="validateLeaseOp"];
+
+  subgraph cluster_tools {
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Tools</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    style="rounded,filled";
+    fillcolor="#0F172A";
+    color="#334155";
+    fontname="Helvetica";
+    fontcolor="#94A3B8";
+    margin=14;
+    labeljust=l;
+    penwidth=1.0;
+
+    T1 [label="inbox_list"];
+    T2 [label="inbox_read"];
+    T3 [label="send_reply"];
+
+    T1 -> T2 -> T3 [style=invis];
+    { rank=same; T1; T2; T3; }
+  }
+
+  edge [color="#94A3B8", penwidth=1.2];
+  Client -> Triage [label="submit  (lease: read-only)"];
+  Triage -> Claude [dir=both, label="tool-use loop"];
+  Triage -> Lease  [label="authorize"];
+  Lease  -> T1     [lhead=cluster_tools];
+
+  edge [color="#475569", penwidth=1.0];
+  T2 -> Triage [
+    style=dashed, color="#64748B", penwidth=1.0,
+    constraint=false,
+    label="x-vendor.acme.email.parsed", fontsize=9
+  ];
+
+  Lease -> Claude [
+    style=dashed, color="#F472B6", penwidth=1.1,
+    constraint=false,
+    label=<<FONT COLOR="#F472B6">PERMISSION_DENIED (send_reply)</FONT>>, fontsize=9
+  ];
+}

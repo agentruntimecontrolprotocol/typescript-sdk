@@ -16,6 +16,7 @@ export default tseslint.config(
       "**/*.tsbuildinfo",
       "coverage/**",
       "**/coverage/**",
+      "recipes/**",
     ],
   },
   eslint.configs.recommended,
