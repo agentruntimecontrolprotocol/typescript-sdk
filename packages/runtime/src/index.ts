@@ -9,6 +9,30 @@ export {
 } from "@arcp/core/state";
 export { Job, JobManager, makeJobContext } from "./job.js";
 export {
+  type JobEffect,
+  type JobManagerEffect,
+  JobManagerService,
+  JobService,
+  jobLayer,
+  jobManagerLayer,
+  makeJobEffect,
+  makeJobManagerEffect,
+  watchdogEffect,
+} from "./job-effect.js";
+export {
+  assertLeaseConstraintsSubsetEffect,
+  assertLeaseSubsetEffect,
+  validateLeaseConstraintsEffect,
+  validateLeaseOpEffect,
+  type ValidateLeaseOpFailure,
+} from "./lease-effect.js";
+export {
+  makeSessionContextEffect,
+  type SessionContextEffect,
+  SessionContextService,
+  sessionContextLayer,
+} from "./session-effect.js";
+export {
   assertLeaseConstraintsSubset,
   assertLeaseSubset,
   canonicalizeTarget,
