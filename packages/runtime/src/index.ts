@@ -48,6 +48,14 @@ export {
   validateLeaseShape,
 } from "./lease.js";
 export { ARCPServer, SessionContext } from "./server.js";
+export {
+  acceptSessionEffect,
+  ARCPRuntimeLayer,
+  type ARCPRuntimeLayerOptions,
+  ARCPServerService,
+  makeARCPServerRuntime,
+  resumeSweepDaemon,
+} from "./server-effect.js";
 export type {
   AgentHandler,
   ARCPServerOptions,
