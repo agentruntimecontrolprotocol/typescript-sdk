@@ -36,9 +36,7 @@ describe("LeaseSchema (Effect Schema)", () => {
   });
 
   it("rejects empty pattern strings inside the value array", async () => {
-    await expect(
-      decode(LeaseSchema)({ "tool.call": [""] }),
-    ).rejects.toThrow();
+    await expect(decode(LeaseSchema)({ "tool.call": [""] })).rejects.toThrow();
   });
 
   it("accepts the docs/guides/lease.md example via Effect schema", async () => {
@@ -65,7 +63,6 @@ describe("LeaseConstraintsSchema (Effect Schema)", () => {
       decode(LeaseConstraintsSchema)({ expires_at: "" }),
     ).rejects.toThrow();
   });
-
 });
 
 describe("capability name predicates", () => {

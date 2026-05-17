@@ -20,7 +20,8 @@ import {
   type JobResultPayload,
   JobSubscribedPayloadSchema,
   type JobSubscribedPayload,
-  ResultChunkBodySchema,
+  parseJobEventBody,
+  type ResultChunkBody,
   SessionJobsPayloadSchema,
   type SessionJobsPayload,
   SessionPingPayloadSchema,
@@ -41,7 +42,51 @@ function decodePayload<S extends EffectSchema.Schema.AnyNoContext>(
   payload: unknown,
 ): EffectSchema.Schema.Type<S> | null {
   try {
-    return Schema.decodeUnknownSync(schema)(payload) as EffectSchema.Schema.Type<S>;
+    return Schema.decodeUnknownSync(schema)(
+      payload,
+    ) as EffectSchema.Schema.Type<S>;
+  } catch {
+    return null;
+  }
+}
+
+function decodeJobSubscribedPayload(
+  payload: unknown,
+): JobSubscribedPayload | null {
+  try {
+    const decoded: JobSubscribedPayload = Schema.decodeUnknownSync(
+      JobSubscribedPayloadSchema as EffectSchema.Schema<
+        JobSubscribedPayload,
+        unknown
+      >,
+    )(payload);
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+function decodeJobAcceptedPayload(
+  payload: unknown,
+): JobAcceptedPayload | null {
+  try {
+    const decoded: JobAcceptedPayload = Schema.decodeUnknownSync(
+      JobAcceptedPayloadSchema as EffectSchema.Schema<
+        JobAcceptedPayload,
+        unknown
+      >,
+    )(payload);
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+function decodeJobEventPayload(payload: unknown): JobEventPayload | null {
+  try {
+    return Schema.decodeUnknownSync(
+      JobEventPayloadSchema as EffectSchema.Schema<JobEventPayload, unknown>,
+    )(payload);
   } catch {
     return null;
   }
@@ -209,9 +254,12 @@ function handleSessionJobs(target: DispatchTarget, env: BaseEnvelope): boolean {
   return true;
 }
 
-function handleJobSubscribed(target: DispatchTarget, env: BaseEnvelope): boolean {
+function handleJobSubscribed(
+  target: DispatchTarget,
+  env: BaseEnvelope,
+): boolean {
   if (env.type !== "job.subscribed") return false;
-  const payload = decodePayload(JobSubscribedPayloadSchema, env.payload);
+  const payload = decodeJobSubscribedPayload(env.payload);
   if (payload === null) return false;
   const d = target.pendingSubscribes.get(payload.job_id);
   if (d === undefined) return false;
@@ -258,29 +306,41 @@ function routeJobEvent(target: DispatchTarget, parsed: BaseEnvelope): void {
 }
 
 function routeJobAccepted(target: DispatchTarget, parsed: BaseEnvelope): void {
-  const payload = decodePayload(JobAcceptedPayloadSchema, parsed.payload);
+  const payload = decodeJobAcceptedPayload(parsed.payload);
   if (payload !== null) onJobAccepted(target, payload);
 }
 
-function routeJobEventFrame(target: DispatchTarget, parsed: BaseEnvelope): void {
+function routeJobEventFrame(
+  target: DispatchTarget,
+  parsed: BaseEnvelope,
+): void {
   if (parsed.job_id === undefined) return;
-  const payload = decodePayload(JobEventPayloadSchema, parsed.payload);
+  const payload = decodeJobEventPayload(parsed.payload);
   if (payload !== null) onJobEvent(target, parsed.job_id, payload);
 }
 
-function routeJobResultFrame(target: DispatchTarget, parsed: BaseEnvelope): void {
+function routeJobResultFrame(
+  target: DispatchTarget,
+  parsed: BaseEnvelope,
+): void {
   if (parsed.job_id === undefined) return;
   const payload = decodePayload(JobResultPayloadSchema, parsed.payload);
   if (payload !== null) onJobResult(target, parsed.job_id, payload);
 }
 
-function routeJobErrorFrame(target: DispatchTarget, parsed: BaseEnvelope): void {
+function routeJobErrorFrame(
+  target: DispatchTarget,
+  parsed: BaseEnvelope,
+): void {
   if (parsed.job_id === undefined) return;
   const payload = decodePayload(JobErrorPayloadSchema, parsed.payload);
   if (payload !== null) onJobError(target, parsed.job_id, payload);
 }
 
-function onJobAccepted(target: DispatchTarget, payload: JobAcceptedPayload): void {
+function onJobAccepted(
+  target: DispatchTarget,
+  payload: JobAcceptedPayload,
+): void {
   const inv = target.pendingAccepts.shift();
   if (inv === undefined || inv.acceptance.settled) return;
   inv.jobId = payload.job_id;
@@ -302,8 +362,12 @@ function onJobEvent(
   if (inv === undefined) return;
   inv.events.push(ep);
   if (ep.kind !== "result_chunk") return;
-  const body = decodePayload(ResultChunkBodySchema, ep.body);
-  if (body === null) return;
+  let body: ResultChunkBody;
+  try {
+    body = parseJobEventBody("result_chunk", ep.body);
+  } catch {
+    return;
+  }
   let bucket = inv.chunks.get(body.result_id);
   if (bucket === undefined) {
     bucket = [];

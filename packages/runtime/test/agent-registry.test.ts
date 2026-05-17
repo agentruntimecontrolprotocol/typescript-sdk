@@ -5,15 +5,13 @@ import {
 import { Cause, Effect, Exit } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-  AgentRegistry,
-  AgentRegistryService,
-} from "../src/agent-registry.js";
+import { AgentRegistry, AgentRegistryService } from "../src/agent-registry.js";
 import type { AgentHandler, JobContext } from "../src/types.js";
 
 const stubCtx = {} as JobContext;
 
-const makeHandler = (label: string): AgentHandler =>
+const makeHandler =
+  (label: string): AgentHandler =>
   async () =>
     label;
 

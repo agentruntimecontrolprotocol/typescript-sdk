@@ -8,11 +8,7 @@ import { Effect } from "effect";
  * Synchronous, side-effecting on `map`. Use {@link getOrCreateEffect} for
  * `Ref<Map>` consumers in Effect-land.
  */
-export function getOrCreate<K, V>(
-  map: Map<K, V>,
-  key: K,
-  make: () => V,
-): V {
+export function getOrCreate<K, V>(map: Map<K, V>, key: K, make: () => V): V {
   const existing = map.get(key);
   if (existing !== undefined) return existing;
   const created = make();

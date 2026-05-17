@@ -26,7 +26,9 @@ function envFor(seq: number, sessionId: SessionId = SESSION): BaseEnvelope {
 }
 
 function withInMemoryService<A>(
-  program: (db: InstanceType<typeof Database>) => Effect.Effect<A, never, EventLogService>,
+  program: (
+    db: InstanceType<typeof Database>,
+  ) => Effect.Effect<A, never, EventLogService>,
 ): Promise<A> {
   const db = new Database(":memory:");
   return Effect.runPromise(program(db).pipe(Effect.provide(eventLogLayer(db))));

@@ -46,9 +46,11 @@ export class WebSocketTransport implements Transport {
     if (frame === null) return;
     const h = this.handler;
     if (h === null) return;
-    this.inboundChain = this.inboundChain.then(() => h(frame)).catch((): void => {
-      /* Keep the queue alive; runtime logs protocol errors. */
-    });
+    this.inboundChain = this.inboundChain
+      .then(() => h(frame))
+      .catch((): void => {
+        /* Keep the queue alive; runtime logs protocol errors. */
+      });
   }
 
   public get closed(): boolean {

@@ -23,7 +23,9 @@ const httpServer = createServer((req, res) => {
   res.end("hello");
 });
 
-const arcp = new ARCPServer({ /* … */ });
+const arcp = new ARCPServer({
+  /* … */
+});
 
 const handle = attachArcpUpgrade(httpServer, {
   path: "/arcp",
@@ -53,16 +55,16 @@ with `close()` to detach.
 
 ### `AttachArcpUpgradeOptions`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `path?: string` | `"/arcp"` | URL path that should upgrade. Other paths fall through. |
-| `allowedHosts?: readonly string[]` | none | If set, rejects upgrades whose `Host` header isn't in the list (DNS-rebind protection). |
-| `onTransport: (transport, req) => void` | — | Receives a paired `Transport` and the original `IncomingMessage`. Typically calls `server.accept(transport)`. |
+| Field                                   | Default   | Notes                                                                                                         |
+| --------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------- |
+| `path?: string`                         | `"/arcp"` | URL path that should upgrade. Other paths fall through.                                                       |
+| `allowedHosts?: readonly string[]`      | none      | If set, rejects upgrades whose `Host` header isn't in the list (DNS-rebind protection).                       |
+| `onTransport: (transport, req) => void` | —         | Receives a paired `Transport` and the original `IncomingMessage`. Typically calls `server.accept(transport)`. |
 
 ### `ArcpUpgradeHandle`
 
-| Field | Notes |
-| --- | --- |
+| Field                    | Notes                                                            |
+| ------------------------ | ---------------------------------------------------------------- |
 | `close(): Promise<void>` | Detach the upgrade listener; existing transports are unaffected. |
 
 ## DNS-rebind protection

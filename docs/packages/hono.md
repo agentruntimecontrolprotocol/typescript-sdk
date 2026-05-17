@@ -25,7 +25,9 @@ app.get("/healthz", (c) => c.text("ok"));
 
 const httpServer = serve({ fetch: app.fetch, port: 3000 });
 
-const arcp = new ARCPServer({ /* … */ });
+const arcp = new ARCPServer({
+  /* … */
+});
 
 attachArcpToHono(httpServer, {
   path: "/arcp",
@@ -48,18 +50,18 @@ middleware. Skip this if you already have a Hono app — call
 
 #### `CreateArcpHonoAppOptions`
 
-| Field | Notes |
-| --- | --- |
+| Field                              | Notes                             |
+| ---------------------------------- | --------------------------------- |
 | `allowedHosts?: readonly string[]` | Validate `Host` on every request. |
 
 ### `attachArcpToHono(server, options)`
 
 Thin wrapper around `attachArcpUpgrade` from [`@arcp/node`](./node.md).
 
-| Field | Notes |
-| --- | --- |
-| `path?: string` | Defaults to `"/arcp"`. |
-| `allowedHosts?: readonly string[]` | DNS-rebind protection. |
+| Field                                   | Notes                      |
+| --------------------------------------- | -------------------------- |
+| `path?: string`                         | Defaults to `"/arcp"`.     |
+| `allowedHosts?: readonly string[]`      | DNS-rebind protection.     |
 | `onTransport: (transport, req) => void` | Pair with `server.accept`. |
 
 ## Bun + Hono

@@ -105,7 +105,8 @@ function pushArrayErrors(
 ): void {
   if (type !== "array" || !Array.isArray(value)) return;
   const items = schema["items"];
-  if (items === undefined || typeof items !== "object" || items === null) return;
+  if (items === undefined || typeof items !== "object" || items === null)
+    return;
   for (const [idx, item] of value.entries()) {
     errors.push(
       ...validateAgainstSchema(

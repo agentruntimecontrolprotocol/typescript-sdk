@@ -8,13 +8,13 @@ understood, never silently dropped.
 
 ## What's extensible
 
-| Surface | Vendor namespace |
-| --- | --- |
-| Envelope `type` | `x-vendor.<vendor>.<type>` |
-| Event `kind` (inside `job.event.payload`) | `x-vendor.<vendor>.<kind>` |
-| Lease capability namespace | `x-vendor.<vendor>.<cap>` |
-| Envelope `extensions` object keys | `x-vendor.<vendor>.<key>` |
-| Auth scheme | `x-vendor.<vendor>.<scheme>` |
+| Surface                                   | Vendor namespace             |
+| ----------------------------------------- | ---------------------------- |
+| Envelope `type`                           | `x-vendor.<vendor>.<type>`   |
+| Event `kind` (inside `job.event.payload`) | `x-vendor.<vendor>.<kind>`   |
+| Lease capability namespace                | `x-vendor.<vendor>.<cap>`    |
+| Envelope `extensions` object keys         | `x-vendor.<vendor>.<key>`    |
+| Auth scheme                               | `x-vendor.<vendor>.<scheme>` |
 
 ## Naming rules
 

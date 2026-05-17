@@ -270,9 +270,7 @@ function makePendingOps(ref: PendingRef) {
         return withEntry(state, id, { ...entry, meta });
       }),
     peekMeta: (id: MessageId): Effect.Effect<PendingMeta | undefined> =>
-      SynchronizedRef.get(ref).pipe(
-        Effect.map((s) => s.entries.get(id)?.meta),
-      ),
+      SynchronizedRef.get(ref).pipe(Effect.map((s) => s.entries.get(id)?.meta)),
     resolve: (id: MessageId, value: unknown): Effect.Effect<boolean> =>
       completeAndRemove(ref, id, (entry) =>
         EffectDeferred.succeed(entry.deferred, value),

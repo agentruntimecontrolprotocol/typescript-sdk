@@ -23,7 +23,9 @@ const app = createArcpExpressApp({
 app.get("/healthz", (_req, res) => res.send("ok"));
 
 const httpServer = createServer(app);
-const arcp = new ARCPServer({ /* … */ });
+const arcp = new ARCPServer({
+  /* … */
+});
 
 attachArcpToExpress(httpServer, {
   path: "/arcp",
@@ -39,9 +41,7 @@ httpServer.listen(3000);
 ### `createArcpExpressApp(options?)`
 
 ```ts
-function createArcpExpressApp(
-  options?: CreateArcpExpressAppOptions,
-): Express;
+function createArcpExpressApp(options?: CreateArcpExpressAppOptions): Express;
 ```
 
 Returns a fresh Express app with sane defaults:
@@ -54,20 +54,20 @@ Most apps that already exist as Express can skip this and just call
 
 #### `CreateArcpExpressAppOptions`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `disablePoweredBy?: boolean` | `true` | Strip `X-Powered-By: Express`. |
-| `allowedHosts?: readonly string[]` | none | Validate `Host` on every request. |
+| Field                              | Default | Notes                             |
+| ---------------------------------- | ------- | --------------------------------- |
+| `disablePoweredBy?: boolean`       | `true`  | Strip `X-Powered-By: Express`.    |
+| `allowedHosts?: readonly string[]` | none    | Validate `Host` on every request. |
 
 ### `attachArcpToExpress(server, options)`
 
 Thin wrapper around `attachArcpUpgrade` from
 [`@arcp/node`](./node.md). Accepts the same options:
 
-| Field | Notes |
-| --- | --- |
-| `path?: string` | Defaults to `"/arcp"`. |
-| `allowedHosts?: readonly string[]` | Recommended for public servers. |
+| Field                                   | Notes                                    |
+| --------------------------------------- | ---------------------------------------- |
+| `path?: string`                         | Defaults to `"/arcp"`.                   |
+| `allowedHosts?: readonly string[]`      | Recommended for public servers.          |
 | `onTransport: (transport, req) => void` | Pair the transport with `server.accept`. |
 
 Returns an `ArcpUpgradeHandle` with `close()`.

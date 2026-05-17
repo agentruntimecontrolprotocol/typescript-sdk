@@ -47,11 +47,11 @@ Hard constraints — do not violate:
 
 ## Files
 
-| File | Role |
-| --- | --- |
-| `diagram-template-light.dot` | Starting point. Full style docs in the header. |
-| `diagram-template-dark.dot`  | Dark companion. Structure must match the light variant. |
-| `arcp-light.dot` / `arcp-dark.dot` | Worked example shown above. |
+| File                               | Role                                                    |
+| ---------------------------------- | ------------------------------------------------------- |
+| `diagram-template-light.dot`       | Starting point. Full style docs in the header.          |
+| `diagram-template-dark.dot`        | Dark companion. Structure must match the light variant. |
+| `arcp-light.dot` / `arcp-dark.dot` | Worked example shown above.                             |
 
 The `.dot` files are the source you edit. The `.svg` files are rendered
 deliverables; you commit both and reference them from markdown.
@@ -99,24 +99,24 @@ background is active.
 
 ### Palette
 
-| Role | Light | Dark |
-| --- | --- | --- |
-| canvas | transparent | transparent |
-| primary text | `#1F2937` ink-900 | `#F1F5F9` slate-100 |
-| cluster label | `#475569` ink-600 | `#94A3B8` slate-400 |
-| muted subtitle | `#94A3B8` ink-400 | `#64748B` slate-500 |
-| primary edge | `#64748B` ink-500 | `#94A3B8` slate-400 |
-| default edge | `#94A3B8` ink-400 | `#64748B` slate-500 |
-| secondary edge | `#CBD5E1` ink-300 | `#475569` slate-600 |
-| default node fill | white | `#334155` slate-700 |
-| default node border | `#CBD5E1` ink-300 | `#475569` slate-600 |
-| cluster border | `#E2E8F0` ink-200 | `#334155` slate-700 |
-| outer cluster fill | `#F1F5F9` ink-100 | `#0F172A` slate-900 |
-| inner cluster fill | `#F8FAFC` ink-50 | `#1E293B` slate-800 |
-| ENTRY fill / border | `#3B82F6` / `#2563EB` | unchanged |
-| HUB fill / border | `#F59E0B` / `#D97706` | unchanged |
-| feedback edge | `#F472B6` pink-400 | unchanged |
-| feedback label | `#DB2777` pink-600 | `#F472B6` pink-400 |
+| Role                | Light                 | Dark                |
+| ------------------- | --------------------- | ------------------- |
+| canvas              | transparent           | transparent         |
+| primary text        | `#1F2937` ink-900     | `#F1F5F9` slate-100 |
+| cluster label       | `#475569` ink-600     | `#94A3B8` slate-400 |
+| muted subtitle      | `#94A3B8` ink-400     | `#64748B` slate-500 |
+| primary edge        | `#64748B` ink-500     | `#94A3B8` slate-400 |
+| default edge        | `#94A3B8` ink-400     | `#64748B` slate-500 |
+| secondary edge      | `#CBD5E1` ink-300     | `#475569` slate-600 |
+| default node fill   | white                 | `#334155` slate-700 |
+| default node border | `#CBD5E1` ink-300     | `#475569` slate-600 |
+| cluster border      | `#E2E8F0` ink-200     | `#334155` slate-700 |
+| outer cluster fill  | `#F1F5F9` ink-100     | `#0F172A` slate-900 |
+| inner cluster fill  | `#F8FAFC` ink-50      | `#1E293B` slate-800 |
+| ENTRY fill / border | `#3B82F6` / `#2563EB` | unchanged           |
+| HUB fill / border   | `#F59E0B` / `#D97706` | unchanged           |
+| feedback edge       | `#F472B6` pink-400    | unchanged           |
+| feedback label      | `#DB2777` pink-600    | `#F472B6` pink-400  |
 
 ### Node variants
 

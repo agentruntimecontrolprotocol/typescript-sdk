@@ -1,6 +1,10 @@
 import { randomBytes } from "node:crypto";
 
-import { type JobId, type ResumeToken, TaggedResumeWindowExpired } from "@arcp/core";
+import {
+  type JobId,
+  type ResumeToken,
+  TaggedResumeWindowExpired,
+} from "@arcp/core";
 import { Effect, SynchronizedRef } from "effect";
 
 export interface IdempotencyEntry {
@@ -114,7 +118,10 @@ function sweepMap<V extends { expiresAt: number }>(
 
 function makeIdempotencyOps(ref: IdempotencyRef) {
   return {
-    get: (principal: string, key: string): Effect.Effect<IdempotencyEntry | undefined> =>
+    get: (
+      principal: string,
+      key: string,
+    ): Effect.Effect<IdempotencyEntry | undefined> =>
       SynchronizedRef.get(ref).pipe(
         Effect.map((m) => m.get(idempotencyKey(principal, key))),
       ),
@@ -206,19 +213,19 @@ function takeResumeOutcome(
   sessionId: string,
   now: number,
 ): Effect.Effect<TakeOutcome> {
-  return SynchronizedRef.modify(ref, (map): readonly [TakeOutcome, ResumeMap] => {
-    const existing = map.get(sessionId);
-    if (existing === undefined) {
-      return [{ kind: "missing" }, map];
-    }
-    if (existing.expiresAt < now) {
-      return [{ kind: "expired" }, withoutResume(map, sessionId)];
-    }
-    return [
-      { kind: "hit", record: existing },
-      withoutResume(map, sessionId),
-    ];
-  });
+  return SynchronizedRef.modify(
+    ref,
+    (map): readonly [TakeOutcome, ResumeMap] => {
+      const existing = map.get(sessionId);
+      if (existing === undefined) {
+        return [{ kind: "missing" }, map];
+      }
+      if (existing.expiresAt < now) {
+        return [{ kind: "expired" }, withoutResume(map, sessionId)];
+      }
+      return [{ kind: "hit", record: existing }, withoutResume(map, sessionId)];
+    },
+  );
 }
 
 function takeResume(

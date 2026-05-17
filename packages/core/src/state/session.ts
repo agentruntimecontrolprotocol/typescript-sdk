@@ -163,9 +163,8 @@ export class SessionStateService extends Effect.Service<SessionStateService>()(
   "arcp/SessionStateService",
   {
     effect: Effect.gen(function* () {
-      const ref = yield* SynchronizedRef.make<SessionStateInternals>(
-        initialInternals(),
-      );
+      const ref =
+        yield* SynchronizedRef.make<SessionStateInternals>(initialInternals());
       return makeSessionStateOps(ref);
     }),
   },
@@ -308,7 +307,9 @@ function applyVendorKeys(
 ): void {
   for (const k of Object.keys(client)) {
     if (KNOWN_CAPABILITY_KEYS.has(k)) continue;
-    (out as Record<string, unknown>)[k] = (client as Record<string, unknown>)[k];
+    (out as Record<string, unknown>)[k] = (client as Record<string, unknown>)[
+      k
+    ];
   }
   for (const k of Object.keys(runtime)) {
     if (KNOWN_CAPABILITY_KEYS.has(k)) continue;

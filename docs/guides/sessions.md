@@ -68,9 +68,7 @@ import {
 const server = new ARCPServer({
   runtime: { name: "my-runtime", version: "1.0.0" },
   capabilities: { encodings: ["json"], agents: ["greet"] },
-  bearer: new StaticBearerVerifier(
-    new Map([["tok", { principal: "me" }]]),
-  ),
+  bearer: new StaticBearerVerifier(new Map([["tok", { principal: "me" }]])),
   // optional tuning:
   resumeWindowSeconds: 600,
   heartbeatIntervalSeconds: 30,
@@ -111,7 +109,7 @@ the runtime as part of that emission (§6 mandates this).
 Either side can send `session.bye { reason? }`:
 
 ```ts
-await client.close("done");          // sends session.bye then closes transport
+await client.close("done"); // sends session.bye then closes transport
 ```
 
 The runtime's reciprocal:
@@ -147,11 +145,11 @@ synchronously rather than emitting a non-conforming envelope.
 The runtime applies caps to protect against runaway sessions
 (§14, configurable on `ARCPServerOptions.caps`):
 
-| Cap | Default | Effect |
-| --- | --- | --- |
-| `maxBufferedEvents` | 10,000 | Resume buffer ceiling per session. |
-| `maxBufferedBytes` | 16 MiB | Resume buffer byte ceiling. |
-| `maxConcurrentJobs` | 100 | Live `pending`/`running` jobs per session. |
+| Cap                 | Default | Effect                                     |
+| ------------------- | ------- | ------------------------------------------ |
+| `maxBufferedEvents` | 10,000  | Resume buffer ceiling per session.         |
+| `maxBufferedBytes`  | 16 MiB  | Resume buffer byte ceiling.                |
+| `maxConcurrentJobs` | 100     | Live `pending`/`running` jobs per session. |
 
 Exceeding any cap surfaces as a `session.error` with code
 `RESOURCE_EXHAUSTED`.

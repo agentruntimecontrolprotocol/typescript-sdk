@@ -54,7 +54,6 @@ import type {
 //   - `close(reason?)`                → sends session.bye then closes transport.
 //   - v1.1: `ack(seq)`, `listJobs(filter, opts)`, `subscribe(jobId, opts)`.
 
-
 /**
  * Client-side driver for an ARCP v1.1 session (§6).
  *
@@ -384,9 +383,7 @@ export class ARCPClient {
   ): "aborted-before-submit" | null {
     if (signal === undefined) return null;
     if (signal.aborted) {
-      invocation.acceptance.reject(
-        new CancelledError("aborted before submit"),
-      );
+      invocation.acceptance.reject(new CancelledError("aborted before submit"));
       return "aborted-before-submit";
     }
     const onAbort = (): void => {
@@ -550,10 +547,16 @@ export class ARCPClient {
         pendingAccepts: this.pendingAccepts,
         pendingLists: this.pendingLists,
         pendingSubscribes: this.pendingSubscribes,
-        handlers: this.handlers as Map<string, (env: Envelope) => Promise<void>>,
+        handlers: this.handlers as Map<
+          string,
+          (env: Envelope) => Promise<void>
+        >,
         transport: this.transport,
         observeEventSeq: (env) => {
-          if (env.event_seq !== undefined && env.event_seq > this.lastEventSeq) {
+          if (
+            env.event_seq !== undefined &&
+            env.event_seq > this.lastEventSeq
+          ) {
             this.lastEventSeq = env.event_seq;
             this.scheduleAutoAck();
           }
@@ -590,9 +593,7 @@ export class ARCPClient {
       // best-effort
     }
   }
-
 }
-
 
 /**
  * Lightweight typed assertion used in tests and bridge code: narrow an

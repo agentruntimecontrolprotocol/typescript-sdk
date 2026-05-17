@@ -36,9 +36,9 @@ full command reference.
 
 - **`@arcp/sdk`** — apps that contain both client and runtime in the
   same process (in-process workers, integration tests, monoliths).
-- **`@arcp/client`** + `@arcp/core`** — browser apps, lightweight
+- **`@arcp/client`** + `@arcp/core`\*\* — browser apps, lightweight
   agents-as-clients.
-- **`@arcp/runtime`** + `@arcp/core`** — server processes that host
+- **`@arcp/runtime`** + `@arcp/core`\*\* — server processes that host
   agents but never act as ARCP clients themselves.
 
 `@arcp/core` is always a transitive dep — you don't usually install

@@ -35,7 +35,11 @@ import {
   wrapJobCtx,
 } from "./job-runner-helpers.js";
 import { Job, makeJobContext } from "./job.js";
-import { initialBudgetFromLease, validateLeaseConstraints, validateLeaseShape } from "./lease.js";
+import {
+  initialBudgetFromLease,
+  validateLeaseConstraints,
+  validateLeaseShape,
+} from "./lease.js";
 import type { ARCPServer, SessionContext } from "./server.js";
 import { digest, type IdempotencyEntry } from "./stores.js";
 import type { AgentHandler, JobContext } from "./types.js";
@@ -119,10 +123,17 @@ export class JobRunner {
     if (await this.rejectIfOverConcurrencyCap(ctx)) return;
     const resolved = await this.resolveSubmitAgent(ctx, env.payload);
     if (resolved === null) return;
-    const leaseFields = await this.validateLeaseAndConstraints(ctx, env.payload);
+    const leaseFields = await this.validateLeaseAndConstraints(
+      ctx,
+      env.payload,
+    );
     if (leaseFields === null) return;
     const principal = ctx.state.identity?.principal ?? "<anonymous>";
-    const idempotency = await this.checkIdempotency(ctx, principal, env.payload);
+    const idempotency = await this.checkIdempotency(
+      ctx,
+      principal,
+      env.payload,
+    );
     if (idempotency === "conflict") return;
     await this.acceptAndDispatchSubmit({
       ctx,
@@ -259,14 +270,15 @@ export class JobRunner {
 
   private constructJob(input: ConstructJobInput): Job {
     const traceId: TraceId =
-      input.env.trace_id ?? (randomBytes(16).toString("hex"));
+      input.env.trace_id ?? randomBytes(16).toString("hex");
     const idempotencyHit = input.idempotencyHit;
     const job = new Job({
       options: {
         ...(idempotencyHit === null ? {} : { jobId: idempotencyHit.jobId }),
         sessionId: input.sessionId,
         agent: input.parsedAgentName,
-        agentVersion: input.resolvedVersion === "" ? null : input.resolvedVersion,
+        agentVersion:
+          input.resolvedVersion === "" ? null : input.resolvedVersion,
         lease: input.leaseFields.requestedLease,
         leaseConstraints: input.leaseFields.leaseConstraints,
         initialBudget: input.leaseFields.initialBudget,
@@ -411,7 +423,7 @@ export class JobRunner {
 
   private resolveDelegateAgent(
     body: DelegateBody,
-  ): { ok: true } & ResolvedSubmitAgent | { ok: false; error: ARCPError } {
+  ): ({ ok: true } & ResolvedSubmitAgent) | { ok: false; error: ARCPError } {
     let parsedAgent: { name: string; version: string | null };
     try {
       parsedAgent = parseAgentRef(body.agent);
@@ -455,7 +467,8 @@ export class JobRunner {
       options: {
         sessionId,
         agent: input.parsedAgentName,
-        agentVersion: input.resolvedVersion === "" ? null : input.resolvedVersion,
+        agentVersion:
+          input.resolvedVersion === "" ? null : input.resolvedVersion,
         lease: requested,
         leaseConstraints: effectiveConstraints,
         initialBudget: initialBudgetFromLease(requested),
@@ -542,6 +555,3 @@ export class JobRunner {
     };
   }
 }
-
-export { forwardEventToSubscriber } from "./job-runner-helpers.js";
-

@@ -23,10 +23,10 @@ tree.
 
 Call the `research` MCP tool with:
 
-| Field         | Required | Notes                                              |
-| ------------- | -------- | -------------------------------------------------- |
-| `question`    | yes      | The user's question, verbatim.                     |
-| `budget_usd`  | no       | Total USD cap across planner + workers (def 0.50). |
+| Field        | Required | Notes                                              |
+| ------------ | -------- | -------------------------------------------------- |
+| `question`   | yes      | The user's question, verbatim.                     |
+| `budget_usd` | no       | Total USD cap across planner + workers (def 0.50). |
 
 The tool returns JSON with three fields:
 

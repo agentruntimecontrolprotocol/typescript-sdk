@@ -45,9 +45,7 @@ const TEST_CLIENT: ARCPClientOptions = {
  * the running fiber if the service is unbound (a test setup bug, never an
  * expected runtime path).
  */
-function assertBound(
-  client: ARCPClient | null,
-): Effect.Effect<ARCPClient> {
+function assertBound(client: ARCPClient | null): Effect.Effect<ARCPClient> {
   return client === null
     ? Effect.die("ARCPClientService is unbound in test")
     : Effect.succeed(client);
@@ -91,9 +89,7 @@ function startFakeRuntime(server: Transport): {
       return;
     }
     if (f.type === "job.submit") {
-      acceptedJobId = `job_${Math.random()
-        .toString(36)
-        .slice(2, 10)}`;
+      acceptedJobId = `job_${Math.random().toString(36).slice(2, 10)}`;
       await server.send({
         arcp: PROTOCOL_VERSION,
         id: newMessageId(),
@@ -192,9 +188,7 @@ describe("ARCPClientLayer + ARCPClientService", () => {
 
         // Synthesize two events from the fake runtime side.
         yield* Effect.promise(() => fake.emitJobEvent(handle.jobId, "log"));
-        yield* Effect.promise(() =>
-          fake.emitJobEvent(handle.jobId, "thought"),
-        );
+        yield* Effect.promise(() => fake.emitJobEvent(handle.jobId, "thought"));
 
         const collected = yield* collectFiber;
         return [...collected].map((env) => {

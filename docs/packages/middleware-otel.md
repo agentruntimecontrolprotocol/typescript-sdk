@@ -39,10 +39,10 @@ startWebSocketServer({
 
 ### `withTracing(inner, options): Transport`
 
-| Option | Notes |
-| --- | --- |
-| `tracer: Tracer` | OpenTelemetry `Tracer` instance. |
-| `sendSpanName?: (frame) => string` | Custom span name on send. Default: `arcp.send`. |
+| Option                             | Notes                                              |
+| ---------------------------------- | -------------------------------------------------- |
+| `tracer: Tracer`                   | OpenTelemetry `Tracer` instance.                   |
+| `sendSpanName?: (frame) => string` | Custom span name on send. Default: `arcp.send`.    |
 | `recvSpanName?: (frame) => string` | Custom span name on receive. Default: `arcp.recv`. |
 
 Returns a new `Transport` that wraps `inner`. Calls

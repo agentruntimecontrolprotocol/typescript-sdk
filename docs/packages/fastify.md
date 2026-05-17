@@ -17,7 +17,9 @@ import { ARCPServer } from "@arcp/runtime";
 import { attachArcpToFastify } from "@arcp/fastify";
 
 const app = Fastify({ logger: true });
-const arcp = new ARCPServer({ /* … */ });
+const arcp = new ARCPServer({
+  /* … */
+});
 
 app.get("/healthz", async () => "ok");
 
@@ -47,11 +49,11 @@ function attachArcpToFastify(
 Delegates to `attachArcpUpgrade(app.server, options)`. Options match
 [`@arcp/node`](./node.md):
 
-| Field | Notes |
-| --- | --- |
-| `path?: string` | Defaults to `"/arcp"`. |
-| `allowedHosts?: readonly string[]` | Validate `Host` on the upgrade. |
-| `onTransport: (transport, req) => void` | Pair with `server.accept`. |
+| Field                                   | Notes                           |
+| --------------------------------------- | ------------------------------- |
+| `path?: string`                         | Defaults to `"/arcp"`.          |
+| `allowedHosts?: readonly string[]`      | Validate `Host` on the upgrade. |
+| `onTransport: (transport, req) => void` | Pair with `server.accept`.      |
 
 Returns an `ArcpUpgradeHandle`.
 
@@ -61,7 +63,9 @@ Detach on shutdown to avoid leaking upgrade listeners during HMR or
 hot-reload:
 
 ```ts
-const handle = attachArcpToFastify(app, { /* … */ });
+const handle = attachArcpToFastify(app, {
+  /* … */
+});
 app.addHook("onClose", async () => {
   await handle.close();
 });

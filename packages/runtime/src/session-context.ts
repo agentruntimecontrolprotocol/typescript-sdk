@@ -10,10 +10,7 @@ import {
   InternalError,
   InvalidRequestError,
 } from "@arcp/core/errors";
-import {
-  classifyUnknownType,
-  CORE_MESSAGE_TYPES,
-} from "@arcp/core/extensions";
+import { classifyUnknownType, CORE_MESSAGE_TYPES } from "@arcp/core/extensions";
 import type { Logger } from "@arcp/core/logger";
 import {
   type Envelope,
@@ -251,10 +248,7 @@ export class SessionContext implements EventSeqSource {
     const caps = this.server.options.caps ?? {};
     const maxEvents = caps.maxBufferedEvents ?? DEFAULT_MAX_BUFFERED_EVENTS;
     const maxBytes = caps.maxBufferedBytes ?? DEFAULT_MAX_BUFFERED_BYTES;
-    if (
-      this.bufferedEventCount > maxEvents ||
-      this.bufferedBytes > maxBytes
-    ) {
+    if (this.bufferedEventCount > maxEvents || this.bufferedBytes > maxBytes) {
       void this.emitSessionError(
         new InternalError("Per-session buffered envelope cap exceeded", {
           retryable: false,
@@ -355,7 +349,10 @@ export class SessionContext implements EventSeqSource {
     try {
       const inserted = await this.server.eventLog.append(parsed);
       if (inserted) return false;
-      this.logger.debug({ id: parsed.id }, "duplicate inbound, skipping dispatch");
+      this.logger.debug(
+        { id: parsed.id },
+        "duplicate inbound, skipping dispatch",
+      );
       return true;
     } catch (error) {
       this.logger.error({ err: error }, "event log append (inbound) failed");
@@ -363,7 +360,9 @@ export class SessionContext implements EventSeqSource {
     }
   }
 
-  private async validateInbound(parsed: BaseEnvelope): Promise<Envelope | null> {
+  private async validateInbound(
+    parsed: BaseEnvelope,
+  ): Promise<Envelope | null> {
     const result = decodeEnvelope(parsed);
     if (Either.isRight(result)) return result.right;
     // Mirror zod's `invalid_union_discriminator` behavior: if `type` is not a
@@ -374,14 +373,14 @@ export class SessionContext implements EventSeqSource {
       return null;
     }
     await this.emitSessionError(
-      new InvalidRequestError(
-        `Invalid envelope: ${result.left.message}`,
-      ),
+      new InvalidRequestError(`Invalid envelope: ${result.left.message}`),
     );
     return null;
   }
 
-  private async handleUnknownTypeDisposition(parsed: BaseEnvelope): Promise<void> {
+  private async handleUnknownTypeDisposition(
+    parsed: BaseEnvelope,
+  ): Promise<void> {
     const disposition = classifyUnknownType(parsed.type, {
       extensionsObject: parsed.extensions,
     });

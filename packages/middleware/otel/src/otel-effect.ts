@@ -126,8 +126,5 @@ export const OtelTracerLayer = (
   );
   const resourceLayer = OtelResource.layer(options.resource);
   const tracerLayer = OtelTracer.layer;
-  return Layer.provide(
-    tracerLayer,
-    Layer.merge(providerLayer, resourceLayer),
-  );
+  return Layer.provide(tracerLayer, Layer.merge(providerLayer, resourceLayer));
 };

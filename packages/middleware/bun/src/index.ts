@@ -162,4 +162,3 @@ function checkHostHeader(
   if (allowed.includes(hostOnly)) return null;
   return new Response("Forbidden: Host header not allowed", { status: 403 });
 }
-

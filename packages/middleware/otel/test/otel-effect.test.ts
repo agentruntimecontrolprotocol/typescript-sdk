@@ -68,9 +68,7 @@ describe("OtelTracerLayer", () => {
     // session boundaries is covered by `withTracing` and is out of scope
     // for this Effect-shape bridge).
     const program = Effect.gen(function* () {
-      yield* Effect.succeed(undefined).pipe(
-        Effect.withSpan("job.submit"),
-      );
+      yield* Effect.succeed(undefined).pipe(Effect.withSpan("job.submit"));
       yield* Effect.succeed(undefined).pipe(Effect.withSpan("handler"));
     }).pipe(Effect.withSpan("session.handshake"), Effect.provide(layer));
 
@@ -98,12 +96,8 @@ describe("OtelTracerLayer", () => {
     const submit = byName.get("job.submit");
     const handler = byName.get("handler");
     expect(root?.parentSpanContext).toBeUndefined();
-    expect(submit?.parentSpanContext?.spanId).toBe(
-      root?.spanContext().spanId,
-    );
-    expect(handler?.parentSpanContext?.spanId).toBe(
-      root?.spanContext().spanId,
-    );
+    expect(submit?.parentSpanContext?.spanId).toBe(root?.spanContext().spanId);
+    expect(handler?.parentSpanContext?.spanId).toBe(root?.spanContext().spanId);
 
     await provider.shutdown();
   });

@@ -142,5 +142,7 @@ function narrowSubsetViolation(cause: unknown): TaggedLeaseSubsetViolation {
 function narrowInvalidRequest(cause: unknown): TaggedInvalidRequest {
   const lifted = liftAsTagged(cause);
   if (lifted.code === "INVALID_REQUEST") return lifted;
-  throw new Error(`Unexpected validate-constraints failure code: ${lifted.code}`);
+  throw new Error(
+    `Unexpected validate-constraints failure code: ${lifted.code}`,
+  );
 }

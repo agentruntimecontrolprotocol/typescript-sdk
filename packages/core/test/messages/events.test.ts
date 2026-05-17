@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,19 +16,12 @@ import {
   ToolResultBodySchema,
 } from "@arcp/core";
 
+import { decode } from "../decode-schema.js";
+
 // Per §8 / §8.2 / §8.2.1 / §8.4, the `job.event.payload.body` is a
 // discriminated wire shape keyed by `kind`. These tests pin the JSON
 // shapes accepted/rejected by the migrated Effect schemas in events.ts
 // and exercise the discriminated dispatch through `parseJobEventBody`.
-
-// Effect schemas have a `Schema<A, I, R>` shape where `I` (the encoded
-// type) varies per schema. `decodeUnknown` accepts any schema and produces
-// an `Effect<A, ParseError, R>`. We declare the helper generically so each
-// per-body schema decodes to its own `A`.
-const decode =
-  <A, I>(s: Schema.Schema<A, I>) =>
-  (input: unknown): Promise<A> =>
-    Effect.runPromise(Schema.decodeUnknown(s)(input));
 
 describe("ProgressBodySchema (Effect Schema)", () => {
   it("accepts the docs/guides/job-events.md progress example", async () => {
@@ -274,9 +267,10 @@ describe("JobEventPayloadSchema (Effect Schema)", () => {
 
 describe("parseJobEventBody — reserved kind dispatch", () => {
   it("validates `log` bodies through LogPayloadSchema", () => {
-    expect(
-      parseJobEventBody("log", { level: "info", message: "ok" }),
-    ).toEqual({ level: "info", message: "ok" });
+    expect(parseJobEventBody("log", { level: "info", message: "ok" })).toEqual({
+      level: "info",
+      message: "ok",
+    });
     expect(() =>
       parseJobEventBody("log", { level: "verbose", message: "x" }),
     ).toThrow();

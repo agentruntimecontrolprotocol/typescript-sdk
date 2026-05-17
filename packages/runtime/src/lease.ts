@@ -61,7 +61,9 @@ function consumePatternToken(
 ): PatternStep {
   const ch = pattern[i];
   if (ch === "*") return consumeStar(pattern, i, out);
-  const escaped = /[\\^$.|?+()[\]{}]/.test(ch ?? "") ? `\\${ch ?? ""}` : ch ?? "";
+  const escaped = /[\\^$.|?+()[\]{}]/.test(ch ?? "")
+    ? `\\${ch ?? ""}`
+    : (ch ?? "");
   return { out: out + escaped, next: i + 1 };
 }
 

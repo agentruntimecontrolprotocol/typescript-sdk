@@ -29,10 +29,7 @@ import { AgentRegistry } from "./agent-registry.js";
 import { JobRunner } from "./job-runner.js";
 import type { Job } from "./job.js";
 import { handleResume } from "./server-resume.js";
-import {
-  handleJobSubscribe,
-  handleListJobs,
-} from "./server-subscribe.js";
+import { handleJobSubscribe, handleListJobs } from "./server-subscribe.js";
 import {
   type SessionContext,
   SessionContext as SessionContextCtor,
@@ -53,11 +50,9 @@ export { SessionContext } from "./session-context.js";
 // `progress`/`result_chunk` event kinds, `lease_constraints` (expires_at),
 // `cost.budget`, and agent versioning.
 
-
 const DEFAULT_HEARTBEAT_SECONDS = 30;
 const DEFAULT_RESUME_WINDOW_SECONDS = 600;
 const DEFAULT_GRACE_MS = 30_000;
-
 
 /**
  * Top-level ARCP runtime/server (§6–§14).
@@ -344,7 +339,6 @@ export class ARCPServer {
     return negotiateCapabilities(payload.capabilities, base);
   }
 
-
   public bindLogger(ctx: SessionContext, clientName: string): void {
     const sessionId = ctx.state.id;
     if (sessionId === undefined) return;
@@ -463,7 +457,7 @@ export class ARCPServer {
   ): Promise<void> {
     if (env.type !== "job.cancel") return;
     const jobId = env.job_id;
-     
+
     if (jobId === undefined) {
       await ctx.emitSessionError(
         new InvalidRequestError("job.cancel requires job_id"),

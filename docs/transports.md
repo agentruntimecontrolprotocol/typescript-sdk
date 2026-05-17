@@ -31,7 +31,7 @@ import { startWebSocketServer } from "@arcp/sdk";
 const wss = await startWebSocketServer({
   host: "127.0.0.1",
   port: 7777,
-  path: "/arcp",                    // optional, default "/arcp"
+  path: "/arcp", // optional, default "/arcp"
   allowedHosts: ["api.example.com"], // optional DNS-rebind protection
   onTransport: (t) => server.accept(t),
 });
@@ -58,7 +58,11 @@ import { WebSocketTransport } from "@arcp/sdk";
 
 const transport = await WebSocketTransport.connect(
   "wss://runtime.example.com/arcp",
-  { headers: { /* optional, browsers ignore */ } },
+  {
+    headers: {
+      /* optional, browsers ignore */
+    },
+  },
 );
 await client.connect(transport);
 ```
@@ -98,8 +102,15 @@ import { StdioTransport, ARCPClient } from "@arcp/sdk";
 import { spawn } from "node:child_process";
 
 const child = spawn("pnpm", [
-  "tsx", "packages/sdk/src/cli.ts", "serve",
-  "--transport", "stdio", "--token", "tok", "--principal", "me",
+  "tsx",
+  "packages/sdk/src/cli.ts",
+  "serve",
+  "--transport",
+  "stdio",
+  "--token",
+  "tok",
+  "--principal",
+  "me",
 ]);
 
 const transport = new StdioTransport({
@@ -107,7 +118,9 @@ const transport = new StdioTransport({
   output: child.stdin!,
 });
 
-const client = new ARCPClient({ /* … */ });
+const client = new ARCPClient({
+  /* … */
+});
 await client.connect(transport);
 ```
 

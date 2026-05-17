@@ -84,8 +84,5 @@ export function staticBearerVerifierLayer(
         ),
       ),
   };
-  return Layer.succeed(
-    BearerVerifierService,
-    BearerVerifierService.make(impl),
-  );
+  return Layer.succeed(BearerVerifierService, BearerVerifierService.make(impl));
 }

@@ -137,17 +137,17 @@ See [packages/](./packages/) for one page per middleware.
 
 Every message is one JSON object with a small fixed envelope:
 
-| Field        | Required | Notes |
-| ------------ | -------- | ----- |
-| `arcp`       | always   | `"1"` for v1.0/v1.1 |
-| `id`         | always   | ULID or UUIDv7, unique per message |
-| `type`       | always   | discriminator (`"session.hello"`, `"job.submit"`, …) |
-| `payload`    | always   | type-specific body |
-| `session_id` | after handshake | absent on pre-session frames |
-| `job_id`     | job-scoped envelopes | set on `job.*` types |
-| `event_seq`  | `job.event` / `job.result` / `job.error` | strictly monotonic per session |
-| `trace_id`   | optional | W3C 32-hex |
-| `extensions` | optional | `x-vendor.*`-keyed extension object |
+| Field        | Required                                 | Notes                                                |
+| ------------ | ---------------------------------------- | ---------------------------------------------------- |
+| `arcp`       | always                                   | `"1"` for v1.0/v1.1                                  |
+| `id`         | always                                   | ULID or UUIDv7, unique per message                   |
+| `type`       | always                                   | discriminator (`"session.hello"`, `"job.submit"`, …) |
+| `payload`    | always                                   | type-specific body                                   |
+| `session_id` | after handshake                          | absent on pre-session frames                         |
+| `job_id`     | job-scoped envelopes                     | set on `job.*` types                                 |
+| `event_seq`  | `job.event` / `job.result` / `job.error` | strictly monotonic per session                       |
+| `trace_id`   | optional                                 | W3C 32-hex                                           |
+| `extensions` | optional                                 | `x-vendor.*`-keyed extension object                  |
 
 Anything else on the wire is ignored. Unknown `x-vendor.*` types are
 round-tripped per §15 — see [vendor-extensions.md](./guides/vendor-extensions.md).

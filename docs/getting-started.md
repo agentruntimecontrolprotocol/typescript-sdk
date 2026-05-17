@@ -43,9 +43,7 @@ const TOKEN = "tok-demo";
 const server = new ARCPServer({
   runtime: { name: "demo-runtime", version: "1.0.0" },
   capabilities: { encodings: ["json"], agents: ["echo"] },
-  bearer: new StaticBearerVerifier(
-    new Map([[TOKEN, { principal: "demo" }]]),
-  ),
+  bearer: new StaticBearerVerifier(new Map([[TOKEN, { principal: "demo" }]])),
 });
 
 server.registerAgent("echo", async (input, ctx) => {
@@ -104,9 +102,7 @@ const wss = await startWebSocketServer({
 console.log(`listening on ${wss.url}`); // ws://127.0.0.1:7777/arcp
 
 // client side
-const transport = await WebSocketTransport.connect(
-  "ws://127.0.0.1:7777/arcp",
-);
+const transport = await WebSocketTransport.connect("ws://127.0.0.1:7777/arcp");
 await client.connect(transport);
 ```
 

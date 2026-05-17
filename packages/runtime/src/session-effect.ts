@@ -102,9 +102,7 @@ function unboundSessionContextStub(): SessionContextEffect {
   // error. Defects surface as `Cause.Die` rather than polluting the typed
   // channel of every op.
   const die = (): Effect.Effect<never> =>
-    Effect.die(
-      "SessionContextService not bound; provide sessionContextLayer",
-    );
+    Effect.die("SessionContextService not bound; provide sessionContextLayer");
   return {
     send: () => die(),
     nextEventSeq: die(),

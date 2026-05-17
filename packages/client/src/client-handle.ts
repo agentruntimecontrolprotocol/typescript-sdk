@@ -29,7 +29,7 @@ export interface InvocationState {
 export function makeHandleFromInvocation(inv: InvocationState): JobHandle {
   return {
     get jobId(): JobId {
-      return inv.jobId ?? ("");
+      return inv.jobId ?? "";
     },
     get lease(): Lease {
       return inv.lease ?? {};

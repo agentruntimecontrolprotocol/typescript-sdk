@@ -58,10 +58,10 @@ startWebSocketServer({
 
 The middleware emits two span types per envelope:
 
-| Span | Attributes |
-| --- | --- |
+| Span        | Attributes                                                                   |
+| ----------- | ---------------------------------------------------------------------------- |
 | `arcp.send` | `arcp.type`, `arcp.id`, `arcp.session_id`, `arcp.job_id?`, `arcp.event_seq?` |
-| `arcp.recv` | same |
+| `arcp.recv` | same                                                                         |
 
 For `job.submit` / `job.accepted` / `job.result` / `job.error`, the
 middleware also attaches: `arcp.agent`, `arcp.lease`, `arcp.budget`

@@ -213,9 +213,7 @@ function makeOps(ref: Ref.Ref<RegistryState>) {
       version: string,
       handler: AgentHandler,
     ): Effect.Effect<void> =>
-      Ref.update(ref, (s) =>
-        withHandler(s, { name, version, handler }),
-      ),
+      Ref.update(ref, (s) => withHandler(s, { name, version, handler })),
     resolve: (
       name: string,
       version: string | null,

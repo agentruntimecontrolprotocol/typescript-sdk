@@ -200,4 +200,6 @@ export class EventLog {
 
 /** Helper schema (exported for tests): ensures a row's parsed envelope is valid. */
 export const EventRowEnvelopeSchema = ParseEnvelopeFromRow;
-export type ParsedRowEnvelope = Schema.Schema.Type<typeof EventRowEnvelopeSchema>;
+export type ParsedRowEnvelope = Schema.Schema.Type<
+  typeof EventRowEnvelopeSchema
+>;

@@ -32,15 +32,15 @@ arcp serve \
 
 Flags:
 
-| Flag | Default | Notes |
-| --- | --- | --- |
-| `--transport <ws\|stdio>` | `ws` | `stdio` makes this a subprocess agent. |
-| `--host <host>` | `127.0.0.1` | Bind address for WebSocket. |
-| `--port <port>` | `7777` | Bind port for WebSocket. |
-| `--path <path>` | `/arcp` | URL path for the WS upgrade. |
-| `--token <token>` | — | Required. Static bearer accepted by the verifier. |
-| `--principal <id>` | — | Principal returned when the token verifies. |
-| `--db <path>` | none | If set, persist events to this SQLite file. |
+| Flag                      | Default     | Notes                                             |
+| ------------------------- | ----------- | ------------------------------------------------- |
+| `--transport <ws\|stdio>` | `ws`        | `stdio` makes this a subprocess agent.            |
+| `--host <host>`           | `127.0.0.1` | Bind address for WebSocket.                       |
+| `--port <port>`           | `7777`      | Bind port for WebSocket.                          |
+| `--path <path>`           | `/arcp`     | URL path for the WS upgrade.                      |
+| `--token <token>`         | —           | Required. Static bearer accepted by the verifier. |
+| `--principal <id>`        | —           | Principal returned when the token verifies.       |
+| `--db <path>`             | none        | If set, persist events to this SQLite file.       |
 
 ## `arcp submit`
 
@@ -58,17 +58,17 @@ arcp submit \
 
 Flags:
 
-| Flag | Notes |
-| --- | --- |
-| `--url <ws-url>` | Runtime URL. |
-| `--token <token>` | Bearer token. |
-| `--agent <name>` | Registered agent name. |
-| `--input <json>` | Inline JSON payload. |
-| `--input-file <path>` | Read payload from a file. |
-| `--idempotency-key <key>` | Optional dedupe key (§7.2). |
-| `--max-runtime-sec <n>` | Hard wall clock for the job. |
-| `--lease <json>` | Lease object (§9). |
-| `--trace-id <hex>` | 32-hex W3C trace id to propagate. |
+| Flag                      | Notes                             |
+| ------------------------- | --------------------------------- |
+| `--url <ws-url>`          | Runtime URL.                      |
+| `--token <token>`         | Bearer token.                     |
+| `--agent <name>`          | Registered agent name.            |
+| `--input <json>`          | Inline JSON payload.              |
+| `--input-file <path>`     | Read payload from a file.         |
+| `--idempotency-key <key>` | Optional dedupe key (§7.2).       |
+| `--max-runtime-sec <n>`   | Hard wall clock for the job.      |
+| `--lease <json>`          | Lease object (§9).                |
+| `--trace-id <hex>`        | 32-hex W3C trace id to propagate. |
 
 Stdout receives the final `job.result` payload as JSON; the process
 exit code is `0` on `success`, non-zero otherwise. Events are streamed
@@ -88,13 +88,13 @@ arcp replay \
 
 Flags:
 
-| Flag | Notes |
-| --- | --- |
-| `--db <path>` | SQLite event log to read. |
-| `--session <id>` | Filter to a specific session. |
-| `--job <id>` | Filter to a specific job. |
+| Flag              | Notes                                  |
+| ----------------- | -------------------------------------- |
+| `--db <path>`     | SQLite event log to read.              |
+| `--session <id>`  | Filter to a specific session.          |
+| `--job <id>`      | Filter to a specific job.              |
 | `--after-seq <n>` | Start strictly after this `event_seq`. |
-| `--until-seq <n>` | Stop at this `event_seq`. |
+| `--until-seq <n>` | Stop at this `event_seq`.              |
 
 Events are printed one per line, newest envelope at the bottom.
 
@@ -121,9 +121,9 @@ See [transports.md#stdio](./transports.md#stdio) for the full pattern.
 
 ## Exit codes
 
-| Code | Meaning |
-| --- | --- |
-| 0 | Job completed with `final_status: "success"`. |
-| 1 | Runtime/server error (auth, bind failure, unknown agent). |
-| 2 | Job terminated with `error`, `cancelled`, or `timed_out`. |
-| 64 | Bad CLI arguments. |
+| Code | Meaning                                                   |
+| ---- | --------------------------------------------------------- |
+| 0    | Job completed with `final_status: "success"`.             |
+| 1    | Runtime/server error (auth, bind failure, unknown agent). |
+| 2    | Job terminated with `error`, `cancelled`, or `timed_out`. |
+| 64   | Bad CLI arguments.                                        |

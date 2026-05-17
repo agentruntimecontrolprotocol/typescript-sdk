@@ -20,13 +20,13 @@ Most apps don't install this explicitly — it's a transitive of
 
 ```ts
 import {
-  Envelope,            // discriminated union of every message type
-  EnvelopeSchema,      // Zod schema covering Envelope
-  BaseEnvelope,        // common envelope fields
-  buildEnvelope,       // helper to construct + validate
-  messageEnvelope,     // build per-message-type envelope
-  isPreSessionType,    // checks if a type may flow before session.welcome
-  isValidTraceId,      // 32-hex check
+  Envelope, // discriminated union of every message type
+  EnvelopeSchema, // Zod schema covering Envelope
+  BaseEnvelope, // common envelope fields
+  buildEnvelope, // helper to construct + validate
+  messageEnvelope, // build per-message-type envelope
+  isPreSessionType, // checks if a type may flow before session.welcome
+  isValidTraceId, // 32-hex check
 } from "@arcp/core";
 ```
 
@@ -47,12 +47,7 @@ import type {
   TraceId,
 } from "@arcp/core";
 
-import {
-  newId,
-  newJobId,
-  newMessageId,
-  newSessionId,
-} from "@arcp/core";
+import { newId, newJobId, newMessageId, newSessionId } from "@arcp/core";
 ```
 
 Brand types prevent accidental cross-assignment between e.g.
@@ -63,7 +58,7 @@ instances.
 
 ```ts
 import {
-  ARCPError,               // base
+  ARCPError, // base
   AgentNotAvailableError,
   AgentVersionNotAvailableError,
   BudgetExhaustedError,
@@ -93,7 +88,7 @@ patterns.
 
 ```ts
 import {
-  Transport,               // interface
+  Transport, // interface
   WireFrame,
   SendableFrame,
   FrameHandler,
@@ -113,10 +108,10 @@ for the contract and existing implementations.
 
 ```ts
 import {
-  SessionState,       // phase machine
-  SessionPhase,       // "pre-handshake" | "awaiting-welcome" | "accepted" | "closed"
-  SessionSnapshot,    // read-only view
-  PendingRegistry,    // pending-request correlation
+  SessionState, // phase machine
+  SessionPhase, // "pre-handshake" | "awaiting-welcome" | "accepted" | "closed"
+  SessionSnapshot, // read-only view
+  PendingRegistry, // pending-request correlation
   PendingMeta,
   negotiateCapabilities,
 } from "@arcp/core";
@@ -158,7 +153,7 @@ See [auth guide](../guides/auth.md) for custom verifier patterns.
 
 ```ts
 import {
-  Logger,           // pino-shaped interface
+  Logger, // pino-shaped interface
   rootLogger,
   sessionLogger,
   silentLogger,
@@ -175,7 +170,7 @@ pre-bound to `session_id` and `job_id`.
 import {
   CORE_MESSAGE_TYPES,
   CoreMessageType,
-  classifyUnknownType,             // → "core" | "vendor-extension" | "unknown"
+  classifyUnknownType, // → "core" | "vendor-extension" | "unknown"
   isCoreType,
   isVendorExtensionName,
   validateExtensionsObject,
@@ -192,12 +187,12 @@ rules these helpers enforce.
 ```ts
 import {
   IMPL_VERSION,
-  PROTOCOL_VERSION,        // "1"
+  PROTOCOL_VERSION, // "1"
   ProtocolVersion,
   intersectFeatures,
   isCompatibleVersion,
-  V1_1_FEATURES,           // tuple of v1.1 feature names
-  V1_1_Feature,            // union type
+  V1_1_FEATURES, // tuple of v1.1 feature names
+  V1_1_Feature, // union type
 } from "@arcp/core";
 ```
 
@@ -208,10 +203,10 @@ client and runtime feature sets during handshake.
 
 ```ts
 import {
-  combineSignals,         // merge multiple AbortSignals
-  Deferred,               // a promise + resolve/reject in one object
-  validateAgainstSchema,  // zod with friendlier errors
-  safeSetInterval,        // unref'd + clearable interval
+  combineSignals, // merge multiple AbortSignals
+  Deferred, // a promise + resolve/reject in one object
+  validateAgainstSchema, // zod with friendlier errors
+  safeSetInterval, // unref'd + clearable interval
   safeSetTimeout,
   nowTimestamp,
 } from "@arcp/core";

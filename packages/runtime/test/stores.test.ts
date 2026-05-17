@@ -15,7 +15,10 @@ import {
 
 const FUTURE = Date.now() + 60_000;
 
-function entry(jobId: string, overrides: Partial<IdempotencyEntry> = {}): IdempotencyEntry {
+function entry(
+  jobId: string,
+  overrides: Partial<IdempotencyEntry> = {},
+): IdempotencyEntry {
   return {
     jobId: jobId,
     agent: "echo",

@@ -21,7 +21,9 @@ interface FakeSession extends SessionContextLike {
   closedFlag: boolean;
 }
 
-function makeFake(opts: { accepted?: boolean; closed?: boolean } = {}): FakeSession {
+function makeFake(
+  opts: { accepted?: boolean; closed?: boolean } = {},
+): FakeSession {
   const sent: BaseEnvelope[] = [];
   const emitted: { jobId: JobId; payload: JobErrorPayload }[] = [];
   const acks: number[] = [];

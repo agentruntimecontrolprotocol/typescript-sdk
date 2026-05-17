@@ -42,7 +42,7 @@ type BearerIdentity = {
   principal: string;
   entitlements?: {
     sessions?: readonly string[]; // restrict resume to these session ids
-    traces?: readonly string[];   // restrict trace_id visibility
+    traces?: readonly string[]; // restrict trace_id visibility
   };
 };
 ```

@@ -19,18 +19,18 @@ function captureLogger(): {
   readonly records: CapturedRecord[];
 } {
   const records: CapturedRecord[] = [];
-  const captured = Logger.make(
-    ({ annotations, logLevel, message }) => {
-      const flat = Array.isArray(message)
-        ? message.map((m) => (typeof m === "string" ? m : JSON.stringify(m))).join(" ")
-        : String(message);
-      records.push({
-        level: logLevel.label,
-        message: flat,
-        annotations: Object.fromEntries(HashMap.entries(annotations)),
-      });
-    },
-  );
+  const captured = Logger.make(({ annotations, logLevel, message }) => {
+    const flat = Array.isArray(message)
+      ? message
+          .map((m) => (typeof m === "string" ? m : JSON.stringify(m)))
+          .join(" ")
+      : String(message);
+    records.push({
+      level: logLevel.label,
+      message: flat,
+      annotations: Object.fromEntries(HashMap.entries(annotations)),
+    });
+  });
   return {
     layer: Logger.replace(Logger.defaultLogger, captured),
     records,
@@ -65,10 +65,7 @@ describe("Effect logger bridge", () => {
 
   it("sessionLoggerEffect propagates session_id annotation", async () => {
     const { layer, records } = captureLogger();
-    const program = sessionLoggerEffect(
-      "sess-abc",
-      Effect.logInfo("started"),
-    );
+    const program = sessionLoggerEffect("sess-abc", Effect.logInfo("started"));
     await Effect.runPromise(Effect.provide(program, layer));
     expect(records).toHaveLength(1);
     expect(records[0]?.annotations).toEqual({ session_id: "sess-abc" });

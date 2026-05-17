@@ -145,18 +145,14 @@ describe("PendingRegistryService (Effect)", () => {
     const program = Effect.gen(function* () {
       const reg = yield* PendingRegistryService;
       const waiters = yield* Effect.all(
-        Array.from({ length: N }, (_, i) =>
-          reg.register<number>(`msg_${i}`),
-        ),
+        Array.from({ length: N }, (_, i) => reg.register<number>(`msg_${i}`)),
         { concurrency: "unbounded" },
       );
       const size = yield* reg.size;
       // resolve them all so nothing leaks; the waiters themselves prove
       // round-trip semantics.
       yield* Effect.all(
-        Array.from({ length: N }, (_, i) =>
-          reg.resolve(`msg_${i}`, i),
-        ),
+        Array.from({ length: N }, (_, i) => reg.resolve(`msg_${i}`, i)),
         { concurrency: "unbounded" },
       );
       const resolved = yield* Effect.all(waiters, { concurrency: "unbounded" });
@@ -175,9 +171,7 @@ describe("PendingRegistryService (Effect)", () => {
     const program = Effect.gen(function* () {
       const reg = yield* PendingRegistryService;
       const outcomes = yield* Effect.all(
-        Array.from({ length: N }, () =>
-          Effect.exit(reg.register<number>(id)),
-        ),
+        Array.from({ length: N }, () => Effect.exit(reg.register<number>(id))),
         { concurrency: "unbounded" },
       );
       const size = yield* reg.size;

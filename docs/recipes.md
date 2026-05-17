@@ -42,7 +42,9 @@ without re-running the agent:
 const key = `weekly-report-2026-W19`;
 
 async function runSafely() {
-  const client = new ARCPClient({ /* … */ });
+  const client = new ARCPClient({
+    /* … */
+  });
   const transport = await WebSocketTransport.connect("wss://…");
   await client.connect(transport);
 
@@ -181,17 +183,25 @@ exhaustion. See [leases guide](./guides/leases.md).
 import { ARCPClient, ARCPServer, pairMemoryTransports } from "@arcp/sdk";
 
 async function makePair() {
-  const server = new ARCPServer({ /* … */ });
+  const server = new ARCPServer({
+    /* … */
+  });
   const [c, s] = pairMemoryTransports();
   await server.accept(s);
 
-  const client = new ARCPClient({ /* … */ });
+  const client = new ARCPClient({
+    /* … */
+  });
   await client.connect(c);
 
-  return { client, server, dispose: async () => {
-    await client.close();
-    await server.close();
-  }};
+  return {
+    client,
+    server,
+    dispose: async () => {
+      await client.close();
+      await server.close();
+    },
+  };
 }
 ```
 
@@ -214,7 +224,9 @@ const transport = new StdioTransport({
   output: child.stdin!,
 });
 
-const client = new ARCPClient({ /* … */ });
+const client = new ARCPClient({
+  /* … */
+});
 await client.connect(transport);
 ```
 

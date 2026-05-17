@@ -50,7 +50,6 @@ describe("JobSubmitPayloadSchema (Effect Schema)", () => {
       }),
     ).rejects.toThrow();
   });
-
 });
 
 describe("JobBudgetSchema (Effect Schema)", () => {
@@ -85,7 +84,6 @@ describe("JobCancelPayloadSchema (Effect Schema)", () => {
     const input = { reason: "client requested" };
     await expect(decode(JobCancelPayloadSchema)(input)).resolves.toEqual(input);
   });
-
 });
 
 describe("JobStateSchema (Effect Schema)", () => {
@@ -141,7 +139,6 @@ describe("JobResultPayloadSchema (Effect Schema)", () => {
       }),
     ).rejects.toThrow();
   });
-
 });
 
 describe("JobErrorPayloadSchema (Effect Schema)", () => {
@@ -186,7 +183,6 @@ describe("JobErrorPayloadSchema (Effect Schema)", () => {
       }),
     ).rejects.toThrow();
   });
-
 });
 
 describe("JobErrorFinalStatusSchema (Effect Schema)", () => {

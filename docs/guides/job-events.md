@@ -6,16 +6,16 @@ namespace.
 
 ## The eight kinds
 
-| Kind | Body | Purpose |
-| --- | --- | --- |
-| `log` | `{ level, message, attributes? }` | Plain log line. |
-| `thought` | `{ text }` | Model reasoning / internal monologue. |
-| `tool_call` | `{ tool, args, call_id }` | Agent invoked a tool. |
-| `tool_result` | `{ call_id, result? \| error? }` | Result for a `tool_call`. |
-| `status` | `{ phase, message? }` | Lifecycle hint (`running`, `fetching`, …). |
-| `metric` | `{ name, value, unit?, attributes? }` | Numeric measurement. |
-| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }` | Reference to an artifact. |
-| `delegate` | `{ delegate_id, agent, input, lease_request? }` | Spawn a child job (§10). |
+| Kind           | Body                                            | Purpose                                    |
+| -------------- | ----------------------------------------------- | ------------------------------------------ |
+| `log`          | `{ level, message, attributes? }`               | Plain log line.                            |
+| `thought`      | `{ text }`                                      | Model reasoning / internal monologue.      |
+| `tool_call`    | `{ tool, args, call_id }`                       | Agent invoked a tool.                      |
+| `tool_result`  | `{ call_id, result? \| error? }`                | Result for a `tool_call`.                  |
+| `status`       | `{ phase, message? }`                           | Lifecycle hint (`running`, `fetching`, …). |
+| `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                       |
+| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact.                  |
+| `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Spawn a child job (§10).                   |
 
 `tool_result` carries either `result` or `error` (mutually exclusive).
 `artifact_ref` is a reference; storage is out of scope for ARCP. The
@@ -39,7 +39,11 @@ server.registerAgent("research", async (input, ctx) => {
   // …
   await ctx.toolResult({
     call_id: "s1",
-    result: { hits: [/* … */] },
+    result: {
+      hits: [
+        /* … */
+      ],
+    },
   });
 
   await ctx.metric({ name: "tokens.in", value: 1284, unit: "tokens" });
@@ -64,10 +68,18 @@ client.on("job.event", (env) => {
   if (env.job_id !== myJobId) return;
   const { kind, body } = env.payload;
   switch (kind) {
-    case "log":     console.log(`[${body.level}] ${body.message}`); break;
-    case "status":  console.log(`status → ${body.phase}`); break;
-    case "metric":  metrics[body.name] = (metrics[body.name] ?? 0) + body.value; break;
-    case "artifact_ref": queueDownload(body.uri); break;
+    case "log":
+      console.log(`[${body.level}] ${body.message}`);
+      break;
+    case "status":
+      console.log(`status → ${body.phase}`);
+      break;
+    case "metric":
+      metrics[body.name] = (metrics[body.name] ?? 0) + body.value;
+      break;
+    case "artifact_ref":
+      queueDownload(body.uri);
+      break;
   }
 });
 ```

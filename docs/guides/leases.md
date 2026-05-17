@@ -15,12 +15,12 @@ type Lease = {
 
 A capability name is `<namespace>:<resource>`. Reserved namespaces:
 
-| Namespace | What it gates |
-| --- | --- |
-| `fs.read` | Filesystem reads. Pattern is a path glob. |
-| `fs.write` | Filesystem writes. |
-| `net.fetch` | Outbound HTTP/S3/etc. Pattern is a URL glob. |
-| `tool.call` | Tool invocation. Pattern matches against `tool` name. |
+| Namespace        | What it gates                                          |
+| ---------------- | ------------------------------------------------------ |
+| `fs.read`        | Filesystem reads. Pattern is a path glob.              |
+| `fs.write`       | Filesystem writes.                                     |
+| `net.fetch`      | Outbound HTTP/S3/etc. Pattern is a URL glob.           |
+| `tool.call`      | Tool invocation. Pattern matches against `tool` name.  |
 | `agent.delegate` | Spawning child jobs. Pattern matches child agent name. |
 
 Custom namespaces MUST use `x-vendor.<vendor>.<cap>`:
@@ -38,8 +38,8 @@ const handle = await client.submit({
   agent: "weekly-report",
   input: { week: "2026-W19" },
   lease: {
-    "net.fetch":      ["https://api.example.com/**", "s3://reports-bucket/**"],
-    "tool.call":      ["web.*", "summarize"],
+    "net.fetch": ["https://api.example.com/**", "s3://reports-bucket/**"],
+    "tool.call": ["web.*", "summarize"],
     "agent.delegate": ["pdf-renderer@*"],
   },
 });
@@ -54,12 +54,12 @@ const handle = await client.submit({
 
 Examples:
 
-| Pattern | Matches | Does not match |
-| --- | --- | --- |
-| `https://api.example.com/*` | `https://api.example.com/v1` | `https://api.example.com/v1/users` |
-| `https://api.example.com/**` | `https://api.example.com/v1/users/42` | `https://other.example.com/` |
-| `s3://reports/**.csv` | `s3://reports/2026/W19.csv` | `s3://reports/2026/W19.json` |
-| `tool.call:web.*` | `web.search` | `web.search.advanced` (extra segment) |
+| Pattern                      | Matches                               | Does not match                        |
+| ---------------------------- | ------------------------------------- | ------------------------------------- |
+| `https://api.example.com/*`  | `https://api.example.com/v1`          | `https://api.example.com/v1/users`    |
+| `https://api.example.com/**` | `https://api.example.com/v1/users/42` | `https://other.example.com/`          |
+| `s3://reports/**.csv`        | `s3://reports/2026/W19.csv`           | `s3://reports/2026/W19.json`          |
+| `tool.call:web.*`            | `web.search`                          | `web.search.advanced` (extra segment) |
 
 ## Canonicalization (§14)
 
@@ -87,7 +87,7 @@ const handle = await client.submit({
   input: {},
   lease: {
     "net.fetch": ["https://**"],
-    "fs.write":  ["/tmp/**"],
+    "fs.write": ["/tmp/**"],
   },
 });
 
@@ -104,11 +104,11 @@ broader lease — that's the bright line.
 
 The runtime checks the lease at the moment of operation:
 
-| Event | Check |
-| --- | --- |
-| `tool_call` | `tool.call:<tool>` matches; specific tools may check sub-namespaces. |
-| `delegate` | child `lease_request` is a subset of parent's effective lease. |
-| `tool_result` carrying URL fetches | implicit `net.fetch` check inside the tool implementation. |
+| Event                              | Check                                                                |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| `tool_call`                        | `tool.call:<tool>` matches; specific tools may check sub-namespaces. |
+| `delegate`                         | child `lease_request` is a subset of parent's effective lease.       |
+| `tool_result` carrying URL fetches | implicit `net.fetch` check inside the tool implementation.           |
 
 When a check fails, the runtime emits a `tool_result` on the parent
 with `error.code: "PERMISSION_DENIED"` (or, for delegation,
@@ -169,7 +169,7 @@ await client.submit({
   input: {},
   lease: { "net.fetch": ["https://**"] },
   leaseConstraints: {
-    budgets: { usd: 2.00, tokens: 100_000 },
+    budgets: { usd: 2.0, tokens: 100_000 },
   },
 });
 ```

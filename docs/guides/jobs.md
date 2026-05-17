@@ -76,16 +76,16 @@ produces `job.error` with that code. Throwing anything else produces
 
 ## `SubmitOptions`
 
-| Field | Notes |
-| --- | --- |
-| `agent: string` | Required. Must match a registered name. |
-| `input?: unknown` | Free-form payload, encoded per `capabilities.encodings`. |
-| `lease?: Lease` | Capability grant. Runtime MAY reduce, MUST NOT expand (§9). |
-| `idempotencyKey?: string` | (§7.2) — collapses retries. |
-| `maxRuntimeSec?: number` | Hard wall clock; trips `TIMEOUT`. |
-| `traceId?: TraceId` | 32-hex W3C trace id to propagate. |
-| `signal?: AbortSignal` | Client-side cancellation; sends `job.cancel` on abort. |
-| `leaseConstraints?: LeaseConstraints` | v1.1 (§9.5/§9.6) — expiration + budgets. |
+| Field                                 | Notes                                                       |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `agent: string`                       | Required. Must match a registered name.                     |
+| `input?: unknown`                     | Free-form payload, encoded per `capabilities.encodings`.    |
+| `lease?: Lease`                       | Capability grant. Runtime MAY reduce, MUST NOT expand (§9). |
+| `idempotencyKey?: string`             | (§7.2) — collapses retries.                                 |
+| `maxRuntimeSec?: number`              | Hard wall clock; trips `TIMEOUT`.                           |
+| `traceId?: TraceId`                   | 32-hex W3C trace id to propagate.                           |
+| `signal?: AbortSignal`                | Client-side cancellation; sends `job.cancel` on abort.      |
+| `leaseConstraints?: LeaseConstraints` | v1.1 (§9.5/§9.6) — expiration + budgets.                    |
 
 ## Idempotency (§7.2)
 
@@ -181,7 +181,7 @@ const handle = await client.submit({
   input: { query: "…" },
   lease: { "net.fetch": ["https://**"] },
   leaseConstraints: {
-    budgets: { usd: 1.50, tokens: 50_000 },
+    budgets: { usd: 1.5, tokens: 50_000 },
   },
 });
 ```

@@ -159,7 +159,8 @@ export function makeJobEffect(job: JobLike): JobEffect {
     jobId: job.jobId,
     emitAccepted: liftSend(() => job.emitAccepted()),
     emitRunning: liftSend(() => job.emitRunning()),
-    emitEventKind: (kind, body) => liftSend(() => job.emitEventKind(kind, body)),
+    emitEventKind: (kind, body) =>
+      liftSend(() => job.emitEventKind(kind, body)),
     emitResult: (result) => liftSend(() => job.emitResult(result)),
     emitErrorEnvelope: (payload) =>
       liftSend(() => job.emitErrorEnvelope(payload)),
@@ -268,7 +269,9 @@ function watchdogPoll(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function liftSend(thunk: () => Promise<void>): Effect.Effect<void, TaggedSdkError> {
+function liftSend(
+  thunk: () => Promise<void>,
+): Effect.Effect<void, TaggedSdkError> {
   return Effect.tryPromise({
     try: thunk,
     catch: (cause) => liftToTagged(cause),

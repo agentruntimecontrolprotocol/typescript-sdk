@@ -112,10 +112,14 @@ async function sendResumeWelcome(args: SendResumeWelcomeArgs): Promise<void> {
   const { server, ctx, freshToken, sessionId } = args;
   const resumeWindowSec =
     server.options.resumeWindowSeconds ?? DEFAULT_RESUME_WINDOW_SECONDS;
-  const welcome = server.buildWelcomePayload(ctx, ctx.state.capabilities ?? {}, {
-    resumeToken: freshToken,
-    resumeWindowSec,
-  });
+  const welcome = server.buildWelcomePayload(
+    ctx,
+    ctx.state.capabilities ?? {},
+    {
+      resumeToken: freshToken,
+      resumeWindowSec,
+    },
+  );
   ctx.state.transition("accepted");
   server.sessions.set(sessionId, ctx);
   await ctx.send(

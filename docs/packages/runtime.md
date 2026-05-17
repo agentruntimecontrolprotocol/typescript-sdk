@@ -17,9 +17,7 @@ import { ARCPServer, StaticBearerVerifier } from "@arcp/runtime";
 const server = new ARCPServer({
   runtime: { name: "my-runtime", version: "1.0.0" },
   capabilities: { encodings: ["json"], agents: ["echo"] },
-  bearer: new StaticBearerVerifier(
-    new Map([["tok", { principal: "me" }]]),
-  ),
+  bearer: new StaticBearerVerifier(new Map([["tok", { principal: "me" }]])),
 });
 
 server.registerAgent("echo", async (input, ctx) => {
@@ -31,21 +29,21 @@ await server.accept(transport);
 
 ### `ARCPServerOptions`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `runtime: RuntimeIdentity` | — | `{ name, version }` advertised on welcome. |
-| `capabilities: Capabilities` | — | `{ encodings, agents, extensions? }`. |
-| `bearer?: BearerVerifier` | required in v1.0 | See [auth guide](../guides/auth.md). |
-| `eventLog?: EventLog` | in-memory | Drop-in for durable resume. |
-| `logger?: Logger` | `rootLogger` | Pino-shaped. |
-| `heartbeatIntervalSeconds?: number` | 30 | v1.1 — interval for `session.heartbeat`. |
-| `resumeWindowSeconds?: number` | 600 | §6.3 — buffered-event TTL. |
-| `cancelGraceMs?: number` | 30_000 | §7.4 — grace before forced terminate. |
-| `idempotencyTtlMs?: number` | 86_400_000 (24h) | §7.2 — idempotency cache TTL. |
-| `caps?: SessionCaps` | see below | §14 — per-session DoS caps. |
-| `features?: readonly string[]` | `V1_1_FEATURES` | Advertised feature set. |
-| `jobAuthorizationPolicy?: (job, principal) => boolean` | same-principal | Authorization gate. |
-| `backPressureThreshold?: number` | 1000 | v1.1 — unacked events before stall. |
+| Field                                                  | Default          | Notes                                      |
+| ------------------------------------------------------ | ---------------- | ------------------------------------------ |
+| `runtime: RuntimeIdentity`                             | —                | `{ name, version }` advertised on welcome. |
+| `capabilities: Capabilities`                           | —                | `{ encodings, agents, extensions? }`.      |
+| `bearer?: BearerVerifier`                              | required in v1.0 | See [auth guide](../guides/auth.md).       |
+| `eventLog?: EventLog`                                  | in-memory        | Drop-in for durable resume.                |
+| `logger?: Logger`                                      | `rootLogger`     | Pino-shaped.                               |
+| `heartbeatIntervalSeconds?: number`                    | 30               | v1.1 — interval for `session.heartbeat`.   |
+| `resumeWindowSeconds?: number`                         | 600              | §6.3 — buffered-event TTL.                 |
+| `cancelGraceMs?: number`                               | 30_000           | §7.4 — grace before forced terminate.      |
+| `idempotencyTtlMs?: number`                            | 86_400_000 (24h) | §7.2 — idempotency cache TTL.              |
+| `caps?: SessionCaps`                                   | see below        | §14 — per-session DoS caps.                |
+| `features?: readonly string[]`                         | `V1_1_FEATURES`  | Advertised feature set.                    |
+| `jobAuthorizationPolicy?: (job, principal) => boolean` | same-principal   | Authorization gate.                        |
+| `backPressureThreshold?: number`                       | 1000             | v1.1 — unacked events before stall.        |
 
 #### `SessionCaps` defaults
 
@@ -170,13 +168,19 @@ type Job = {
   readonly agentRef: string;
   readonly lease: Lease;
   readonly leaseConstraints?: LeaseConstraints;
-  readonly parentJobId?: JobId;       // delegate child
+  readonly parentJobId?: JobId; // delegate child
   readonly delegateId?: string;
   readonly traceId?: TraceId;
-  readonly createdAt: string;          // ISO timestamp
+  readonly createdAt: string; // ISO timestamp
   readonly budget: Map<string, number>; // mutable
   submitterPrincipal?: string;
-  state: "pending" | "running" | "success" | "error" | "cancelled" | "timed_out";
+  state:
+    | "pending"
+    | "running"
+    | "success"
+    | "error"
+    | "cancelled"
+    | "timed_out";
   readonly signal: AbortSignal;
   readonly isTerminal: boolean;
 };
@@ -211,18 +215,18 @@ enforcement check; throws `PermissionDeniedError`,
 Per-session state owned by the runtime. Most callers don't touch it —
 the server class drives everything. Useful entry points:
 
-| Field/method | Use |
-| --- | --- |
-| `state: SessionState` | Phase machine. |
-| `jobs: JobManager` | Live job tracking. |
-| `pending: PendingRegistry` | Pending request map. |
-| `nextEventSeq()` | Allocate next session-scoped seq. |
-| `registerHandler(type, handler)` | Custom envelope handler (vendor types). |
-| `send(envelope)` | Direct emission (fan-out to subscribers). |
-| `emitSessionError(err)` | Force-close with `session.error`. |
-| `emitJobError(jobId, payload)` | Force-terminate a job. |
-| `negotiatedFeatures: string[]` | Effective v1.1 set. |
-| `lastAckedEventSeq` | v1.1 back-pressure tracking. |
+| Field/method                     | Use                                       |
+| -------------------------------- | ----------------------------------------- |
+| `state: SessionState`            | Phase machine.                            |
+| `jobs: JobManager`               | Live job tracking.                        |
+| `pending: PendingRegistry`       | Pending request map.                      |
+| `nextEventSeq()`                 | Allocate next session-scoped seq.         |
+| `registerHandler(type, handler)` | Custom envelope handler (vendor types).   |
+| `send(envelope)`                 | Direct emission (fan-out to subscribers). |
+| `emitSessionError(err)`          | Force-close with `session.error`.         |
+| `emitJobError(jobId, payload)`   | Force-terminate a job.                    |
+| `negotiatedFeatures: string[]`   | Effective v1.1 set.                       |
+| `lastAckedEventSeq`              | v1.1 back-pressure tracking.              |
 
 ## Job authorization
 
@@ -233,8 +237,11 @@ new ARCPServer({
   // …
   jobAuthorizationPolicy: (job, principal) => {
     if (job.submitterPrincipal === principal) return true;
-    if (sharedTenants.has(job.submitterPrincipal!)
-        && sharedTenants.has(principal!)) return true;
+    if (
+      sharedTenants.has(job.submitterPrincipal!) &&
+      sharedTenants.has(principal!)
+    )
+      return true;
     return false;
   },
 });

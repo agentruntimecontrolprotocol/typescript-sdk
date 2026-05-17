@@ -19,7 +19,7 @@ about delegation just see two job streams.
 ```ts
 server.registerAgent("orchestrator", async (input, ctx) => {
   await ctx.delegate({
-    delegate_id: "render-pdf",          // local correlation id
+    delegate_id: "render-pdf", // local correlation id
     agent: "pdf-renderer",
     input: { source: input.markdown },
     lease_request: {
@@ -138,16 +138,19 @@ handles and cancel them in a `try`/`finally`:
 server.registerAgent("orchestrator", async (input, ctx) => {
   const children = new Set<JobId>();
   try {
-    await ctx.delegate({ /* … */ });
+    await ctx.delegate({
+      /* … */
+    });
     // …
   } finally {
     if (ctx.signal.aborted) {
       // emit cancel intents for children — they're separate jobs
-      for (const id of children) await ctx.toolCall({
-        tool: "x-vendor.acme.cancel",
-        call_id: id,
-        args: { job_id: id, reason: "parent-cancelled" },
-      });
+      for (const id of children)
+        await ctx.toolCall({
+          tool: "x-vendor.acme.cancel",
+          call_id: id,
+          args: { job_id: id, reason: "parent-cancelled" },
+        });
     }
   }
 });

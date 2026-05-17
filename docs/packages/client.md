@@ -32,16 +32,16 @@ const client = new ARCPClient({
 
 ### `ARCPClientOptions`
 
-| Field | Required | Notes |
-| --- | --- | --- |
-| `client: ClientIdentity` | yes | `{ name, version }` advertised in `session.hello`. |
-| `authScheme: AuthScheme` | yes | `"bearer"` for v1.0. Vendor schemes via `x-vendor.*`. |
-| `token?: string` | bearer only | Bearer token. |
-| `capabilities?: Capabilities` | no | Client-advertised caps. |
-| `features?: readonly string[]` | no | Defaults to `V1_1_FEATURES`. |
-| `logger?: Logger` | no | Pino-shaped logger. |
-| `handshakeTimeoutMs?: number` | no | Default 5000. |
-| `autoAck?: boolean \| ClientAutoAckOptions` | no | v1.1 — enables auto-ack. |
+| Field                                       | Required    | Notes                                                 |
+| ------------------------------------------- | ----------- | ----------------------------------------------------- |
+| `client: ClientIdentity`                    | yes         | `{ name, version }` advertised in `session.hello`.    |
+| `authScheme: AuthScheme`                    | yes         | `"bearer"` for v1.0. Vendor schemes via `x-vendor.*`. |
+| `token?: string`                            | bearer only | Bearer token.                                         |
+| `capabilities?: Capabilities`               | no          | Client-advertised caps.                               |
+| `features?: readonly string[]`              | no          | Defaults to `V1_1_FEATURES`.                          |
+| `logger?: Logger`                           | no          | Pino-shaped logger.                                   |
+| `handshakeTimeoutMs?: number`               | no          | Default 5000.                                         |
+| `autoAck?: boolean \| ClientAutoAckOptions` | no          | v1.1 — enables auto-ack.                              |
 
 ## Methods
 
@@ -76,12 +76,16 @@ streaming. See [resume guide](../guides/resume.md).
 const handle: JobHandle = await client.submit({
   agent: "x",
   input: {},
-  lease: { /* … */ },
+  lease: {
+    /* … */
+  },
   idempotencyKey: "…",
   maxRuntimeSec: 600,
   traceId: "0123…",
-  signal: ac.signal,                   // optional client-side cancel
-  leaseConstraints: { /* v1.1 */ },
+  signal: ac.signal, // optional client-side cancel
+  leaseConstraints: {
+    /* v1.1 */
+  },
 });
 ```
 
@@ -113,8 +117,8 @@ feature.
 
 ```ts
 const sub = await client.subscribe(jobId, {
-  history: true,           // include past events
-  fromEventSeq: 100,       // only events strictly after this seq
+  history: true, // include past events
+  fromEventSeq: 100, // only events strictly after this seq
 });
 
 // stop receiving
@@ -135,9 +139,15 @@ Manual back-pressure ack. Most callers use `autoAck: true` instead.
 ### `on(type, handler)`
 
 ```ts
-client.on("job.event", (env) => { /* … */ });
-client.on("job.result", (env) => { /* … */ });
-client.on("x-vendor.acme.warmup", (env) => { /* … */ });
+client.on("job.event", (env) => {
+  /* … */
+});
+client.on("job.result", (env) => {
+  /* … */
+});
+client.on("x-vendor.acme.warmup", (env) => {
+  /* … */
+});
 ```
 
 Register an inbound envelope handler. Handlers are awaited — back-
@@ -168,41 +178,41 @@ Sends `session.bye` and closes the transport. Idempotent.
 
 ## Getters
 
-| Getter | Notes |
-| --- | --- |
-| `state: SessionState` | The phase machine. |
-| `pending: PendingRegistry` | Outstanding request map. |
-| `logger: Logger` | Pre-bound to `session_id`. |
-| `lastEventSeqObserved: number` | Latest seen `event_seq`. |
-| `welcomePayload: SessionWelcomePayload \| null` | The current welcome. |
-| `negotiatedFeatures: readonly string[]` | Effective v1.1 feature set. |
-| `hasFeature(name): boolean` | Convenience. |
+| Getter                                          | Notes                       |
+| ----------------------------------------------- | --------------------------- |
+| `state: SessionState`                           | The phase machine.          |
+| `pending: PendingRegistry`                      | Outstanding request map.    |
+| `logger: Logger`                                | Pre-bound to `session_id`.  |
+| `lastEventSeqObserved: number`                  | Latest seen `event_seq`.    |
+| `welcomePayload: SessionWelcomePayload \| null` | The current welcome.        |
+| `negotiatedFeatures: readonly string[]`         | Effective v1.1 feature set. |
+| `hasFeature(name): boolean`                     | Convenience.                |
 
 ## `JobHandle`
 
 Returned by `submit()`.
 
-| Field | Notes |
-| --- | --- |
-| `jobId: JobId` | Server-assigned. |
-| `lease: Lease` | The effective lease (possibly narrowed). |
-| `agent?: string` | v1.1 — resolved agent ref including version. |
-| `traceId?: TraceId` | Same id if you passed one in. |
-| `leaseConstraints?: LeaseConstraints` | v1.1 lease constraints. |
-| `budget?: Record<string, number>` | v1.1 initial budget per currency. |
-| `done: Promise<JobResultPayload>` | Resolves on `job.result`, rejects on `job.error`. |
-| `collectChunks(): Promise<Buffer \| string>` | v1.1 — assemble `result_chunk` stream. |
+| Field                                        | Notes                                             |
+| -------------------------------------------- | ------------------------------------------------- |
+| `jobId: JobId`                               | Server-assigned.                                  |
+| `lease: Lease`                               | The effective lease (possibly narrowed).          |
+| `agent?: string`                             | v1.1 — resolved agent ref including version.      |
+| `traceId?: TraceId`                          | Same id if you passed one in.                     |
+| `leaseConstraints?: LeaseConstraints`        | v1.1 lease constraints.                           |
+| `budget?: Record<string, number>`            | v1.1 initial budget per currency.                 |
+| `done: Promise<JobResultPayload>`            | Resolves on `job.result`, rejects on `job.error`. |
+| `collectChunks(): Promise<Buffer \| string>` | v1.1 — assemble `result_chunk` stream.            |
 
 ## `JobSubscription` — v1.1
 
 Returned by `subscribe()`.
 
-| Field | Notes |
-| --- | --- |
-| `jobId: JobId` | The target job. |
-| `subscribedFrom: number` | First `event_seq` returned. |
-| `replayed: boolean` | Whether history was included. |
-| `unsubscribe(): Promise<void>` | End the subscription. |
+| Field                          | Notes                         |
+| ------------------------------ | ----------------------------- |
+| `jobId: JobId`                 | The target job.               |
+| `subscribedFrom: number`       | First `event_seq` returned.   |
+| `replayed: boolean`            | Whether history was included. |
+| `unsubscribe(): Promise<void>` | End the subscription.         |
 
 ## Tree-shaking
 

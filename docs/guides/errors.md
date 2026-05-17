@@ -7,23 +7,23 @@ to the wire identically whether they surface as `session.error`,
 
 ## Codes
 
-| Code | Class | Meaning | Retryable |
-| --- | --- | --- | --- |
-| `INVALID_REQUEST` | `InvalidRequestError` | Malformed envelope or arguments. | No |
-| `UNAUTHENTICATED` | `UnauthenticatedError` | Bad or missing bearer token. | No |
-| `PERMISSION_DENIED` | `PermissionDeniedError` | Lease check failed. | No |
-| `JOB_NOT_FOUND` | `JobNotFoundError` | Unknown `job_id`. | No |
-| `AGENT_NOT_AVAILABLE` | `AgentNotAvailableError` | Agent name not registered. | No |
-| `AGENT_VERSION_NOT_AVAILABLE` | `AgentVersionNotAvailableError` | Pinned version absent (v1.1). | No |
-| `CANCELLED` | `CancelledError` | Job cancelled via `job.cancel`. | No |
-| `TIMEOUT` | `TimeoutError` | Wall-clock `max_runtime_sec` tripped. | Yes |
-| `INTERNAL_ERROR` | `InternalError` | Unhandled runtime error. | Yes |
-| `LEASE_SUBSET_VIOLATION` | `LeaseSubsetViolationError` | Child lease wider than parent (§10). | No |
-| `LEASE_EXPIRED` | `LeaseExpiredError` | `lease_constraints.expires_at` reached (v1.1). | No |
-| `BUDGET_EXHAUSTED` | `BudgetExhaustedError` | `lease_constraints.budgets` depleted (v1.1). | No |
-| `RESUME_WINDOW_EXPIRED` | `ResumeWindowExpiredError` | Resume past `resume_window_sec`. | No |
-| `HEARTBEAT_LOST` | `HeartbeatLostError` | Two consecutive missed pongs (v1.1). | Yes |
-| `DUPLICATE_KEY` | `DuplicateKeyError` | Idempotency key collision with conflicting input. | No |
+| Code                          | Class                           | Meaning                                           | Retryable |
+| ----------------------------- | ------------------------------- | ------------------------------------------------- | --------- |
+| `INVALID_REQUEST`             | `InvalidRequestError`           | Malformed envelope or arguments.                  | No        |
+| `UNAUTHENTICATED`             | `UnauthenticatedError`          | Bad or missing bearer token.                      | No        |
+| `PERMISSION_DENIED`           | `PermissionDeniedError`         | Lease check failed.                               | No        |
+| `JOB_NOT_FOUND`               | `JobNotFoundError`              | Unknown `job_id`.                                 | No        |
+| `AGENT_NOT_AVAILABLE`         | `AgentNotAvailableError`        | Agent name not registered.                        | No        |
+| `AGENT_VERSION_NOT_AVAILABLE` | `AgentVersionNotAvailableError` | Pinned version absent (v1.1).                     | No        |
+| `CANCELLED`                   | `CancelledError`                | Job cancelled via `job.cancel`.                   | No        |
+| `TIMEOUT`                     | `TimeoutError`                  | Wall-clock `max_runtime_sec` tripped.             | Yes       |
+| `INTERNAL_ERROR`              | `InternalError`                 | Unhandled runtime error.                          | Yes       |
+| `LEASE_SUBSET_VIOLATION`      | `LeaseSubsetViolationError`     | Child lease wider than parent (§10).              | No        |
+| `LEASE_EXPIRED`               | `LeaseExpiredError`             | `lease_constraints.expires_at` reached (v1.1).    | No        |
+| `BUDGET_EXHAUSTED`            | `BudgetExhaustedError`          | `lease_constraints.budgets` depleted (v1.1).      | No        |
+| `RESUME_WINDOW_EXPIRED`       | `ResumeWindowExpiredError`      | Resume past `resume_window_sec`.                  | No        |
+| `HEARTBEAT_LOST`              | `HeartbeatLostError`            | Two consecutive missed pongs (v1.1).              | Yes       |
+| `DUPLICATE_KEY`               | `DuplicateKeyError`             | Idempotency key collision with conflicting input. | No        |
 
 `isRetryableByDefault(code)` reflects the column above. Per-error
 overrides ride on the payload's `retryable` field.

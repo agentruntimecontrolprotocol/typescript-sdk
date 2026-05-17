@@ -210,9 +210,7 @@ export async function forwardEventToSubscriber(
       session_id: sub.state.id,
       ...(src.job_id === undefined ? {} : { job_id: src.job_id }),
       ...(src.trace_id === undefined ? {} : { trace_id: src.trace_id }),
-      ...(src.event_seq === undefined
-        ? {}
-        : { event_seq: sub.nextEventSeq() }),
+      ...(src.event_seq === undefined ? {} : { event_seq: sub.nextEventSeq() }),
     },
   });
   await sub.send(env);

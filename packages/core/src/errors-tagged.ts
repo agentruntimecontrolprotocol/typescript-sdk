@@ -163,26 +163,10 @@ export class TaggedAgentVersionNotAvailable extends Schema.TaggedError<TaggedAge
   readonly code = "AGENT_VERSION_NOT_AVAILABLE" as const;
 }
 
-/**
- * Transport-layer failure surfaced through Effect's typed-error channel.
- *
- * Not part of the §12 ARCP error catalog — `Transport` is the seam below
- * protocol logic, so its failures are categorically distinct from the
- * `TaggedSdkError` union. Effect-shaped transports (`memoryTransportEffect`,
- * `stdioTransportEffect`, `websocketTransportEffect`) fail their `incoming`
- * stream and `send` Effect with this error.
- *
- * `kind` is a free-form, opt-in tag for upstream pattern matching
- * (`"send"`, `"receive"`, `"parse"`, `"closed"`, etc.). `cause` carries the
- * underlying defect (typically a Node `Error` from `ws` / `readline`).
- */
-export class TaggedTransportError extends Schema.TaggedError<TaggedTransportError>()(
-  "TransportError",
-  {
-    cause: Schema.Defect,
-    kind: Schema.optional(Schema.String),
-  },
-) {}
+export {
+  TaggedTransportError,
+  transportSendError,
+} from "./transport-error.js";
 
 /**
  * Discriminated union of every Effect-native ARCP error. Mirrors `SdkError`

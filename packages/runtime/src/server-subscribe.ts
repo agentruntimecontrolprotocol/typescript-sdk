@@ -9,7 +9,7 @@ import type {
 } from "@arcp/core/messages";
 import { newMessageId } from "@arcp/core/util";
 
-import { forwardEventToSubscriber } from "./job-runner.js";
+import { forwardEventToSubscriber } from "./job-runner-helpers.js";
 import type { Job } from "./job.js";
 import {
   compareJobListEntries,

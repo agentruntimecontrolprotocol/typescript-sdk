@@ -15,7 +15,9 @@ bun add @arcp/bun @arcp/runtime
 import { ARCPServer } from "@arcp/runtime";
 import { serveArcp } from "@arcp/bun";
 
-const arcp = new ARCPServer({ /* … */ });
+const arcp = new ARCPServer({
+  /* … */
+});
 
 const handle = serveArcp({
   port: 3000,
@@ -35,22 +37,22 @@ await handle.close();
 
 ### `serveArcp(options): ArcpServeHandle`
 
-| Option | Default | Notes |
-| --- | --- | --- |
-| `port?: number` | system pick | Bind port. `0` lets Bun pick a free port. |
-| `host?: string` | `"0.0.0.0"` | Bind host. |
-| `path?: string` | `"/arcp"` | URL path that should upgrade. |
-| `allowedHosts?: readonly string[]` | none | DNS-rebind protection. |
-| `onTransport: (transport, origin: Request) => void` | — | Pair with `server.accept`. |
-| `fallback?: (req: Request) => Response \| Promise<Response>` | 404 | Handler for non-ARCP paths. |
+| Option                                                       | Default     | Notes                                     |
+| ------------------------------------------------------------ | ----------- | ----------------------------------------- |
+| `port?: number`                                              | system pick | Bind port. `0` lets Bun pick a free port. |
+| `host?: string`                                              | `"0.0.0.0"` | Bind host.                                |
+| `path?: string`                                              | `"/arcp"`   | URL path that should upgrade.             |
+| `allowedHosts?: readonly string[]`                           | none        | DNS-rebind protection.                    |
+| `onTransport: (transport, origin: Request) => void`          | —           | Pair with `server.accept`.                |
+| `fallback?: (req: Request) => Response \| Promise<Response>` | 404         | Handler for non-ARCP paths.               |
 
 ### `ArcpServeHandle`
 
-| Field | Notes |
-| --- | --- |
-| `port: number` | Actual bound port (after `port: 0`). |
-| `url: string` | Convenience URL string (e.g. `ws://0.0.0.0:3000/arcp`). |
-| `close(): Promise<void>` | Stop the listener. |
+| Field                    | Notes                                                   |
+| ------------------------ | ------------------------------------------------------- |
+| `port: number`           | Actual bound port (after `port: 0`).                    |
+| `url: string`            | Convenience URL string (e.g. `ws://0.0.0.0:3000/arcp`). |
+| `close(): Promise<void>` | Stop the listener.                                      |
 
 ## `BunWebSocketTransport`
 

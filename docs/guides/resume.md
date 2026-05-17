@@ -15,7 +15,7 @@ advertised window.
    for tab refreshes; disk for crashes).
 3. On reconnect, the client opens a fresh transport and issues
    `session.hello` with `payload.resume = { session_id, resume_token,
-   last_event_seq }`.
+last_event_seq }`.
 4. The runtime validates the token, **rotates it** (single-use), and
    replays buffered events with `event_seq > last_event_seq`, then
    resumes live streaming.

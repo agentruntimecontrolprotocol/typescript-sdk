@@ -158,7 +158,6 @@ describe("SessionHelloPayloadSchema (Effect Schema)", () => {
       input,
     );
   });
-
 });
 
 describe("SessionWelcomePayloadSchema (Effect Schema)", () => {
@@ -197,7 +196,6 @@ describe("SessionWelcomePayloadSchema (Effect Schema)", () => {
       }),
     ).rejects.toThrow();
   });
-
 });
 
 describe("SessionErrorPayloadSchema (Effect Schema)", () => {

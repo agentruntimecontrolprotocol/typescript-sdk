@@ -154,11 +154,10 @@ export function pickDefined<T extends Record<string, unknown>>(
  * end-to-end.
  */
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function messageEnvelope<
-  T extends string,
-  A,
-  I,
->(type: T, payload: Schema.Schema<A, I>) {
+export function messageEnvelope<T extends string, A, I>(
+  type: T,
+  payload: Schema.Schema<A, I>,
+) {
   return Schema.Struct({
     arcp: Schema.Literal(PROTOCOL_VERSION),
     id: MessageIdSchema,

@@ -150,9 +150,8 @@ describe("legacy ARCPServer unchanged (smoke)", () => {
   it("constructs, registers an agent, accepts a memory transport, and welcomes", async () => {
     // This mirrors the existing SDK integration-test setup pattern (without
     // pulling in @arcp/client) — it asserts the legacy class is unchanged.
-    const { pairMemoryTransports, StaticBearerVerifier } = await import(
-      "@arcp/core"
-    );
+    const { pairMemoryTransports, StaticBearerVerifier } =
+      await import("@arcp/core");
     const server = new ARCPServer({
       runtime: TEST_RUNTIME,
       capabilities: { encodings: ["json"] },

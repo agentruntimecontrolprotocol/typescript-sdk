@@ -26,14 +26,14 @@ packages, all ESM, all strictly typed against TypeScript 5.6 with
 Full docs live in [`docs/`](./docs/). Start with
 [getting-started](./docs/getting-started.md) or jump to a guide:
 
-| Guide | Spec | | Guide | Spec |
-| --- | --- | --- | --- | --- |
-| [Sessions](./docs/guides/sessions.md) | §6 | | [Delegation](./docs/guides/delegation.md) | §10 |
-| [Resume](./docs/guides/resume.md) | §6.3 | | [Observability](./docs/guides/observability.md) | §11 |
-| [Authentication](./docs/guides/auth.md) | §6.1 | | [Errors](./docs/guides/errors.md) | §12 |
-| [Jobs](./docs/guides/jobs.md) | §7 | | [Vendor extensions](./docs/guides/vendor-extensions.md) | §15 |
-| [Job events](./docs/guides/job-events.md) | §8 | | [Recipes](./docs/recipes.md) | — |
-| [Leases](./docs/guides/leases.md) | §9 | | [Troubleshooting](./docs/troubleshooting.md) | — |
+| Guide                                     | Spec |     | Guide                                                   | Spec |
+| ----------------------------------------- | ---- | --- | ------------------------------------------------------- | ---- |
+| [Sessions](./docs/guides/sessions.md)     | §6   |     | [Delegation](./docs/guides/delegation.md)               | §10  |
+| [Resume](./docs/guides/resume.md)         | §6.3 |     | [Observability](./docs/guides/observability.md)         | §11  |
+| [Authentication](./docs/guides/auth.md)   | §6.1 |     | [Errors](./docs/guides/errors.md)                       | §12  |
+| [Jobs](./docs/guides/jobs.md)             | §7   |     | [Vendor extensions](./docs/guides/vendor-extensions.md) | §15  |
+| [Job events](./docs/guides/job-events.md) | §8   |     | [Recipes](./docs/recipes.md)                            | —    |
+| [Leases](./docs/guides/leases.md)         | §9   |     | [Troubleshooting](./docs/troubleshooting.md)            | —    |
 
 ## Install
 
@@ -180,16 +180,16 @@ Every event the runtime emits to the client is one `job.event` envelope
 whose `payload.kind` is one of eight reserved values or a vendor
 `x-vendor.*` extension:
 
-| Kind           | Body shape                                       | Purpose                                             |
-| -------------- | ------------------------------------------------ | --------------------------------------------------- |
-| `log`          | `{ level, message, attributes? }`                | Plain log line.                                     |
-| `thought`      | `{ text }`                                       | Model reasoning / internal monologue.               |
-| `tool_call`    | `{ tool, args, call_id }`                        | Agent invoked a tool.                               |
-| `tool_result`  | `{ call_id, result? \| error? }`                 | Result for a `tool_call`.                           |
-| `status`       | `{ phase, message? }`                            | Lifecycle hint (e.g., `running`, `fetching`).       |
-| `metric`       | `{ name, value, unit?, attributes? }`            | Numeric measurement.                                |
-| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`     | Reference to an artifact (storage is out of scope). |
-| `delegate`     | `{ delegate_id, agent, input, lease_request? }`  | Initiate a child job.                               |
+| Kind           | Body shape                                      | Purpose                                             |
+| -------------- | ----------------------------------------------- | --------------------------------------------------- |
+| `log`          | `{ level, message, attributes? }`               | Plain log line.                                     |
+| `thought`      | `{ text }`                                      | Model reasoning / internal monologue.               |
+| `tool_call`    | `{ tool, args, call_id }`                       | Agent invoked a tool.                               |
+| `tool_result`  | `{ call_id, result? \| error? }`                | Result for a `tool_call`.                           |
+| `status`       | `{ phase, message? }`                           | Lifecycle hint (e.g., `running`, `fetching`).       |
+| `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                                |
+| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact (storage is out of scope). |
+| `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Initiate a child job.                               |
 
 Sequence numbers are session-scoped (§8.3): one counter across all
 concurrent jobs in the session. Replay across a resume preserves
@@ -227,7 +227,9 @@ client re-issues `session.hello` carrying:
 
 ```ts
 {
-  resume: { session_id, resume_token, last_event_seq }
+  resume: {
+    (session_id, resume_token, last_event_seq);
+  }
 }
 ```
 

@@ -20,9 +20,8 @@ const encodeLog = (input: Schema.Schema.Type<typeof LogPayloadSchema>) =>
 
 const decodeMetric = (input: unknown) =>
   Effect.runPromise(Schema.decodeUnknown(MetricPayloadSchema)(input));
-const encodeMetric = (
-  input: Schema.Schema.Type<typeof MetricPayloadSchema>,
-) => Effect.runPromise(Schema.encode(MetricPayloadSchema)(input));
+const encodeMetric = (input: Schema.Schema.Type<typeof MetricPayloadSchema>) =>
+  Effect.runPromise(Schema.encode(MetricPayloadSchema)(input));
 
 const decodeLevel = (input: unknown) =>
   Effect.runPromise(Schema.decodeUnknown(LogLevelSchema)(input));
@@ -67,9 +66,7 @@ describe("LogPayloadSchema (Effect Schema)", () => {
 
   describe("decode — rejects", () => {
     it("rejects empty message (zod parity: .min(1))", async () => {
-      await expect(
-        decodeLog({ level: "info", message: "" }),
-      ).rejects.toThrow();
+      await expect(decodeLog({ level: "info", message: "" })).rejects.toThrow();
     });
 
     it("rejects unknown level", async () => {

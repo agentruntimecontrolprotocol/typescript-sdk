@@ -52,16 +52,12 @@ describe("BearerVerifierService default provider", () => {
 
 describe("StaticBearerVerifier (legacy Promise surface)", () => {
   it("resolves known tokens to the identity", async () => {
-    const v = new StaticBearerVerifier(
-      new Map([["tok-good", ALICE]]),
-    );
+    const v = new StaticBearerVerifier(new Map([["tok-good", ALICE]]));
     await expect(v.verify("tok-good")).resolves.toEqual(ALICE);
   });
 
   it("throws UnauthenticatedError for unknown tokens", async () => {
     const v = new StaticBearerVerifier(new Map());
-    await expect(v.verify("nope")).rejects.toBeInstanceOf(
-      UnauthenticatedError,
-    );
+    await expect(v.verify("nope")).rejects.toBeInstanceOf(UnauthenticatedError);
   });
 });

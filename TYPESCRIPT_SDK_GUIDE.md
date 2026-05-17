@@ -194,7 +194,7 @@
 - **Mark stability**: `@public`, `@beta`, `@alpha`, `@internal`,
   `@deprecated <replacement>`.
 - **Never duplicate type info in prose** ("the string name of the
-  user"). Document *meaning*, *invariants*, *side effects*.
+  user"). Document _meaning_, _invariants_, _side effects_.
 - **Examples must compile.** Run them through `tsd` or
   `eslint-plugin-tsdoc` in CI.
 
@@ -258,16 +258,16 @@
 These are **enforced limits**, not aspirations. Failing CI is the
 correct response.
 
-| Metric                       | Max | Aspire   |
-|------------------------------|----:|---------:|
-| Line length (chars)          | 100 | 80       |
-| Function body (lines)        |  40 | ≤ 20     |
-| File length (lines)          | 300 | ≤ 150    |
-| Function parameters          |   3 | ≤ 2 (use options object) |
-| Cyclomatic complexity        |  10 | ≤ 5      |
-| Nesting depth                |   3 | ≤ 2      |
-| Generic type parameters      |   3 | ≤ 2      |
-| Public exports per barrel    |  50 | split if more |
+| Metric                    | Max |                   Aspire |
+| ------------------------- | --: | -----------------------: |
+| Line length (chars)       | 100 |                       80 |
+| Function body (lines)     |  40 |                     ≤ 20 |
+| File length (lines)       | 300 |                    ≤ 150 |
+| Function parameters       |   3 | ≤ 2 (use options object) |
+| Cyclomatic complexity     |  10 |                      ≤ 5 |
+| Nesting depth             |   3 |                      ≤ 2 |
+| Generic type parameters   |   3 |                      ≤ 2 |
+| Public exports per barrel |  50 |            split if more |
 
 - **One function does one thing.** If you need "and" to name it,
   split it.
@@ -286,8 +286,14 @@ correct response.
 ```jsonc
 {
   "rules": {
-    "max-len": ["error", { "code": 100, "ignoreUrls": true, "ignoreStrings": true }],
-    "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
+    "max-len": [
+      "error",
+      { "code": 100, "ignoreUrls": true, "ignoreStrings": true },
+    ],
+    "max-lines": [
+      "error",
+      { "max": 300, "skipBlankLines": true, "skipComments": true },
+    ],
     "max-lines-per-function": ["error", { "max": 40, "skipBlankLines": true }],
     "max-params": ["error", 3],
     "max-depth": ["error", 3],
@@ -297,14 +303,17 @@ correct response.
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/no-misused-promises": "error",
     "@typescript-eslint/explicit-module-boundary-types": "error",
-    "@typescript-eslint/consistent-type-imports": ["error", { "fixStyle": "inline-type-imports" }],
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      { "fixStyle": "inline-type-imports" },
+    ],
     "@typescript-eslint/consistent-type-exports": "error",
     "@typescript-eslint/no-non-null-assertion": "error",
     "@typescript-eslint/prefer-readonly": "error",
     "@typescript-eslint/switch-exhaustiveness-check": "error",
     "import/no-default-export": "error",
-    "import/no-cycle": "error"
-  }
+    "import/no-cycle": "error",
+  },
 }
 ```
 

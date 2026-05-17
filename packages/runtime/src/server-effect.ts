@@ -144,7 +144,8 @@ function eventLogServiceLayer(
   return opts.eventLogLayer ?? unconfiguredEventLogLayer();
 }
 
-const UNCONFIGURED_EVENT_LOG = "EventLogService not provided to ARCPRuntimeLayer";
+const UNCONFIGURED_EVENT_LOG =
+  "EventLogService not provided to ARCPRuntimeLayer";
 
 function unconfiguredEventLogLayer(): Layer.Layer<EventLogService> {
   // The default-provided ops on `EventLogService` already fail-fast on every
@@ -176,9 +177,7 @@ function arcpServerScopedLayer(
     ARCPServerService,
     Effect.gen(function* () {
       const server = yield* Effect.sync(() => makeLegacyServer(opts));
-      yield* Effect.addFinalizer(() =>
-        Effect.promise(() => server.close()),
-      );
+      yield* Effect.addFinalizer(() => Effect.promise(() => server.close()));
       return ARCPServerService.make({ server });
     }),
   );
@@ -211,7 +210,9 @@ function makeLegacyServer(opts: ARCPRuntimeLayerOptions): ARCPServer {
   // we never pass `undefined` for an optional slot. We narrow each key
   // through a small mutable map and then construct the final options object
   // — this keeps the per-field type intact without `any`.
-  const carried: { [K in (typeof PASSTHROUGH_KEYS)[number]]?: ARCPServerOptions[K] } = {};
+  const carried: {
+    [K in (typeof PASSTHROUGH_KEYS)[number]]?: ARCPServerOptions[K];
+  } = {};
   for (const key of PASSTHROUGH_KEYS) {
     const value = opts[key];
     if (value === undefined) continue;
@@ -291,11 +292,7 @@ export function ARCPRuntimeLayer(
     bearerLayerFor(opts),
     eventLogServiceLayer(opts),
   );
-  return Layer.mergeAll(
-    LoggerLayer,
-    baseServices,
-    arcpServerScopedLayer(opts),
-  );
+  return Layer.mergeAll(LoggerLayer, baseServices, arcpServerScopedLayer(opts));
 }
 
 // ---------------------------------------------------------------------------
@@ -358,8 +355,9 @@ function adaptTransportEffect(transport: TransportEffect): Transport {
 
 class TransportEffectAdapter implements Transport {
   readonly #transport: TransportEffect;
-  #frameHandler: ((frame: Record<string, unknown>) => Promise<void> | void) | null =
-    null;
+  #frameHandler:
+    | ((frame: Record<string, unknown>) => Promise<void> | void)
+    | null = null;
   #closeHandler: ((err?: Error) => void) | null = null;
   readonly #buffered: Record<string, unknown>[] = [];
   #closed = false;
@@ -381,9 +379,7 @@ class TransportEffectAdapter implements Transport {
     handler: (frame: Record<string, unknown>) => Promise<void> | void,
   ): void {
     if (this.#frameHandler !== null) {
-      throw new Error(
-        "TransportEffectAdapter already has a frame handler",
-      );
+      throw new Error("TransportEffectAdapter already has a frame handler");
     }
     this.#frameHandler = handler;
     if (this.#buffered.length > 0) {
@@ -423,8 +419,7 @@ class TransportEffectAdapter implements Transport {
         this.#closeHandler?.();
       } catch (error) {
         this.#closed = true;
-        const err =
-          error instanceof Error ? error : new Error(String(error));
+        const err = error instanceof Error ? error : new Error(String(error));
         this.#closeHandler?.(err);
       }
     })();

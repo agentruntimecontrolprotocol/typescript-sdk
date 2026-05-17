@@ -30,26 +30,16 @@
 // installed by this module — by design, the legacy `Map<string, ClientHandler>`
 // is one-handler-per-type. Pick one shape per type per client.
 
-import {
-  type JobId,
-  LoggerLayer,
-  TaggedTransportError,
-} from "@arcp/core";
+import { type JobId, LoggerLayer } from "@arcp/core";
 import type { Envelope } from "@arcp/core/messages";
 import {
-  Effect,
-  Layer,
-  ManagedRuntime,
-  type Scope,
-  Stream,
-} from "effect";
+  type TaggedTransportError,
+  transportSendError,
+} from "@arcp/core/transport-error";
+import { Effect, Layer, ManagedRuntime, type Scope, Stream } from "effect";
 
 import { ARCPClient } from "./client.js";
-import type {
-  ARCPClientOptions,
-  JobHandle,
-  SubmitOptions,
-} from "./types.js";
+import type { ARCPClientOptions, JobHandle, SubmitOptions } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Service tag
@@ -103,10 +93,7 @@ const UNBOUND_MESSAGE =
   "ARCPClientService is not bound; use ARCPClientLayer or makeARCPClientRuntime";
 
 const unboundError = (): TaggedTransportError =>
-  new TaggedTransportError({
-    cause: new Error(UNBOUND_MESSAGE),
-    kind: "send",
-  });
+  transportSendError(new Error(UNBOUND_MESSAGE));
 
 const UNBOUND: ARCPClientServiceShape = {
   client: null,
@@ -155,7 +142,7 @@ function makeShape(client: ARCPClient): ARCPClientServiceShape {
     submit: (opts) =>
       Effect.tryPromise({
         try: () => client.submit(opts),
-        catch: (cause) => new TaggedTransportError({ cause, kind: "send" }),
+        catch: transportSendError,
       }),
     cancel: (jobId, opts) =>
       Effect.tryPromise({
@@ -163,7 +150,7 @@ function makeShape(client: ARCPClient): ARCPClientServiceShape {
           opts === undefined
             ? client.cancelJob(jobId)
             : client.cancelJob(jobId, opts),
-        catch: (cause) => new TaggedTransportError({ cause, kind: "send" }),
+        catch: transportSendError,
       }),
     close: Effect.promise(() => client.close().catch(() => undefined)),
   };

@@ -36,6 +36,14 @@
       "types": "./dist/errors.d.ts",
       "import": "./dist/errors.js"
     },
+    "./errors-tagged": {
+      "types": "./dist/errors-tagged.d.ts",
+      "import": "./dist/errors-tagged.js"
+    },
+    "./transport-error": {
+      "types": "./dist/transport-error.d.ts",
+      "import": "./dist/transport-error.js"
+    },
     "./extensions": {
       "types": "./dist/extensions.d.ts",
       "import": "./dist/extensions.js"

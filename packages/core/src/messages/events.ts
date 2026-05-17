@@ -115,7 +115,7 @@ export const DelegateBodySchema = Schema.Struct({
   lease_request: Schema.optional(LeaseMutableEffectSchema),
   /** v1.1 §9.4/§9.5 — child lease bound; MUST NOT exceed parent's. */
   lease_constraints: Schema.optional(LeaseConstraintsSchema),
-});
+}) satisfies Schema.Schema.AnyNoContext;
 export type DelegateBody = Schema.Schema.Type<typeof DelegateBodySchema>;
 
 /**

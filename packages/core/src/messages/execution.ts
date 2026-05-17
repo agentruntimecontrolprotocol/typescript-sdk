@@ -8,10 +8,7 @@ import {
 } from "../errors.js";
 
 import { JobEventPayloadSchema } from "./events.js";
-import {
-  LeaseConstraintsSchema,
-  LeaseSchema,
-} from "./lease-schema.js";
+import { LeaseConstraintsSchema, LeaseSchema } from "./lease-schema.js";
 
 // ARCP v1.0 §7-§8 job-related envelopes.
 
@@ -146,7 +143,9 @@ export const JobSubmitPayloadSchema = Schema.Struct({
     Schema.Number.pipe(Schema.int(), Schema.positive()),
   ),
 });
-export type JobSubmitPayload = Schema.Schema.Type<typeof JobSubmitPayloadSchema>;
+export type JobSubmitPayload = Schema.Schema.Type<
+  typeof JobSubmitPayloadSchema
+>;
 
 /**
  * Initial per-currency budget counters echoed in `job.accepted` when the
@@ -186,7 +185,9 @@ export type JobAcceptedPayload = Schema.Schema.Type<
 export const JobCancelPayloadSchema = Schema.Struct({
   reason: Schema.optional(Schema.String),
 });
-export type JobCancelPayload = Schema.Schema.Type<typeof JobCancelPayloadSchema>;
+export type JobCancelPayload = Schema.Schema.Type<
+  typeof JobCancelPayloadSchema
+>;
 
 // Job lifecycle states (§7.3)
 
@@ -209,7 +210,6 @@ export const TERMINAL_JOB_STATES = [
 ] as const;
 export type TerminalJobState = (typeof TERMINAL_JOB_STATES)[number];
 
-
 // Terminal events: job.result (success) and job.error (failure variants).
 
 /**
@@ -228,7 +228,9 @@ export const JobResultPayloadSchema = Schema.Struct({
     Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
   ),
 });
-export type JobResultPayload = Schema.Schema.Type<typeof JobResultPayloadSchema>;
+export type JobResultPayload = Schema.Schema.Type<
+  typeof JobResultPayloadSchema
+>;
 
 export const JobErrorFinalStatusSchema = Schema.Literal(
   "error",

@@ -18,32 +18,32 @@ go deeper into each subsystem.
 
 ## Guides (one per spec section)
 
-| Page | Spec |
-| --- | --- |
-| [Sessions](./guides/sessions.md) | §6 |
-| [Resume](./guides/resume.md) | §6.3 |
-| [Authentication](./guides/auth.md) | §6.1 |
-| [Jobs](./guides/jobs.md) | §7 |
-| [Job events](./guides/job-events.md) | §8 |
-| [Leases](./guides/leases.md) | §9 |
-| [Delegation](./guides/delegation.md) | §10 |
-| [Observability](./guides/observability.md) | §11 |
-| [Errors](./guides/errors.md) | §12 |
-| [Vendor extensions](./guides/vendor-extensions.md) | §15 |
+| Page                                               | Spec |
+| -------------------------------------------------- | ---- |
+| [Sessions](./guides/sessions.md)                   | §6   |
+| [Resume](./guides/resume.md)                       | §6.3 |
+| [Authentication](./guides/auth.md)                 | §6.1 |
+| [Jobs](./guides/jobs.md)                           | §7   |
+| [Job events](./guides/job-events.md)               | §8   |
+| [Leases](./guides/leases.md)                       | §9   |
+| [Delegation](./guides/delegation.md)               | §10  |
+| [Observability](./guides/observability.md)         | §11  |
+| [Errors](./guides/errors.md)                       | §12  |
+| [Vendor extensions](./guides/vendor-extensions.md) | §15  |
 
 ## Packages
 
-| Package | Page |
-| --- | --- |
-| `@arcp/sdk` | [packages/sdk](./packages/sdk.md) |
-| `@arcp/core` | [packages/core](./packages/core.md) |
-| `@arcp/client` | [packages/client](./packages/client.md) |
-| `@arcp/runtime` | [packages/runtime](./packages/runtime.md) |
-| `@arcp/node` | [packages/node](./packages/node.md) |
-| `@arcp/express` | [packages/express](./packages/express.md) |
-| `@arcp/fastify` | [packages/fastify](./packages/fastify.md) |
-| `@arcp/hono` | [packages/hono](./packages/hono.md) |
-| `@arcp/bun` | [packages/bun](./packages/bun.md) |
+| Package                 | Page                                                      |
+| ----------------------- | --------------------------------------------------------- |
+| `@arcp/sdk`             | [packages/sdk](./packages/sdk.md)                         |
+| `@arcp/core`            | [packages/core](./packages/core.md)                       |
+| `@arcp/client`          | [packages/client](./packages/client.md)                   |
+| `@arcp/runtime`         | [packages/runtime](./packages/runtime.md)                 |
+| `@arcp/node`            | [packages/node](./packages/node.md)                       |
+| `@arcp/express`         | [packages/express](./packages/express.md)                 |
+| `@arcp/fastify`         | [packages/fastify](./packages/fastify.md)                 |
+| `@arcp/hono`            | [packages/hono](./packages/hono.md)                       |
+| `@arcp/bun`             | [packages/bun](./packages/bun.md)                         |
 | `@arcp/middleware-otel` | [packages/middleware-otel](./packages/middleware-otel.md) |
 
 ## Reference

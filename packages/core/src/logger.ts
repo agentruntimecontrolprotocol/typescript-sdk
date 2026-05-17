@@ -69,7 +69,8 @@ function pinoMethodFor(level: LogLevel.LogLevel): PinoMethod {
  */
 function stringifyPart(part: unknown): string {
   if (typeof part === "string") return part;
-  if (typeof part === "number" || typeof part === "boolean") return String(part);
+  if (typeof part === "number" || typeof part === "boolean")
+    return String(part);
   return JSON.stringify(part);
 }
 

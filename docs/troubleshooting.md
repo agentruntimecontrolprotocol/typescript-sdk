@@ -106,7 +106,7 @@ culprits are `console.log` calls or unsilenced library logs.
 **Fix:**
 
 - Route logs to `stderr`: `console.error(...)`, `pino({ destination:
-  process.stderr })`, etc.
+process.stderr })`, etc.
 - For libraries you can't reroute, set `silent: true` or run them
   inside a context that buffers `stdout`.
 

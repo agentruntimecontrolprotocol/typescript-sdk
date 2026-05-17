@@ -68,9 +68,12 @@ export {
   TaggedResumeWindowExpired,
   type TaggedSdkError,
   TaggedTimeout,
-  TaggedTransportError,
   TaggedUnauthenticated,
 } from "./errors-tagged.js";
+export {
+  TaggedTransportError,
+  transportSendError,
+} from "./transport-error.js";
 export {
   CORE_MESSAGE_TYPES,
   type CoreMessageType,

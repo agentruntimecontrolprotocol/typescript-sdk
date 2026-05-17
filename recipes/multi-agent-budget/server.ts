@@ -48,7 +48,7 @@ server.registerAgent("planner", async (input, ctx) => {
   // check (below, at each delegate) sees an honest "remaining"
   await ctx.metric({
     name: "cost.completion",
-    value: 5.00,
+    value: 5.0,
     unit: "USD",
   });
   const { subQuestions } = JSON.parse(plan.choices[0].message.content);
@@ -92,7 +92,7 @@ server.registerAgent("worker", async (input, ctx) => {
     });
     await ctx.metric({
       name: "cost.completion",
-      value: 5.00,
+      value: 5.0,
       unit: "USD",
     });
   }

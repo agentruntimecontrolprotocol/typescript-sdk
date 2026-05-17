@@ -85,7 +85,9 @@ export interface EventLogEffect {
   /** Append a single envelope. Resolves to `true` if a new row was inserted. */
   readonly append: (env: BaseEnvelope) => Effect.Effect<boolean>;
   /** Append many envelopes inside a single SQLite transaction. */
-  readonly appendBatch: (envs: readonly BaseEnvelope[]) => Effect.Effect<number>;
+  readonly appendBatch: (
+    envs: readonly BaseEnvelope[],
+  ) => Effect.Effect<number>;
   /**
    * Stream envelopes for `sessionId` with `event_seq` strictly greater than
    * `afterEventSeq`. The underlying SQLite iterator is consumed lazily inside
@@ -239,10 +241,7 @@ function makeCount(stmts: EventLogStmts) {
 }
 
 function makeGetById(stmts: EventLogStmts) {
-  return (
-    sessionId: string,
-    id: string,
-  ): Effect.Effect<BaseEnvelope | null> =>
+  return (sessionId: string, id: string): Effect.Effect<BaseEnvelope | null> =>
     Effect.sync(() => {
       const row = stmts.getById.get({ session_id: sessionId, id }) as
         | EventRow

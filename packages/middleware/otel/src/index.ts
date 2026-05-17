@@ -41,10 +41,7 @@ import {
 import type { WithTracingOptions } from "./types.js";
 
 export type { WithTracingOptions } from "./types.js";
-export {
-  OtelTracerLayer,
-  type OtelTracerLayerOptions,
-} from "./otel-effect.js";
+export { OtelTracerLayer, type OtelTracerLayerOptions } from "./otel-effect.js";
 
 // Per ARCP §15 (IANA / extension namespace), all envelope extensions must be
 // in the `x-vendor.<vendor>.<name>` namespace. The OTel propagation carrier

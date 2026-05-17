@@ -68,4 +68,6 @@ export type Lease = Schema.Schema.Type<typeof LeaseSchema>;
 export const LeaseConstraintsSchema = Schema.Struct({
   expires_at: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
 });
-export type LeaseConstraints = Schema.Schema.Type<typeof LeaseConstraintsSchema>;
+export type LeaseConstraints = Schema.Schema.Type<
+  typeof LeaseConstraintsSchema
+>;

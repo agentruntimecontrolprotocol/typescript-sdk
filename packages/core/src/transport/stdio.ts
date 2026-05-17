@@ -158,7 +158,9 @@ export function stdioTransportEffect(
       }
     });
   });
-  const send = (frame: SendableFrame): Effect.Effect<void, TaggedTransportError> =>
+  const send = (
+    frame: SendableFrame,
+  ): Effect.Effect<void, TaggedTransportError> =>
     Effect.tryPromise({
       try: () => transport.send(frame),
       catch: (cause) => new TaggedTransportError({ cause, kind: "send" }),

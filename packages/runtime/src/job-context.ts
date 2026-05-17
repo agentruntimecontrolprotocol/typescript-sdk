@@ -178,9 +178,7 @@ async function writeChunk(
   encoding: "utf8" | "base64" | undefined,
 ): Promise<void> {
   if (state.finalized) {
-    throw new InvalidRequestError(
-      "ResultStream: cannot write after finalize",
-    );
+    throw new InvalidRequestError("ResultStream: cannot write after finalize");
   }
   await state.job.emitEventKind("result_chunk", {
     result_id: state.resultId,
@@ -205,9 +203,7 @@ async function finalizeStream(
     final_status: "success",
     result_id: state.resultId,
     ...(opts?.summary === undefined ? {} : { summary: opts.summary }),
-    ...(opts?.resultSize === undefined
-      ? {}
-      : { result_size: opts.resultSize }),
+    ...(opts?.resultSize === undefined ? {} : { result_size: opts.resultSize }),
   });
 }
 
