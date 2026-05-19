@@ -1,0 +1,46 @@
+// ARCP per-job span hierarchy (light)
+// client: arcp.send (job.submit) is the root; runtime arcp.recv mirrors it and
+// emits arcp.send for job.accepted, job.event, and job.result — each paired
+// with a client arcp.recv child.
+digraph PerJobSpanTree {
+  rankdir=TB; bgcolor="transparent"; compound=true; fontname="Helvetica";
+  splines=ortho; nodesep=0.32; ranksep=0.45; pad="0.35,0.25";
+
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#CBD5E1",
+        fontname="Helvetica", fontsize=11, fontcolor="#1F2937",
+        margin="0.22,0.11", penwidth=1.0];
+  edge [fontname="Helvetica", fontsize=9, fontcolor="#64748B", color="#94A3B8",
+        penwidth=1.1, arrowsize=0.75, arrowhead=vee];
+
+  Submit [
+    label=<<FONT POINT-SIZE="12"><B>client: arcp.send</B></FONT><BR/><FONT POINT-SIZE="9" COLOR="#CBD5E1">job.submit</FONT>>,
+    fillcolor="#3B82F6", color="#2563EB", fontcolor="white", penwidth=1.4
+  ];
+
+  RecvSubmit [
+    label=<<FONT POINT-SIZE="12"><B>runtime: arcp.recv</B></FONT><BR/><FONT POINT-SIZE="9" COLOR="white">job.submit</FONT>>,
+    fillcolor="#F59E0B", color="#D97706", fontcolor="white", penwidth=1.4
+  ];
+
+  SendAccepted [label=<<FONT POINT-SIZE="11">runtime: arcp.send</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">job.accepted</FONT>>];
+  RecvAccepted [label=<<FONT POINT-SIZE="11">client: arcp.recv</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">job.accepted</FONT>>];
+
+  SendEvent    [label=<<FONT POINT-SIZE="11">runtime: arcp.send</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">job.event × N</FONT>>];
+  RecvEvent    [label=<<FONT POINT-SIZE="11">client: arcp.recv</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">job.event × N</FONT>>];
+
+  SendResult   [label=<<FONT POINT-SIZE="11">runtime: arcp.send</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">job.result</FONT>>];
+  RecvResult   [label=<<FONT POINT-SIZE="11">client: arcp.recv</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">job.result</FONT>>];
+
+  edge [color="#64748B", penwidth=1.2];
+  Submit -> RecvSubmit;
+
+  edge [color="#CBD5E1", penwidth=1.0];
+  RecvSubmit   -> SendAccepted;
+  SendAccepted -> RecvAccepted;
+
+  RecvSubmit   -> SendEvent;
+  SendEvent    -> RecvEvent;
+
+  RecvSubmit   -> SendResult;
+  SendResult   -> RecvResult;
+}

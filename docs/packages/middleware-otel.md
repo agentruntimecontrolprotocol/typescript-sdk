@@ -106,16 +106,10 @@ the inner wrappers' work.
 
 A typical span tree for a single job:
 
-```
-client: arcp.send (job.submit)
-  ├── runtime: arcp.recv (job.submit)
-  │     └── runtime: arcp.send (job.accepted)
-  │            └── client: arcp.recv (job.accepted)
-  ├── runtime: arcp.send (job.event ×N)
-  │     └── client: arcp.recv (job.event ×N)
-  └── runtime: arcp.send (job.result)
-         └── client: arcp.recv (job.result)
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../diagrams/per-job-span-tree-dark.svg">
+  <img alt="Per-job span hierarchy — client arcp.send (job.submit) is the root; runtime arcp.recv mirrors it and emits arcp.send for job.accepted, job.event ×N, and job.result, each paired with a client arcp.recv child" src="../../diagrams/per-job-span-tree-light.svg">
+</picture>
 
 Adding user-defined spans inside an agent (`tracer.startActiveSpan`)
 nests under the `runtime: arcp.recv (job.submit)` span automatically.

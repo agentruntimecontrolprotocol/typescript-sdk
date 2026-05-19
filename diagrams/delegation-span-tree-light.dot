@@ -1,0 +1,27 @@
+// ARCP delegation span tree (light)
+// orchestrator parent span with delegated child agent spans.
+digraph DelegationSpanTree {
+  rankdir=TB; bgcolor="transparent"; compound=true; fontname="Helvetica";
+  splines=ortho; nodesep=0.32; ranksep=0.45; pad="0.35,0.25";
+
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#CBD5E1",
+        fontname="Helvetica", fontsize=11, fontcolor="#1F2937",
+        margin="0.22,0.11", penwidth=1.0];
+  edge [fontname="Helvetica", fontsize=9, fontcolor="#64748B", color="#94A3B8",
+        penwidth=1.1, arrowsize=0.75, arrowhead=vee];
+
+  Parent [
+    label=<<FONT POINT-SIZE="12"><B>orchestrator</B></FONT><BR/><FONT POINT-SIZE="9" COLOR="#CBD5E1">parent span</FONT>>,
+    fillcolor="#3B82F6", color="#2563EB", fontcolor="white", penwidth=1.4
+  ];
+
+  Pdf [label=<<FONT POINT-SIZE="11">pdf-renderer</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">child span</FONT>>];
+  Sum [label=<<FONT POINT-SIZE="11">summarizer</FONT><BR/><FONT POINT-SIZE="9" COLOR="#94A3B8">child span</FONT>>];
+
+  edge [color="#64748B", penwidth=1.2];
+  Parent -> Pdf;
+  Parent -> Sum;
+
+  Pdf -> Sum [style=invis];
+  { rank=same; Pdf; Sum; }
+}

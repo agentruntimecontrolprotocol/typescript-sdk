@@ -121,11 +121,10 @@ sides, every child job becomes a child span of the parent — your
 observability stack reconstructs the orchestration tree
 automatically.
 
-```
-parent span "orchestrator"
-  ├── child span "pdf-renderer"
-  └── child span "summarizer"
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../diagrams/delegation-span-tree-dark.svg">
+  <img alt="Delegation span tree — orchestrator parent span with pdf-renderer and summarizer child spans" src="../../diagrams/delegation-span-tree-light.svg">
+</picture>
 
 ## Cancellation cascade
 

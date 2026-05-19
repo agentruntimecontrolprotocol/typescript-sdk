@@ -104,12 +104,10 @@ the context before invoking handlers.
 Children inherit the parent's `trace_id`, so delegate jobs become
 child spans of the parent automatically:
 
-```
-client                  runtime
-  span "submit"          span "job.run orchestrator"
-                          ├─ span "job.run pdf-renderer"
-                          └─ span "job.run summarizer"
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../diagrams/observability-delegation-dark.svg">
+  <img alt="Delegation cascade — client submit span pairs with runtime orchestrator span, whose child spans are job.run pdf-renderer and job.run summarizer (linked by trace_id)" src="../../diagrams/observability-delegation-light.svg">
+</picture>
 
 See [delegation.md](./delegation.md#trace-propagation).
 
