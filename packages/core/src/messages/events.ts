@@ -6,7 +6,7 @@ import { ArtifactRefSchema } from "./artifacts.js";
 import { LeaseConstraintsSchema } from "./lease-schema.js";
 import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
 
-// ARCP v1.0 §8 + v1.1 §8.2/§8.4 — `job.event` body schemas.
+// ARCP v1.1 §8 / §8.2 / §8.4 — `job.event` body schemas.
 //
 // This module owns the per-kind body schemas and the `parseJobEventBody`
 // dispatch over the reserved-kind set. Bodies for `log`, `metric`, and

@@ -5,5 +5,5 @@ import { fileURLToPath } from "node:url";
 
 const SCHEMA_PATH = fileURLToPath(new URL("schema.sql", import.meta.url));
 
-/** The ARCP v1.0 event-log DDL. Idempotent (`CREATE TABLE IF NOT EXISTS`). */
+/** The ARCP v1.1 event-log DDL. Idempotent (`CREATE TABLE IF NOT EXISTS`). */
 export const SCHEMA_SQL: string = readFileSync(SCHEMA_PATH, "utf8");

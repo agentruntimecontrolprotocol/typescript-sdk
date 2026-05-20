@@ -26,7 +26,7 @@ export interface JobDependencies {
   readonly logger: Logger;
 }
 
-// ARCP v1.0 §7-§8 job execution.
+// ARCP v1.1 §7-§8 job execution.
 //
 // State machine: pending → running → {success | error | cancelled | timed_out}.
 // All event-bearing envelopes (job.event / job.result / job.error) carry a

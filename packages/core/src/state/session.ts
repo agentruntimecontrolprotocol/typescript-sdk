@@ -11,7 +11,7 @@ import type { Capabilities } from "../messages/types.js";
 
 import type { SessionPhase, SessionSnapshot } from "./types.js";
 
-// ARCP v1.0 session lifecycle. Phases:
+// ARCP v1.1 session lifecycle. Phases:
 //
 //   opening   — pre-welcome
 //   accepted  — post-welcome, live

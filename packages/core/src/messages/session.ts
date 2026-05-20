@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import { messageEnvelope } from "../envelope.js";
 import { ErrorPayloadSchema } from "../errors.js";
 
-// ARCP v1.0 + v1.1 session envelopes (§6):
+// ARCP v1.1 session envelopes (§6):
 //   session.hello     — client → runtime; opens a new or resumed session.
 //   session.welcome   — runtime → client; issued on accepted hello.
 //   session.error     — runtime → client; rejection or fatal session-level error.

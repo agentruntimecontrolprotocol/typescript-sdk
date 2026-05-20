@@ -1,4 +1,4 @@
-// Public surface of @arcp/runtime. See ARCP v1.0.
+// Public surface of @arcp/runtime. See ARCP v1.1.
 export {
   negotiateCapabilities,
   type PendingMeta,

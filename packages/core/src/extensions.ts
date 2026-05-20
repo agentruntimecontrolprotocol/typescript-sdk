@@ -1,6 +1,6 @@
 import { InvalidRequestError } from "./errors.js";
 
-// ARCP v1.0 extensions are `x-vendor.<vendor>.<name>` per §15 IANA notes.
+// ARCP v1.1 extensions are `x-vendor.<vendor>.<name>` per §15 IANA notes.
 // The old `arcpx.<vendor>.<name>.v<n>` namespace is gone.
 
 /**
@@ -26,7 +26,7 @@ export function isVendorExtensionName(
 }
 
 /**
- * Closed set of core v1.0 message types. Any other type must be in the
+ * Closed set of core v1.1 message types. Any other type must be in the
  * `x-vendor.*` namespace.
  */
 export const CORE_MESSAGE_TYPES = [
@@ -47,7 +47,7 @@ const CORE_TYPE_SET: ReadonlySet<string> = new Set(CORE_MESSAGE_TYPES);
 
 const CORE_PREFIXES = ["session.", "job."] as const;
 
-/** Whether `type` is one of the ten core ARCP v1.0 message types. */
+/** Whether `type` is one of the ten core ARCP v1.1 message types. */
 export function isCoreType(type: string): type is CoreMessageType {
   return CORE_TYPE_SET.has(type);
 }

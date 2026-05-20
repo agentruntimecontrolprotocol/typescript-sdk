@@ -5,7 +5,7 @@ import type { Capabilities } from "../messages/types.js";
 /**
  * Phases of a single ARCP session.
  *
- * @see ARCP v1.0 §6.
+ * @see ARCP v1.1 §6.
  */
 export type SessionPhase = "opening" | "accepted" | "closing" | "rejected";
 

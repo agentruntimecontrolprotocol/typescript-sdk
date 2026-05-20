@@ -14,7 +14,7 @@ import {
 
 import type { LeaseOpContext } from "./types.js";
 
-// ARCP v1.0 §9 — leases.
+// ARCP v1.1 §9 — leases.
 //
 // A lease is an immutable record granted to a job at submission. It maps
 // capability names to lists of glob patterns. Enforcement is the runtime's

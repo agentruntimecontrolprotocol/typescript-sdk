@@ -157,7 +157,7 @@ pressure their work if you need to.
 
 ```ts
 await client.send({
-  arcp: "1",
+  arcp: "1.1",
   id: newMessageId(),
   type: "x-vendor.acme.warmup",
   session_id: client.state.sessionId!,

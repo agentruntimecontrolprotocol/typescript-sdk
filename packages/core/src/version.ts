@@ -1,12 +1,12 @@
 /**
  * Protocol version implemented by this package.
  *
- * Tracks ARCP v1.1 (additive over v1.0). The `arcp` envelope field is the
- * literal major-version string per §5.1; v1.1 keeps this at `"1"` and uses
- * the feature-negotiation capability in `session.hello`/`session.welcome`
- * to detect what each peer supports.
+ * Tracks ARCP v1.1 (additive over v1.0). The `arcp` envelope field carries
+ * the full protocol version per §5.1. Peers also exchange a
+ * `capabilities.features` list in `session.hello`/`session.welcome` to
+ * negotiate which v1.1 additive features each side supports.
  */
-export const PROTOCOL_VERSION = "1" as const;
+export const PROTOCOL_VERSION = "1.1" as const;
 
 /** Implementation version of this package. Bump on releases. */
 export const IMPL_VERSION = "0.2.0" as const;
@@ -44,8 +44,8 @@ export type ProtocolVersion = typeof PROTOCOL_VERSION;
 /**
  * Whether `other` is wire-compatible with this implementation.
  *
- * v1.1 stays at `arcp: "1"` literally — the wire-format major did not
- * change between v1.0 and v1.1. Feature negotiation happens through the
+ * Compares the `arcp` literal against [`PROTOCOL_VERSION`]. Additive v1.1
+ * feature differences are negotiated separately through the
  * `capabilities.features` array.
  */
 export function isCompatibleVersion(other: string): boolean {

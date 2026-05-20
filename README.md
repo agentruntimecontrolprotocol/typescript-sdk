@@ -2,9 +2,9 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-brightgreen.svg)](#)
-[![ARCP](https://img.shields.io/badge/arcp-v1.0-orange.svg)](../spec/docs/draft-arcp-02.md)
+[![ARCP](https://img.shields.io/badge/arcp-v1.1-orange.svg)](../spec/docs/draft-arcp-02.md)
 
-Reference implementation of [ARCP v1.0](../spec/docs/draft-arcp-02.md), the
+Reference implementation of [ARCP v1.1](../spec/docs/draft-arcp-02.md), the
 Agent Runtime Control Protocol — a small wire protocol for letting an
 agent talk to the runtime that hosts it. ARCP is intentionally narrow:
 sessions, jobs, immutable per-job leases, a single event stream with
@@ -115,7 +115,7 @@ Every message on the wire is a JSON object with these required fields:
 
 | Field        | Meaning                                                                            |
 | ------------ | ---------------------------------------------------------------------------------- |
-| `arcp`       | Protocol version. v1.0 is the literal string `"1"`.                                |
+| `arcp`       | Protocol version. v1.1 is the literal string `"1.1"`.                                |
 | `id`         | Unique message id (ULID/UUIDv7).                                                   |
 | `type`       | Message type discriminator (e.g., `"job.submit"`).                                 |
 | `session_id` | REQUIRED on every envelope after `session.welcome`.                                |
@@ -327,7 +327,7 @@ await client.close();
 
 ## Conformance
 
-The SDK is intended to be 100% conforming to ARCP v1.0. Section-by-section
+The SDK is intended to be 100% conforming to ARCP v1.1. Section-by-section
 status lives in [`CONFORMANCE.md`](./CONFORMANCE.md).
 
 Spec sections implemented:
@@ -350,7 +350,7 @@ Twenty-three end-to-end examples, each a `server.ts` + `client.ts`
 pair that talks over a real `Transport`. See
 [`examples/README.md`](./examples/README.md):
 
-v1.0 core:
+Core:
 
 | Example              | Spec              |
 | -------------------- | ----------------- |
@@ -402,7 +402,7 @@ packages/
     hono/              # @arcp/hono
     bun/               # @arcp/bun
     otel/              # @arcp/middleware-otel
-examples/              # Twenty-three runnable two-process demos (v1.0 + v1.1 + host integrations)
+examples/              # Twenty-three runnable two-process demos (v1.1 + host integrations)
 diagrams/              # Graphviz .dot sources + rendered light/dark SVGs (see diagrams/README.md)
 ```
 

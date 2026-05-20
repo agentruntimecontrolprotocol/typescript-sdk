@@ -10,7 +10,7 @@ import type {
 import { validateExtensionsObject } from "./extensions.js";
 import { PROTOCOL_VERSION } from "./version.js";
 
-// ARCP v1.0 §5.1 envelope: `arcp`, `id`, `type`, `session_id`, `trace_id`,
+// ARCP v1.1 §5.1 envelope: `arcp`, `id`, `type`, `session_id`, `trace_id`,
 // `job_id`, `event_seq`, `payload`, plus `extensions`.
 //
 //   - `arcp`        MUST be the literal `"1"`.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `arcp` — small CLI for serving and replaying an ARCP v1.0 runtime.
+ * `arcp` — small CLI for serving and replaying an ARCP v1.1 runtime.
  *
  * Implementation note (Effect migration, issue #47):
  * This CLI deliberately remains a thin Commander → Promise orchestration over

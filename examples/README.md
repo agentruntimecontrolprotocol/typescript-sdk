@@ -1,12 +1,12 @@
 # ARCP TypeScript Examples
 
-Twenty-three end-to-end examples covering ARCP v1.0 and v1.1 plus the
+Twenty-three end-to-end examples covering ARCP v1.1 plus the
 host-integration middlewares. Each one is a pair of two processes — a
 runtime (`server.ts`) and a client (`client.ts`) — that talk over a
 real `Transport`. No mocks. No in-memory shortcuts. Each example exits
 0 on success.
 
-### v1.0 core
+### Core
 
 | Example                                      | Demonstrates                                                                                                                                                                                                                                         | Spec              |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |

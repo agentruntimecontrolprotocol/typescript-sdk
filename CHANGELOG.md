@@ -9,4 +9,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial reference SDK release aligned with ARCP protocol v1.0 (see README status).
+- Initial reference SDK release aligned with ARCP protocol v1.1 (see README status).

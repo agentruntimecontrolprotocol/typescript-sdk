@@ -9,7 +9,7 @@ const factory = monotonicFactory();
  * Mint a fresh monotonic ULID for use as an envelope `id`.
  *
  * Monotonic within a process under fast clock skew. Lexically sortable.
- * @see ARCP v1.0 §5.1 (`id` field semantics).
+ * @see ARCP v1.1 §5.1 (`id` field semantics).
  */
 export function newId(prefix?: string): string {
   const ulid = factory();

@@ -5,7 +5,7 @@
  *   - "build" (parent): runs a fake build, then delegates "test".
  *   - "test"  (child):  runs a fake test suite.
  *
- * Delegation in ARCP v1.0 is a `job.event` of kind "delegate" emitted
+ * Delegation in ARCP v1.1 is a `job.event` of kind "delegate" emitted
  * on the parent's stream. The runtime intercepts it, spawns a child
  * job in the same session, and the child's accept/events/result flow
  * through the same `event_seq` space — interleaved with the parent's.

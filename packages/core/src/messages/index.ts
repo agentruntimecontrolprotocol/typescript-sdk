@@ -1,5 +1,5 @@
 /**
- * Aggregate registry of every core message type defined by ARCP v1.0/v1.1.
+ * Aggregate registry of every core message type defined by ARCP v1.1.
  *
  * `EnvelopeSchema` is the discriminated union over `type` (Effect Schema).
  * Parsing an inbound envelope through this schema yields a fully-typed

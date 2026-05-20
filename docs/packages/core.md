@@ -187,7 +187,7 @@ rules these helpers enforce.
 ```ts
 import {
   IMPL_VERSION,
-  PROTOCOL_VERSION, // "1"
+  PROTOCOL_VERSION, // "1.1"
   ProtocolVersion,
   intersectFeatures,
   isCompatibleVersion,

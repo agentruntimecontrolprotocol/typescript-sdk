@@ -23,7 +23,7 @@ new v1.1 subsections appear after them.
 
 | Requirement                                                                                   | Status      | Location                                                                                                    |
 | --------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
-| §5.1 `arcp` field, REQUIRED, MUST be `"1"` (unchanged in v1.1)                                | Implemented | `packages/core/src/version.ts:PROTOCOL_VERSION = "1"`; `packages/core/src/envelope.ts` rejects other values |
+| §5.1 `arcp` field, REQUIRED, MUST be `"1.1"`                                                  | Implemented | `packages/core/src/version.ts:PROTOCOL_VERSION = "1.1"`; `packages/core/src/envelope.ts` rejects other values |
 | §5.1 `id` REQUIRED, ULID/UUIDv7                                                               | Implemented | `packages/core/src/util/ulid.ts`; emitted by `buildEnvelope`                                                |
 | §5.1 `type` REQUIRED                                                                          | Implemented | `packages/core/src/envelope.ts`                                                                             |
 | §5.1 `session_id` REQUIRED on post-welcome envelopes                                          | Implemented | Per-message schemas in `packages/core/src/messages/{session,execution}.ts`                                  |

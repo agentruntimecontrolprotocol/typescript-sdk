@@ -19,13 +19,13 @@ import type { EventLogFilter, EventLogOptions } from "./types.js";
 
 type DatabaseInstance = InstanceType<typeof Database>;
 
-// ARCP v1.0 event-log indexed columns: session_id, id, type, trace_id,
+// ARCP v1.1 event-log indexed columns: session_id, id, type, trace_id,
 // job_id, event_seq. Replay is by (session_id, event_seq).
 
 /**
  * Append-only SQLite event log.
  *
- * Idempotent appends per (session_id, id) per ARCP v1.0 §5.1.
+ * Idempotent appends per (session_id, id) per ARCP v1.1 §5.1.
  * Replay is by `event_seq` per §6.3 / §8.3.
  *
  * The underlying `better-sqlite3` driver is synchronous; this class wraps

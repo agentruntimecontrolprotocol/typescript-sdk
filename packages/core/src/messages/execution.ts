@@ -10,7 +10,7 @@ import {
 import { JobEventPayloadSchema } from "./events.js";
 import { LeaseConstraintsSchema, LeaseSchema } from "./lease-schema.js";
 
-// ARCP v1.0 §7-§8 job-related envelopes.
+// ARCP v1.1 §7-§8 job-related envelopes.
 
 export {
   isReservedCapabilityName,

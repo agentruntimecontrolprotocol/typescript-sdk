@@ -1,6 +1,6 @@
 # Submit and stream (two-process)
 
-The minimum useful ARCP v1.0 flow: a client submits a one-shot job to a
+The minimum useful ARCP v1.1 flow: a client submits a one-shot job to a
 runtime, the runtime streams events back, and the client prints them.
 
 This example demonstrates 7 of the 8 reserved `job.event` kinds in a

@@ -10,7 +10,7 @@
  * keyed by the brand name). It carries no runtime weight, so values produced
  * by `as SessionId` / `as JobId` etc. round-trip cleanly through JSON.
  *
- * See ARCP v1.0 §5.1 (envelope `session_id`, `job_id`, `id`, `trace_id`,
+ * See ARCP v1.1 §5.1 (envelope `session_id`, `job_id`, `id`, `trace_id`,
  * `event_seq`) and §6.3 (`resume_token`).
  */
 

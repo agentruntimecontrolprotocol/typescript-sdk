@@ -139,7 +139,7 @@ Every message is one JSON object with a small fixed envelope:
 
 | Field        | Required                                 | Notes                                                |
 | ------------ | ---------------------------------------- | ---------------------------------------------------- |
-| `arcp`       | always                                   | `"1"` for v1.0/v1.1                                  |
+| `arcp`       | always                                   | `"1.1"` (the v1.1 wire-format version literal)       |
 | `id`         | always                                   | ULID or UUIDv7, unique per message                   |
 | `type`       | always                                   | discriminator (`"session.hello"`, `"job.submit"`, …) |
 | `payload`    | always                                   | type-specific body                                   |

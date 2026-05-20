@@ -1,11 +1,10 @@
 # Conformance
 
-The TypeScript SDK is intended to be 100% conforming to ARCP v1.0
-and includes opt-in v1.1 features. Section-by-section status lives
-in [`../CONFORMANCE.md`](../CONFORMANCE.md); this page is the docs
-mirror.
+The TypeScript SDK is intended to be 100% conforming to ARCP v1.1.
+Section-by-section status lives in
+[`../CONFORMANCE.md`](../CONFORMANCE.md); this page is the docs mirror.
 
-## v1.0 coverage
+## v1.1 coverage
 
 | Section                    | Status | Notes                                                              |
 | -------------------------- | ------ | ------------------------------------------------------------------ |
@@ -74,7 +73,7 @@ target.
 ## Reporting a deviation
 
 If you find behavior that disagrees with the
-[v1.0 spec](../../spec/docs/draft-arcp-02.md), open an issue with:
+[v1.1 spec](../../spec/docs/draft-arcp-1.1.md), open an issue with:
 
 - Section number.
 - Observed vs. expected behavior.

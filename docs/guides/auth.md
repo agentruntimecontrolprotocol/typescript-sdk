@@ -1,6 +1,6 @@
 # Authentication (§6.1)
 
-ARCP v1.0 supports a single auth scheme: bearer tokens. The client
+ARCP v1.1 supports a single auth scheme: bearer tokens. The client
 sends a token in `session.hello`; the runtime verifies it via a
 `BearerVerifier` and binds the resulting identity to the session.
 
@@ -134,7 +134,7 @@ attachArcpUpgrade(httpServer, {
 
 ## Vendor auth extensions
 
-ARCP v1.0 reserves `authScheme: "bearer"` as the only standard value.
+ARCP v1.1 reserves `authScheme: "bearer"` as the only standard value.
 Custom schemes go through the `x-vendor.*` namespace:
 
 ```ts

@@ -16,7 +16,7 @@ the runtime side starts a child span linked to the client's span.
 ```ts
 // envelope on the wire:
 {
-  arcp: "1",
+  arcp: "1.1",
   id: "01J…",
   type: "job.submit",
   trace_id: "0123456789abcdef0123456789abcdef",

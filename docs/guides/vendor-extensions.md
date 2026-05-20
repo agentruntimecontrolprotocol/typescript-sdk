@@ -74,7 +74,7 @@ type AcmeWarmup = {
 
 // Client sends
 await client.send({
-  arcp: "1",
+  arcp: "1.1",
   id: newMessageId(),
   type: "x-vendor.acme.warmup",
   session_id: client.state.sessionId!,
@@ -111,7 +111,7 @@ Every envelope carries an optional `extensions` object:
 
 ```ts
 {
-  arcp: "1",
+  arcp: "1.1",
   id: "01J…",
   type: "job.submit",
   payload: { /* … */ },

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
-// ARCP v1.0 §8.2 — body shapes used by `job.event` payloads for `kind=log`
-// and `kind=metric`. There are no top-level telemetry envelopes in v1.0.
+// ARCP v1.1 §8.2 — body shapes used by `job.event` payloads for `kind=log`
+// and `kind=metric`. There are no top-level telemetry envelopes in v1.1.
 
 export const LOG_LEVELS = [
   "trace",

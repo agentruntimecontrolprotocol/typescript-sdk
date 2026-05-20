@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
-// ARCP v1.0 §8.2 — `artifact_ref` event kind body shape only. There is no
-// top-level artifact envelope in v1.0; agents emit a `job.event` with
+// ARCP v1.1 §8.2 — `artifact_ref` event kind body shape only. There is no
+// top-level artifact envelope in v1.1; agents emit a `job.event` with
 // `kind = "artifact_ref"` and the body shape below.
 
 /**
