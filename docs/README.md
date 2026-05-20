@@ -1,6 +1,6 @@
 # ARCP TypeScript SDK documentation
 
-Reference docs for the [ARCP](../../spec/docs/draft-arcp-02.md) TypeScript
+Reference docs for the [ARCP](../../spec/docs/draft-arcp-1.1.md) TypeScript
 SDK. The [top-level README](../README.md) is the front door — these pages
 go deeper into each subsystem.
 
