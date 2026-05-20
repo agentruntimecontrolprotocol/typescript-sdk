@@ -17,6 +17,8 @@ import {
 } from "@arcp/sdk";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const sdkRoot = path.resolve(here, "..", "..");
+const workspaceRoot = path.resolve(sdkRoot, "..", "..");
 
 interface TransportFixture {
   name: string;
@@ -75,9 +77,7 @@ const fixtures: TransportFixture[] = [
     name: "stdio",
     async setup() {
       const tsxBin = path.resolve(
-        here,
-        "..",
-        "..",
+        sdkRoot,
         "node_modules",
         ".bin",
         "tsx",
@@ -92,6 +92,11 @@ const fixtures: TransportFixture[] = [
         tsxBin,
         [runtimeScript, ":memory:"],
         {
+          cwd: sdkRoot,
+          env: {
+            ...process.env,
+            TSX_TSCONFIG_PATH: path.join(workspaceRoot, "tsconfig.base.json"),
+          },
           stdio: ["pipe", "pipe", "pipe"],
         },
       );
