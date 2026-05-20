@@ -33,7 +33,9 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["vitest.aliases.ts"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
