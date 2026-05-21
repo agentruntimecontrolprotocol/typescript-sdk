@@ -2,9 +2,9 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-brightgreen.svg)](#)
-[![ARCP](https://img.shields.io/badge/arcp-v1.1-orange.svg)](../spec/docs/draft-arcp-02.md)
+[![ARCP](https://img.shields.io/badge/arcp-v1.1-orange.svg)](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md)
 
-Reference implementation of [ARCP v1.1](../spec/docs/draft-arcp-02.md), the
+Reference implementation of [ARCP v1.1](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md), the
 Agent Runtime Control Protocol — a small wire protocol for letting an
 agent talk to the runtime that hosts it. ARCP is intentionally narrow:
 sessions, jobs, immutable per-job leases, a single event stream with
