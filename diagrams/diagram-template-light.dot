@@ -66,7 +66,7 @@ digraph Template {
   rankdir=TB;             // TB = top-to-bottom flow. LR for horizontal.
   bgcolor="transparent";  // sit on whatever page bg the viewer has
   compound=true;          // allow edges to terminate on cluster boundaries
-  fontname="Helvetica";
+  fontname="TT Commons Pro Trial";
   splines=spline;         // curved edges. try `ortho` for right-angle bus look
   nodesep=0.32;           // horizontal gap between sibling nodes
   ranksep=0.55;           // vertical gap between ranks (rows)
@@ -78,7 +78,7 @@ digraph Template {
     style="rounded,filled",
     fillcolor="white",
     color="#CBD5E1",          // ink-300 border
-    fontname="Helvetica",
+    fontname="TT Commons Pro Trial",
     fontsize=11,
     fontcolor="#1F2937",      // ink-900
     margin="0.22,0.11",
@@ -87,7 +87,7 @@ digraph Template {
 
   // ─── EDGE DEFAULTS ───────────────────────────────────────────────────
   edge [
-    fontname="Helvetica",
+    fontname="TT Commons Pro Trial",
     fontsize=9,
     fontcolor="#64748B",      // ink-500
     color="#94A3B8",          // ink-400
@@ -117,7 +117,7 @@ digraph Template {
     style="rounded,filled";
     fillcolor="#F1F5F9";      // ink-100
     color="#E2E8F0";          // ink-200
-    fontname="Helvetica";
+    fontname="TT Commons Pro Trial";
     fontcolor="#475569";      // ink-600
     margin=14;
     labeljust=l;
@@ -137,7 +137,7 @@ digraph Template {
     style="rounded,filled";
     fillcolor="#F8FAFC";      // ink-50
     color="#E2E8F0";
-    fontname="Helvetica";
+    fontname="TT Commons Pro Trial";
     fontcolor="#475569";
     margin=14;
     labeljust=l;

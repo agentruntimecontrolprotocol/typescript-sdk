@@ -1,14 +1,14 @@
 # Architecture diagrams
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="arcp-dark.svg">
-  <img alt="ARCP architecture (worked example)" src="arcp-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="ARCP architecture (worked example)" src="architecture-light.svg">
 </picture>
 
 Graphviz `.dot` templates for clean architecture diagrams, with paired
 light/dark SVGs that GitHub auto-switches via `<picture>` and
 `prefers-color-scheme`. The image above renders from
-[`arcp-light.dot`](arcp-light.dot) / [`arcp-dark.dot`](arcp-dark.dot).
+[`architecture-light.dot`](architecture-light.dot) / [`architecture-dark.dot`](architecture-dark.dot).
 
 ## Using this with an AI coding agent
 
@@ -51,7 +51,7 @@ Hard constraints — do not violate:
 | ---------------------------------- | ------------------------------------------------------- |
 | `diagram-template-light.dot`       | Starting point. Full style docs in the header.          |
 | `diagram-template-dark.dot`        | Dark companion. Structure must match the light variant. |
-| `arcp-light.dot` / `arcp-dark.dot` | Worked example shown above.                             |
+| `architecture-light.dot` / `architecture-dark.dot` | Worked example shown above.                             |
 
 The `.dot` files are the source you edit. The `.svg` files are rendered
 deliverables; you commit both and reference them from markdown.

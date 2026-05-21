@@ -1,12 +1,12 @@
 // ARCP per-job span hierarchy (dark)
 digraph PerJobSpanTree {
-  rankdir=TB; bgcolor="transparent"; compound=true; fontname="Helvetica";
-  splines=ortho; nodesep=0.32; ranksep=0.45; pad="0.35,0.25";
+  rankdir=TB; bgcolor="transparent"; compound=true; fontname="TT Commons Pro Trial";
+  splines=spline; nodesep=0.32; ranksep=0.45; pad="0.35,0.25";
 
   node [shape=box, style="rounded,filled", fillcolor="#334155", color="#475569",
-        fontname="Helvetica", fontsize=11, fontcolor="#F1F5F9",
+        fontname="TT Commons Pro Trial", fontsize=11, fontcolor="#F1F5F9",
         margin="0.22,0.11", penwidth=1.0];
-  edge [fontname="Helvetica", fontsize=9, fontcolor="#94A3B8", color="#64748B",
+  edge [fontname="TT Commons Pro Trial", fontsize=9, fontcolor="#94A3B8", color="#64748B",
         penwidth=1.1, arrowsize=0.75, arrowhead=vee];
 
   Submit [
