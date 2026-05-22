@@ -10,6 +10,7 @@
       "**/*.cjs",
       "**/*.json",
       "!**/dist",
+      "!**/coverage",
       "!**/node_modules",
       "!**/.tsbuildinfo",
       "!pnpm-lock.yaml",

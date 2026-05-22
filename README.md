@@ -1,421 +1,292 @@
-# ARCP — Agent Runtime Control Protocol (TypeScript reference)
+<h1 align="center">ARCP TypeScript SDK</h1>
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A522-brightgreen.svg)](#)
-[![ARCP](https://img.shields.io/badge/arcp-v1.1-orange.svg)](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md)
+<p align="center"><strong>TypeScript SDK for the Agent Runtime Control Protocol (ARCP) — submit, observe, and control long-running agent jobs from TypeScript.</strong></p>
 
-Reference implementation of [ARCP v1.1](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md), the
-Agent Runtime Control Protocol — a small wire protocol for letting an
-agent talk to the runtime that hosts it. ARCP is intentionally narrow:
-sessions, jobs, immutable per-job leases, a single event stream with
-eight reserved kinds, and a resume token for reconnects. Everything
-else (human-in-the-loop, checkpointing, subscriptions, scheduled jobs)
-is delegated to companion protocols.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@arcp/sdk"><img alt="npm" src="https://img.shields.io/npm/v/@arcp/sdk.svg"></a>
+  <a href="https://github.com/agentruntimecontrolprotocol/typescript-sdk/actions/workflows/test.yml"><img alt="CI" src="https://github.com/agentruntimecontrolprotocol/typescript-sdk/actions/workflows/test.yml/badge.svg"></a>
+  <a href="https://codecov.io/gh/agentruntimecontrolprotocol/typescript-sdk"><img alt="codecov" src="https://codecov.io/gh/agentruntimecontrolprotocol/typescript-sdk/branch/main/graph/badge.svg"></a>
+  <a href="https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md"><img alt="ARCP" src="https://img.shields.io/badge/ARCP-v1.1%20draft-blue"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-lightgrey"></a>
+</p>
 
-This repository is a **pnpm workspace** of independently-versioned
-packages, all ESM, all strictly typed against TypeScript 5.6 with
-`exactOptionalPropertyTypes`.
+<p align="center">
+  <a href="https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md">Specification</a> ·
+  <a href="#concepts">Concepts</a> ·
+  <a href="#installation">Install</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/">Guides</a> ·
+  <a href="docs/">API reference</a>
+</p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./diagrams/architecture-dark.svg">
-  <img alt="ARCP TypeScript SDK architecture" src="./diagrams/architecture-light.svg">
-</picture>
+---
 
-## Documentation
+`@arcp/sdk` is a TypeScript implementation of [ARCP](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md) covering both sides of the wire — the client used to submit and observe jobs (`@arcp/client`), and the runtime used to host them (`@arcp/runtime`). ARCP is a transport-agnostic wire protocol for submitting, observing, and controlling long-running AI agent jobs — covering session liveness and resume, event acknowledgement and flow control, job introspection and cross-session subscription, agent versioning, capability leases with time and budget bounds, lease-bound provisioned credentials, structured progress, and streamed results. This SDK gives you typed, idiomatic TypeScript over that wire format so a client can connect to any conformant runtime, and a runtime can serve any conformant client, without hand-rolling the envelope, sequencing, or lease handling. ARCP wraps the agent function; it does not define how agents are built, how tools are exposed (that's MCP), or how telemetry is exported (that's OpenTelemetry).
 
-Full docs live in [`docs/`](./docs/). Start with
-[getting-started](./docs/getting-started.md) or jump to a guide:
+## Installation
 
-| Guide                                     | Spec |     | Guide                                                   | Spec |
-| ----------------------------------------- | ---- | --- | ------------------------------------------------------- | ---- |
-| [Sessions](./docs/guides/sessions.md)     | §6   |     | [Delegation](./docs/guides/delegation.md)               | §10  |
-| [Resume](./docs/guides/resume.md)         | §6.3 |     | [Observability](./docs/guides/observability.md)         | §11  |
-| [Authentication](./docs/guides/auth.md)   | §6.1 |     | [Errors](./docs/guides/errors.md)                       | §12  |
-| [Jobs](./docs/guides/jobs.md)             | §7   |     | [Vendor extensions](./docs/guides/vendor-extensions.md) | §15  |
-| [Job events](./docs/guides/job-events.md) | §8   |     | [Recipes](./docs/recipes.md)                            | —    |
-| [Leases](./docs/guides/leases.md)         | §9   |     | [Troubleshooting](./docs/troubleshooting.md)            | —    |
-
-## Install
-
-| Install         | When to use                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------- |
-| `@arcp/sdk`     | "Give me everything." Re-exports core + client + runtime, ships the `arcp` CLI.                   |
-| `@arcp/core`    | Shared primitives only — envelopes, errors, messages, transports, event log, auth, session state. |
-| `@arcp/client`  | Build a client that talks to an ARCP runtime. Depends on `@arcp/core`.                            |
-| `@arcp/runtime` | Build a runtime/server that hosts agents. Depends on `@arcp/core`.                                |
+Requires Node.js 22 or later. The SDK is shipped as a pnpm workspace of independently-versioned, ESM-only packages. Install the meta-package for everything (client, runtime, core types, and the `arcp` CLI), or pick à la carte if you only need one side of the wire:
 
 ```sh
-pnpm add @arcp/sdk
+npm install @arcp/sdk
 # or, à la carte:
-pnpm add @arcp/client @arcp/runtime @arcp/core
+npm install @arcp/client @arcp/core            # client side
+npm install @arcp/runtime @arcp/core           # runtime side
 ```
 
-Optional middleware:
+Optional host integrations live in separate middleware packages: `@arcp/node`, `@arcp/express`, `@arcp/fastify`, `@arcp/hono`, `@arcp/bun`, and `@arcp/middleware-otel`.
 
-| Package                 | What it does                                                                        |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| `@arcp/node`            | Attach the ARCP WebSocket upgrade to an existing Node `http.Server`.                |
-| `@arcp/express`         | Express app helper + WS upgrade attachment, with Host-header DNS-rebind protection. |
-| `@arcp/fastify`         | Fastify upgrade attachment that mounts on `app.server`.                             |
-| `@arcp/hono`            | Hono app helper + WS upgrade attachment for `@hono/node-server`.                    |
-| `@arcp/bun`             | Bun-native `serveArcp({...})` listener built on `Bun.serve({ websocket })`.         |
-| `@arcp/middleware-otel` | Emit OpenTelemetry spans and propagate W3C trace context per §11.                   |
+## Quick start
 
-## Quickstart
-
-A complete client + runtime in 40 lines (see
-[`examples/submit-and-stream/`](./examples/submit-and-stream/) for the
-runnable two-process version):
-
-```ts
-import {
-  ARCPClient,
-  ARCPServer,
-  pairMemoryTransports,
-  StaticBearerVerifier,
-} from "@arcp/sdk";
-
-const TOKEN = "tok-demo";
-
-const server = new ARCPServer({
-  runtime: { name: "demo-runtime", version: "1.0.0" },
-  capabilities: { encodings: ["json"], agents: ["echo"] },
-  bearer: new StaticBearerVerifier(new Map([[TOKEN, { principal: "demo" }]])),
-});
-
-// §7.1 Agents are registered by name; handlers receive `(input, ctx)`.
-server.registerAgent("echo", async (input, ctx) => {
-  await ctx.log("info", "received");
-  return { echoed: input };
-});
-
-const [c, s] = pairMemoryTransports();
-server.accept(s);
-
-const client = new ARCPClient({
-  client: { name: "demo-client", version: "1.0.0" },
-  authScheme: "bearer",
-  token: TOKEN,
-});
-
-await client.connect(c);
-const handle = await client.submit({ agent: "echo", input: { hi: 1 } });
-const result = await handle.done;
-// → { final_status: "success", result: { echoed: { hi: 1 } } }
-
-await client.close();
-await server.close();
-```
-
-## Core concepts
-
-### Envelopes (§5)
-
-Every message on the wire is a JSON object with these required fields:
-
-| Field        | Meaning                                                                            |
-| ------------ | ---------------------------------------------------------------------------------- |
-| `arcp`       | Protocol version. v1.1 is the literal string `"1.1"`.                                |
-| `id`         | Unique message id (ULID/UUIDv7).                                                   |
-| `type`       | Message type discriminator (e.g., `"job.submit"`).                                 |
-| `session_id` | REQUIRED on every envelope after `session.welcome`.                                |
-| `payload`    | Type-specific body.                                                                |
-| `event_seq`  | REQUIRED on `job.event`/`job.result`/`job.error` — strictly monotonic per session. |
-| `job_id`     | REQUIRED on every job-scoped envelope.                                             |
-| `trace_id`   | OPTIONAL W3C 32-hex trace id for OTel propagation.                                 |
-| `extensions` | OPTIONAL `x-vendor.*`-namespaced extension object.                                 |
-
-Anything else on the wire is ignored. Unknown `x-vendor.*` types are
-round-tripped per §15.
-
-### Sessions (§6)
-
-Three-message handshake:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./diagrams/session-handshake-dark.svg">
-  <img alt="Session handshake (§6)" src="./diagrams/session-handshake-light.svg">
-</picture>
-
-```
-C → R   session.hello   { client, auth, capabilities?, resume? }
-R → C   session.welcome { runtime, capabilities, resume_token, resume_window_sec }
-        — or —
-R → C   session.error   { code, message }   (transport then closes)
-```
-
-Either side may end the session with `session.bye { reason? }`. The
-`resume_token` is single-use: every `session.welcome` rotates it (§6.2).
-A session.hello with `payload.resume` resumes a prior session by
-session_id and replays events with `event_seq > last_event_seq` (§6.3).
-
-### Jobs (§7)
-
-One verb, one job:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./diagrams/job-lifecycle-dark.svg">
-  <img alt="Job lifecycle (§7)" src="./diagrams/job-lifecycle-light.svg">
-</picture>
-
-```
-C → R   job.submit   { agent, input, lease_request?, idempotency_key?, max_runtime_sec? }
-R → C   job.accepted { job_id, lease, accepted_at, ... }
-R → C   job.event[…] (one or more)
-R → C   job.result   { final_status: "success", result?, summary? }
-        — or —
-R → C   job.error    { final_status: "error"|"cancelled"|"timed_out", code, message, ... }
-```
-
-States: `pending → running → {success|error|cancelled|timed_out}` (§7.3).
-The `final_status` is on the terminal event, not a separate verb.
-
-Cancellation is a single path: `job.cancel { reason? }`. Runtime
-signals the agent and applies a 30-second grace before forced
-termination (§7.4).
-
-### Job events (§8)
-
-Every event the runtime emits to the client is one `job.event` envelope
-whose `payload.kind` is one of eight reserved values or a vendor
-`x-vendor.*` extension:
-
-| Kind           | Body shape                                      | Purpose                                             |
-| -------------- | ----------------------------------------------- | --------------------------------------------------- |
-| `log`          | `{ level, message, attributes? }`               | Plain log line.                                     |
-| `thought`      | `{ text }`                                      | Model reasoning / internal monologue.               |
-| `tool_call`    | `{ tool, args, call_id }`                       | Agent invoked a tool.                               |
-| `tool_result`  | `{ call_id, result? \| error? }`                | Result for a `tool_call`.                           |
-| `status`       | `{ phase, message? }`                           | Lifecycle hint (e.g., `running`, `fetching`).       |
-| `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                                |
-| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact (storage is out of scope). |
-| `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Initiate a child job.                               |
-
-Sequence numbers are session-scoped (§8.3): one counter across all
-concurrent jobs in the session. Replay across a resume preserves
-monotonicity and is gap-free.
-
-### Leases (§9)
-
-A lease is a JSON object: capability namespace → list of glob patterns.
-Reserved namespaces are `fs.read`, `fs.write`, `net.fetch`, `tool.call`,
-`agent.delegate`. Custom namespaces MUST use `x-vendor.<vendor>.<cap>`.
-
-Leases are **immutable at submit**. The runtime MAY reduce a
-`lease_request`; it MUST NOT expand it. There is no extension, refresh,
-or revocation — if more capability is needed, submit a new job.
-
-Glob syntax: `*` matches one segment, `**` matches zero+ segments
-(§9.2). Matching is anchored. Paths are canonicalized (`..`/`.`
-collapse, scheme lower-cased on URLs) before pattern check (§14).
-
-### Delegation (§10)
-
-A parent agent can spawn a child by emitting a `job.event` of kind
-`delegate`. The runtime intercepts that event, validates the child
-`lease_request` is a subset of the parent's effective lease, and
-issues a fresh `job.accepted` for the child with `parent_job_id` and
-`delegate_id` set. The child inherits the parent's `trace_id`. Subset
-violation surfaces as a `tool_result` event on the _parent_ with code
-`LEASE_SUBSET_VIOLATION` (not a session-level error).
-
-### Resume (§6.3)
-
-The runtime advertises `resume_token` and `resume_window_sec` on every
-`session.welcome`. To resume a dropped session within the window, the
-client re-issues `session.hello` carrying:
-
-```ts
-{
-  resume: {
-    (session_id, resume_token, last_event_seq);
-  }
-}
-```
-
-The runtime validates the token, rotates it, replays buffered events
-strictly greater than `last_event_seq`, and continues live streaming.
-Past the window, the resume is rejected with `RESUME_WINDOW_EXPIRED`.
-
-## Running the runtime
-
-### Programmatic
-
-```ts
-import {
-  ARCPServer,
-  StaticBearerVerifier,
-  startWebSocketServer,
-} from "@arcp/sdk";
-
-const server = new ARCPServer({
-  runtime: { name: "my-runtime", version: "1.0.0" },
-  capabilities: { encodings: ["json"], agents: ["my-agent"] },
-  bearer: new StaticBearerVerifier(new Map([["tok", { principal: "me" }]])),
-});
-
-server.registerAgent("my-agent", async (input, ctx) => {
-  // …
-  return { ok: true };
-});
-
-const wss = await startWebSocketServer({
-  host: "127.0.0.1",
-  port: 7777,
-  onTransport: (t) => server.accept(t),
-});
-console.log(`listening on ${wss.url}`);
-```
-
-### CLI
-
-The `@arcp/sdk` package ships an `arcp` binary:
-
-```sh
-# Run a runtime over WebSocket
-pnpm tsx packages/sdk/src/cli.ts serve --host 127.0.0.1 --port 7777 \
-  --token tok --principal me@example.com
-
-# Submit a job and print the terminal result
-pnpm tsx packages/sdk/src/cli.ts submit \
-  --url ws://127.0.0.1:7777 \
-  --token tok \
-  --agent my-agent \
-  --input '{"hi":1}'
-
-# Replay events from a SQLite event log
-pnpm tsx packages/sdk/src/cli.ts replay --db arcp.db --session sess_XYZ --after-seq 0
-```
-
-Use `--transport stdio` to run as a child process driven by a parent
-ARCP client.
-
-## Writing clients
+Connect to a runtime, submit a job, stream its events to completion:
 
 ```ts
 import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
 
 const client = new ARCPClient({
-  client: { name: "my-client", version: "1.0.0" },
+  client: { name: "quickstart", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.TOKEN,
+  token: process.env.ARCP_TOKEN,
 });
 
-const transport = await WebSocketTransport.connect(
-  "wss://runtime.example.com/arcp",
-);
-const welcome = await client.connect(transport);
-console.log("resume_token =", welcome.resume_token);
-
-const handle = await client.submit({
-  agent: "weekly-report",
-  input: { week: "2026-W19" },
-  lease: { "net.fetch": ["s3://example/**"] },
-  idempotencyKey: "weekly-report-2026-W19",
-});
+const transport = await WebSocketTransport.connect("wss://runtime.example.com/arcp");
+await client.connect(transport);
 
 client.on("job.event", (env) => {
-  if (env.type === "job.event") {
-    console.log(`[${env.event_seq}] ${env.payload.kind}`, env.payload.body);
-  }
+  if (env.type !== "job.event") return;
+  console.log(`[${env.event_seq}] ${env.payload.kind}`, env.payload.body);
+});
+
+const handle = await client.submit({
+  agent: "data-analyzer",
+  input: { dataset: "s3://example/sales.csv" },
+  lease: { "net.fetch": ["s3://example/**"] },
 });
 
 const result = await handle.done;
-console.log("done:", result);
+console.log("final:", result.final_status, result.result);
 await client.close();
 ```
 
-## Conformance
+This is the whole shape of the SDK: open a session, submit work, consume an ordered event stream, get a terminal result or error. Everything below is detail on those four moves.
 
-The SDK is intended to be 100% conforming to ARCP v1.1. Section-by-section
-status lives in [`CONFORMANCE.md`](./CONFORMANCE.md).
+## Concepts
 
-Spec sections implemented:
+ARCP organizes everything around four concerns — **identity**, **durability**, **authority**, and **observability** — expressed through five core objects:
 
-- §4 Transport (WebSocket, stdio)
-- §5 Wire format (envelope, version `"1"`, ULID ids, `event_seq`, `trace_id`)
-- §6 Sessions (hello / welcome / error / bye / resume)
-- §7 Jobs (submit / accepted / event / result / error / cancel)
-- §8 Job events (8 reserved kinds + `x-vendor.*`)
-- §9 Leases (immutable per-job, glob matching, canonicalization)
-- §10 Delegation (subset validation, trace inheritance)
-- §11 Trace propagation (W3C trace context via OTel middleware)
-- §12 Error taxonomy (12 codes)
-- §14 Security (resume-window sweep, per-session DoS caps)
-- §15 Vendor extension namespace (`x-vendor.*`)
+- **Session** — a connection between a client and a runtime. A session carries identity (a bearer token), negotiates a feature set in a `hello`/`welcome` handshake, and is *resumable*: if the transport drops, you reconnect with a resume token and the runtime replays buffered events. Jobs outlive the session that started them. See [§6](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md).
+- **Job** — one unit of agent work submitted into a session. A job has an identity, an optional idempotency key, a resolved agent version, and a lifecycle that ends in exactly one terminal state: `success`, `error`, `cancelled`, or `timed_out`. See [§7](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md).
+- **Event** — the ordered, session-scoped stream a job emits: logs, thoughts, tool calls and results, status, metrics, artifact references, progress, and streamed result chunks. Events carry strictly monotonic sequence numbers so the stream survives reconnects gap-free. See [§8](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md).
+- **Lease** — the authority a job runs under, expressed as capability grants (`fs.read`, `fs.write`, `net.fetch`, `tool.call`, `agent.delegate`, `cost.budget`, `model.use`). The runtime enforces the lease at every operation boundary; a job can never act outside it. Leases may carry a budget and an expiry, and may be subset and handed to sub-agents via delegation. See [§9](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md).
+- **Subscription** — read-only attachment to a job started elsewhere (e.g. a dashboard watching a job a CLI submitted). A subscriber observes the live event stream but cannot cancel or mutate the job. Distinct from *resume*, which continues the original session and carries cancel authority. See [§7.6](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md).
 
-## Examples
+The SDK models each of these as first-class objects; the rest of this README shows how.
 
-Twenty-three end-to-end examples, each a `server.ts` + `client.ts`
-pair that talks over a real `Transport`. See
-[`examples/README.md`](./examples/README.md):
+## Guides
 
-Core:
+### Sessions and resume
 
-| Example              | Spec              |
-| -------------------- | ----------------- |
-| `submit-and-stream/` | §13.1 / §8.2      |
-| `delegate/`          | §13.2 / §10       |
-| `resume/`            | §13.3 / §6.3      |
-| `idempotent-retry/`  | §13.5 / §7.2      |
-| `lease-violation/`   | §13.4 / §9.3      |
-| `cancel/`            | §7.4              |
-| `stdio/`             | §4.2 / §22        |
-| `vendor-extensions/` | §8.2 / §9.2 / §15 |
-| `custom-auth/`       | §6.1              |
+Open a session, negotiate features, and reconnect transparently after a transport drop using the resume token — jobs keep running server-side while you're gone.
 
-v1.1 features:
+```ts
+import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
 
-| Example             | Spec        |
-| ------------------- | ----------- |
-| `heartbeat/`        | §6.4        |
-| `ack-backpressure/` | §6.5 / §8.2 |
-| `list-jobs/`        | §6.6        |
-| `subscribe/`        | §7.6 / §6.6 |
-| `agent-versions/`   | §7.5 / §12  |
-| `lease-expires-at/` | §9.5 / §12  |
-| `cost-budget/`      | §9.6 / §12  |
-| `progress/`         | §8.2.1      |
-| `result-chunk/`     | §8.4        |
+const client = new ARCPClient({
+  client: { name: "resumable", version: "1.0.0" },
+  authScheme: "bearer",
+  token: process.env.ARCP_TOKEN,
+});
 
-Host integrations:
+const welcome = await client.connect(
+  await WebSocketTransport.connect("wss://runtime.example.com/arcp"),
+);
+const sessionId = client.state.id!;
+const resumeToken = welcome.resume_token;
+let lastSeq = 0;
+client.on("job.event", (env) => {
+  if (env.event_seq !== undefined) lastSeq = env.event_seq;
+});
 
-| Example    | Middleware              |
-| ---------- | ----------------------- |
-| `tracing/` | `@arcp/middleware-otel` |
-| `express/` | `@arcp/express`         |
-| `fastify/` | `@arcp/fastify`         |
-| `bun/`     | `@arcp/bun`             |
+// ... transport drops ...
 
-## Repository layout
-
-```
-packages/
-  core/                # @arcp/core — envelope, errors, messages, transport, store, auth, state
-  client/              # @arcp/client — ARCPClient
-  runtime/             # @arcp/runtime — ARCPServer, Job, JobContext, Lease helpers
-  sdk/                 # @arcp/sdk — meta-package, ships the `arcp` CLI
-  middleware/
-    node/              # @arcp/node — Node http.Server WS upgrade
-    express/           # @arcp/express
-    fastify/           # @arcp/fastify
-    hono/              # @arcp/hono
-    bun/               # @arcp/bun
-    otel/              # @arcp/middleware-otel
-examples/              # Twenty-three runnable two-process demos (v1.1 + host integrations)
-diagrams/              # Graphviz .dot sources + rendered light/dark SVGs (see diagrams/README.md)
+const client2 = new ARCPClient({
+  client: { name: "resumable", version: "1.0.0" },
+  authScheme: "bearer",
+  token: process.env.ARCP_TOKEN,
+});
+await client2.resume(
+  await WebSocketTransport.connect("wss://runtime.example.com/arcp"),
+  { session_id: sessionId, resume_token: resumeToken, last_event_seq: lastSeq },
+);
+// The runtime replays every event with seq > lastSeq, then resumes live streaming.
 ```
 
-## Development
+### Submitting jobs
 
-```sh
-pnpm install
-pnpm typecheck   # tsc --noEmit per package
-pnpm lint        # biome check .
-pnpm test        # vitest run per package
-pnpm build       # tsc -b across all packages
+Submit a job with an agent (optionally version-pinned as `name@version`), an input, and an optional lease request, idempotency key, and runtime limit.
+
+```ts
+const handle = await client.submit({
+  agent: "weekly-report@2.1.0",
+  input: { week: "2026-W19" },
+  lease: { "net.fetch": ["s3://reports/**"] },
+  leaseConstraints: { expires_at: new Date(Date.now() + 60_000).toISOString() },
+  idempotencyKey: "weekly-report-2026-W19",
+  maxRuntimeSec: 300,
+});
+
+console.log("job_id =", handle.jobId);
+console.log("effective lease =", handle.lease);
+console.log("resolved agent =", handle.agent);
 ```
+
+### Consuming events
+
+Iterate the ordered event stream — `log`, `thought`, `tool_call`, `tool_result`, `status`, `metric`, `artifact_ref`, `progress`, `result_chunk` — and optionally acknowledge progress so the runtime can release buffered events early.
+
+```ts
+const client = new ARCPClient({
+  client: { name: "ack-demo", version: "1.0.0" },
+  authScheme: "bearer",
+  token: process.env.ARCP_TOKEN,
+  autoAck: { intervalMs: 250, minSeqDelta: 32 }, // coalesced session.ack
+});
+
+client.on("job.event", async (env) => {
+  if (env.type !== "job.event") return;
+  switch (env.payload.kind) {
+    case "log":
+      console.log(env.payload.body);
+      break;
+    case "tool_call":
+      console.log("→ tool", env.payload.body);
+      break;
+    case "metric":
+      console.log("metric", env.payload.body);
+      break;
+    case "progress":
+      console.log("progress", env.payload.body);
+      break;
+  }
+  // Or ack manually: await client.ack(env.event_seq!);
+});
+```
+
+### Leases and budgets
+
+Request capabilities, a budget, and an expiry; read budget-remaining metrics as they arrive; handle the runtime's enforcement decisions.
+
+```ts
+const handle = await client.submit({
+  agent: "web-research",
+  input: { iterations: 8, perCallUSD: 0.3 },
+  lease: {
+    "tool.call": ["search.*", "fetch.*"],
+    "cost.budget": ["USD:1.00"],
+  },
+  leaseConstraints: { expires_at: new Date(Date.now() + 600_000).toISOString() },
+});
+
+console.log("initial budget =", handle.budget);
+
+client.on("job.event", (env) => {
+  if (env.type !== "job.event" || env.payload.kind !== "metric") return;
+  const m = env.payload.body as { name: string; value: number; unit?: string };
+  if (m.name === "cost.budget.remaining") {
+    console.log(`budget remaining: ${m.value.toFixed(2)} ${m.unit ?? ""}`);
+  }
+});
+
+try {
+  await handle.done;
+} catch (err) {
+  // BUDGET_EXHAUSTED or LEASE_EXPIRED is never retryable.
+  console.error("job ended:", err);
+}
+```
+
+### Subscribing to jobs
+
+Attach read-only to a job submitted elsewhere and observe its live stream (with optional history replay) without cancel authority.
+
+```ts
+const observer = new ARCPClient({
+  client: { name: "dashboard", version: "1.0.0" },
+  authScheme: "bearer",
+  token: process.env.ARCP_TOKEN,
+});
+await observer.connect(await WebSocketTransport.connect("wss://runtime.example.com/arcp"));
+
+observer.on("job.event", (env) => {
+  if (env.type !== "job.event") return;
+  console.log(`[seq=${env.event_seq}] ${env.payload.kind}`);
+});
+
+const listing = await observer.listJobs({ status: ["running"] });
+const sub = await observer.subscribe(listing.jobs[0].job_id, { history: true });
+console.log(`subscribed from seq=${sub.subscribedFrom} replayed=${sub.replayed}`);
+
+// ... later ...
+await sub.unsubscribe();
+```
+
+### Error handling
+
+Catch the typed error taxonomy and respect the `retryable` flag — `LEASE_EXPIRED` and `BUDGET_EXHAUSTED` are never retryable; a naive retry fails identically.
+
+```ts
+import { ARCPError } from "@arcp/sdk";
+
+try {
+  const handle = await client.submit({ agent: "flaky", input: {} });
+  await handle.done;
+} catch (err) {
+  if (err instanceof ARCPError) {
+    if (err.code === "LEASE_EXPIRED" || err.code === "BUDGET_EXHAUSTED") {
+      throw err; // resubmit with a fresh lease / budget instead
+    }
+    if (err.retryable) {
+      // safe to retry with backoff (e.g. INTERNAL_ERROR, TIMEOUT)
+    }
+  }
+  throw err;
+}
+```
+
+## Feature support
+
+ARCP features this SDK negotiates during the `hello`/`welcome` handshake:
+
+| Feature flag | Status |
+|---|---|
+| `heartbeat` | Supported |
+| `ack` | Supported |
+| `list_jobs` | Supported |
+| `subscribe` | Supported |
+| `lease_expires_at` | Supported |
+| `cost.budget` | Supported |
+| `model.use` | Supported |
+| `provisioned_credentials` | Supported |
+| `progress` | Supported |
+| `result_chunk` | Supported |
+| `agent_versions` | Supported |
+
+## Transport
+
+ARCP is transport-agnostic. This SDK ships a WebSocket transport (default), a stdio transport for in-process child runtimes, and an in-memory transport for tests. WebSocket is the default for networked runtimes; stdio is used for in-process child runtimes. Select one by constructing the corresponding `Transport` (`WebSocketTransport.connect(url)`, `new StdioTransport(...)`, `pairMemoryTransports()`) and passing it to `client.connect(transport)`; host integrations under `packages/middleware/*` attach the WebSocket upgrade to Node, Express, Fastify, Hono, or Bun servers.
+
+## API reference
+
+Full API reference — every type, method, and event payload — is in [`docs/`](docs/).
+
+## Versioning and compatibility
+
+This SDK speaks **ARCP v1.1 (draft)**. The SDK follows semantic versioning independently of the protocol; the protocol version it negotiates is shown above and in `session.hello`. A runtime advertising a different ARCP MAJOR is not guaranteed compatible. Feature mismatches degrade gracefully: the effective feature set is the intersection of what the client and runtime advertise, and the SDK will not use a feature outside it.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Protocol questions and proposed changes belong in the [spec repository](https://github.com/agentruntimecontrolprotocol/spec); SDK bugs and feature requests belong here.
 
 ## License
 
-[Apache-2.0](./LICENSE).
+Apache-2.0 — see [`LICENSE`](LICENSE).

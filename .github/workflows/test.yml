@@ -82,8 +82,20 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Test
-        run: pnpm test
+      - name: Test (with coverage)
+        run: pnpm run test:coverage
+
+      # Upload coverage from the LTS matrix entry only — the report is the
+      # same on every Node version, so one upload is enough. Non-blocking:
+      # a Codecov outage must not break CI.
+      - name: Upload coverage to Codecov
+        if: matrix.node == '22'
+        # codecov/codecov-action v6.0.1
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
+        with:
+          fail_ci_if_error: false
+          flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       # check:cycles runs madge against the compiled .js so it reports only
       # real runtime cycles. Type-only imports (erased by
@@ -104,7 +116,8 @@ jobs:
         with:
           name: test-artifacts-node-${{ matrix.node }}
           path: |
-            coverage/
+            packages/*/coverage/
+            packages/middleware/*/coverage/
             test-results/
             *.log
           if-no-files-found: ignore
