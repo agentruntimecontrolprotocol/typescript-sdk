@@ -9,10 +9,11 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
     environment: "node",
-    // pool=forks + singleFork: vitest 2 has a known SIGSEGV on thread-pool
-    // teardown under Node 24, surfaces in CI as exit 139 despite all tests passing.
+    // Keep the old singleFork behavior under Vitest 4 to avoid Node 24
+    // worker-pool teardown crashes while still using child processes.
     pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
+    isolate: false,
     testTimeout: 10_000,
     hookTimeout: 10_000,
     coverage: {

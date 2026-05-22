@@ -58,9 +58,9 @@
     "@arcp/core": "workspace:*",
     "@arcp/runtime": "workspace:*",
     "@types/express": "^5.0.0",
-    "@types/node": "^22.7.5",
+    "@types/node": "^25.9.1",
     "express": "^5.0.0",
-    "typescript": "^5.6.2",
-    "vitest": "^2.1.2"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
   }
 }
