@@ -33,11 +33,14 @@
     "check:attw": "pnpm -r --filter './packages/**' --workspace-concurrency=1 exec attw --pack . --profile esm-only",
     "check:publint": "pnpm -r --filter './packages/**' --workspace-concurrency=1 exec publint",
     "check:all": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:cycles && pnpm check:attw && pnpm check:publint",
+    "changeset": "changeset",
+    "changeset:version": "changeset version && pnpm install --lockfile-only",
     "prepare": "simple-git-hooks || true"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
     "@biomejs/biome": "^2.4.15",
+    "@changesets/cli": "^2.31.0",
     "@effect/eslint-plugin": "^0.3.2",
     "@eslint/js": "^9.39.4",
     "@types/node": "^25.9.1",

@@ -1,0 +1,64 @@
+# Opens / refreshes a "Version Packages" PR whenever a push to main introduces
+# new `.changeset/*.md` entries. When that PR merges, `package.json` versions
+# and per-package CHANGELOG.md files are committed to main. The existing
+# `publish` workflow then picks up the version bumps and publishes to npm.
+#
+# This split (version here, publish in publish.yml) is intentional: the publish
+# workflow already implements "publish iff version differs from npm" so it
+# composes cleanly without changesets/action's `publish:` input.
+
+name: changesets
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: changesets-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-pr:
+    name: open version PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # changesets needs full history to compute the changelog
+
+      - name: Setup pnpm
+        # pnpm/action-setup v4.0.0
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v4.0.0
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create or update Version Packages PR
+        # changesets/action v1.8.0
+        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
+        with:
+          # `version` runs `changeset version` which bumps package.json files
+          # and writes per-package CHANGELOG.md. We re-run `pnpm install` after
+          # to refresh the lockfile against the bumped workspace versions.
+          version: pnpm run changeset:version
+          title: "chore: version packages"
+          commit: "chore: version packages"
+          # No `publish:` input — publish.yml handles the actual npm publish
+          # once the Version Packages PR is merged.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

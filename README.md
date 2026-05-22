@@ -21,7 +21,9 @@
 
 ---
 
-`@arcp/sdk` is a TypeScript implementation of [ARCP](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md) covering both sides of the wire — the client used to submit and observe jobs (`@arcp/client`), and the runtime used to host them (`@arcp/runtime`). ARCP is a transport-agnostic wire protocol for submitting, observing, and controlling long-running AI agent jobs — covering session liveness and resume, event acknowledgement and flow control, job introspection and cross-session subscription, agent versioning, capability leases with time and budget bounds, lease-bound provisioned credentials, structured progress, and streamed results. This SDK gives you typed, idiomatic TypeScript over that wire format so a client can connect to any conformant runtime, and a runtime can serve any conformant client, without hand-rolling the envelope, sequencing, or lease handling. ARCP wraps the agent function; it does not define how agents are built, how tools are exposed (that's MCP), or how telemetry is exported (that's OpenTelemetry).
+`@arcp/sdk` is the TypeScript reference implementation of [ARCP](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md), the Agent Runtime Control Protocol. It covers both sides of the wire — `@arcp/client` for submitting and observing jobs, `@arcp/runtime` for hosting agents — so either side can talk to any conformant peer in any language without hand-rolling the envelope, sequencing, or lease enforcement.
+
+ARCP itself is a transport-agnostic wire protocol for long-running AI agent jobs. It owns the parts of agent infrastructure that don't change between products — sessions, durable event streams, capability leases, budgets, resume — and stays out of the parts that do. ARCP wraps the agent function; it does not define how agents are built, how tools are exposed (that's MCP), or how telemetry is exported (that's OpenTelemetry).
 
 ## Installation
 
