@@ -99,19 +99,19 @@
   },
   "dependencies": {
     "@effect/platform": "^0.96.1",
-    "better-sqlite3": "^11.5.0",
+    "better-sqlite3": "^12.10.0",
     "effect": "^3.21.2",
-    "jose": "^5.9.6",
-    "pino": "^9.5.0",
-    "ulid": "^2.3.0",
-    "ws": "^8.18.0"
+    "jose": "^6.2.3",
+    "pino": "^10.3.1",
+    "ulid": "^3.0.2",
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^22.7.5",
+    "@types/node": "^25.9.1",
     "@types/ws": "^8.5.12",
-    "@vitest/coverage-v8": "^2.1.2",
-    "typescript": "^5.6.2",
-    "vitest": "^2.1.2"
+    "@vitest/coverage-v8": "^4.1.7",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
   }
 }
