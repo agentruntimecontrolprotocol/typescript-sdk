@@ -33,7 +33,7 @@ await server.accept(transport);
 | ------------------------------------------------------ | ---------------- | ------------------------------------------ |
 | `runtime: RuntimeIdentity`                             | —                | `{ name, version }` advertised on welcome. |
 | `capabilities: Capabilities`                           | —                | `{ encodings, agents, extensions? }`.      |
-| `bearer?: BearerVerifier`                              | required in v1.0 | See [auth guide](../guides/auth.md).       |
+| `bearer?: BearerVerifier`                              | optional         | See [auth guide](../guides/auth.md).       |
 | `eventLog?: EventLog`                                  | in-memory        | Drop-in for durable resume.                |
 | `logger?: Logger`                                      | `rootLogger`     | Pino-shaped.                               |
 | `heartbeatIntervalSeconds?: number`                    | 30               | v1.1 — interval for `session.heartbeat`.   |

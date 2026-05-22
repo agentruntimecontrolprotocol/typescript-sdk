@@ -155,7 +155,7 @@ server.registerAgent("orchestrator", async (input, ctx) => {
 });
 ```
 
-A future ARCP revision may formalize cascade semantics. For v1.0/v1.1
+A future ARCP revision may formalize cascade semantics. For v1.1
 it's an application convention.
 
 ## Idempotency

@@ -35,7 +35,7 @@ const client = new ARCPClient({
 | Field                                       | Required    | Notes                                                 |
 | ------------------------------------------- | ----------- | ----------------------------------------------------- |
 | `client: ClientIdentity`                    | yes         | `{ name, version }` advertised in `session.hello`.    |
-| `authScheme: AuthScheme`                    | yes         | `"bearer"` for v1.0. Vendor schemes via `x-vendor.*`. |
+| `authScheme: AuthScheme`                    | yes         | `"bearer"` for standard auth. Vendor schemes via `x-vendor.*`. |
 | `token?: string`                            | bearer only | Bearer token.                                         |
 | `capabilities?: Capabilities`               | no          | Client-advertised caps.                               |
 | `features?: readonly string[]`              | no          | Defaults to `V1_1_FEATURES`.                          |

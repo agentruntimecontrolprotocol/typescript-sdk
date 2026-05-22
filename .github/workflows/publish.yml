@@ -1,10 +1,11 @@
-# Publishes @agentruntimecontrolprotocol/arcp to npm after the `test` workflow
-# succeeds on main, but only when package.json `version` differs from the
-# version currently published on npm.
+# Publishes all @arcp/* workspace packages to npm after the `test` workflow
+# succeeds on main, skipping any package whose local version is already on the
+# registry. The workspace root (package.json `"private": true`) is never
+# published.
 #
 # Required repo configuration:
 #   - Secret: NPM_TOKEN (npm automation token with publish rights to the
-#     @agentruntimecontrolprotocol scope)
+#     @arcp scope — create at npmjs.com → Access Tokens → Automation)
 #   - Settings > Actions > General > Workflow permissions: "Read and write"
 #     is NOT required; this workflow only needs id-token:write (set below)
 #     for npm provenance.
@@ -34,6 +35,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # required for npm provenance
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,39 +58,51 @@ jobs:
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Read local version
-        id: local
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Read published version
-        id: published
-        run: |
-          name=$(node -p "require('./package.json').name")
-          # `npm view` exits non-zero if the package has never been published.
-          published=$(npm view "$name" version 2>/dev/null || echo "")
-          echo "version=$published" >> "$GITHUB_OUTPUT"
-
-      - name: Decide whether to publish
-        id: decide
-        run: |
-          if [ "${{ steps.local.outputs.version }}" = "${{ steps.published.outputs.version }}" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "Local version (${{ steps.local.outputs.version }}) matches npm; skipping publish."
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "Publishing ${{ steps.local.outputs.version }} (npm has '${{ steps.published.outputs.version }}')."
-          fi
-
       - name: Install dependencies
-        if: steps.decide.outputs.publish == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        if: steps.decide.outputs.publish == 'true'
         run: pnpm run build
 
-      - name: Publish
-        if: steps.decide.outputs.publish == 'true'
+      - name: Publish workspace packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        run: |
+          set -euo pipefail
+
+          # Collect every publishable (non-private) package directory by
+          # scanning packages/ and packages/middleware/*.
+          mapfile -t PACKAGE_DIRS < <(
+            find packages -maxdepth 2 -name "package.json" \
+              -not -path "*/node_modules/*" \
+              | while IFS= read -r manifest; do
+                  dir=$(dirname "$manifest")
+                  private=$(node -p "require('./$manifest').private || false")
+                  [ "$private" = "false" ] && echo "$dir"
+                done
+          )
+
+          published_count=0
+          skipped_count=0
+
+          for dir in "${PACKAGE_DIRS[@]}"; do
+            name=$(node -p "require('./$dir/package.json').name")
+            local_ver=$(node -p "require('./$dir/package.json').version")
+            # npm view exits non-zero if the package was never published.
+            npm_ver=$(npm view "$name" version 2>/dev/null || echo "")
+
+            if [ "$local_ver" = "$npm_ver" ]; then
+              echo "  [skip] $name@$local_ver — already on npm"
+              skipped_count=$((skipped_count + 1))
+            else
+              echo "[publish] $name@$local_ver (npm has '${npm_ver:-nothing}')"
+              # publishConfig in each package.json carries access=public and
+              # provenance=true; --provenance here is the CLI counterpart that
+              # activates the OIDC token flow in GitHub Actions.
+              (cd "$dir" && npm publish --provenance)
+              published_count=$((published_count + 1))
+            fi
+          done
+
+          echo ""
+          echo "Done — published: $published_count  skipped: $skipped_count"
