@@ -3,7 +3,7 @@ import {
   type JobListEntry,
   parseAgentRef,
   type SessionListJobsFilter,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";
 
 import type { Job } from "./job.js";
 

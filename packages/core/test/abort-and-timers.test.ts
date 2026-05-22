@@ -11,7 +11,7 @@ import {
   setIntervalEffect,
   setTimeoutEffect,
   signalToInterruption,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 describe("combineSignals", () => {
   it("returns a fresh signal when given no inputs", () => {

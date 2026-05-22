@@ -1,17 +1,17 @@
 // Implementation note (Effect migration, issue #48):
-// `@arcp/fastify` is a single-line delegation to `attachArcpUpgrade` from
-// `@arcp/node` against `app.server` — Fastify's own request pipeline is not
+// `@agentruntimecontrolprotocol/fastify` is a single-line delegation to `attachArcpUpgrade` from
+// `@agentruntimecontrolprotocol/node` against `app.server` — Fastify's own request pipeline is not
 // consulted for the upgrade event. There is no runtime state, no scoped
 // lifecycle, and no concurrent resource graph that an `Effect`/`Layer` twin
 // would help compose. Effect-graph consumers should keep using
 // `attachArcpToFastify`; see the Effect-integration note in
-// `@arcp/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
+// `@agentruntimecontrolprotocol/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
 
 import {
   type ArcpUpgradeHandle,
   type AttachArcpUpgradeOptions,
   attachArcpUpgrade,
-} from "@arcp/node";
+} from "@agentruntimecontrolprotocol/node";
 import type { FastifyInstance } from "fastify";
 
 export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
@@ -21,8 +21,8 @@ export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
  *
  * Mounts a single upgrade listener on the underlying `http.Server`
  * (`app.server`) at the configured path (`/arcp` by default). DNS rebinding
- * protection is enforced via `allowedHosts` exactly as in `@arcp/express` and
- * `@arcp/node`.
+ * protection is enforced via `allowedHosts` exactly as in `@agentruntimecontrolprotocol/express` and
+ * `@agentruntimecontrolprotocol/node`.
  *
  * Fastify itself is NOT consulted for the upgrade — Node's `http.Server`
  * emits the `upgrade` event before Fastify's request pipeline runs. The HTTP
@@ -31,8 +31,8 @@ export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
  * Example:
  * ```ts
  * import Fastify from "fastify";
- * import { ARCPServer } from "@arcp/runtime";
- * import { attachArcpToFastify } from "@arcp/fastify";
+ * import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+ * import { attachArcpToFastify } from "@agentruntimecontrolprotocol/fastify";
  *
  * const app = Fastify();
  * const arcp = new ARCPServer({ ... });

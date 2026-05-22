@@ -1,13 +1,13 @@
 import { randomBytes } from "node:crypto";
 
-import type { JobId, SessionId } from "@arcp/core";
-import { type BaseEnvelope, buildEnvelope } from "@arcp/core/envelope";
+import type { JobId, SessionId } from "@agentruntimecontrolprotocol/core";
+import { type BaseEnvelope, buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   CancelledError,
   InvalidRequestError,
   UnauthenticatedError,
-} from "@arcp/core/errors";
-import { type Logger, rootLogger } from "@arcp/core/logger";
+} from "@agentruntimecontrolprotocol/core/errors";
+import { type Logger, rootLogger } from "@agentruntimecontrolprotocol/core/logger";
 import type {
   Capabilities,
   Envelope,
@@ -19,11 +19,11 @@ import type {
   SessionListJobsFilter,
   SessionResume,
   SessionWelcomePayload,
-} from "@arcp/core/messages";
-import { PendingRegistry, SessionState } from "@arcp/core/state";
-import type { Transport, WireFrame } from "@arcp/core/transport";
-import { Deferred, newMessageId } from "@arcp/core/util";
-import { intersectFeatures, V1_1_FEATURES } from "@arcp/core/version";
+} from "@agentruntimecontrolprotocol/core/messages";
+import { PendingRegistry, SessionState } from "@agentruntimecontrolprotocol/core/state";
+import type { Transport, WireFrame } from "@agentruntimecontrolprotocol/core/transport";
+import { Deferred, newMessageId } from "@agentruntimecontrolprotocol/core/util";
+import { intersectFeatures, V1_1_FEATURES } from "@agentruntimecontrolprotocol/core/version";
 
 import { dispatchEnvelope } from "./client-dispatch.js";
 import {

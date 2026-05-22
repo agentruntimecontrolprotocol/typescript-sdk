@@ -9,47 +9,47 @@ function fromRoot(relativePath: string): string {
 
 export const arcpWorkspaceAliases = [
   {
-    find: /^@arcp\/core$/,
+    find: /^@agentruntimecontrolprotocol\/core$/,
     replacement: fromRoot("packages/core/src/index.ts"),
   },
   {
-    find: /^@arcp\/core\/(.+)$/,
+    find: /^@agentruntimecontrolprotocol\/core\/(.+)$/,
     replacement: fromRoot("packages/core/src/$1"),
   },
   {
-    find: /^@arcp\/client$/,
+    find: /^@agentruntimecontrolprotocol\/client$/,
     replacement: fromRoot("packages/client/src/index.ts"),
   },
   {
-    find: /^@arcp\/runtime$/,
+    find: /^@agentruntimecontrolprotocol\/runtime$/,
     replacement: fromRoot("packages/runtime/src/index.ts"),
   },
   {
-    find: /^@arcp\/sdk$/,
+    find: /^@agentruntimecontrolprotocol\/sdk$/,
     replacement: fromRoot("packages/sdk/src/index.ts"),
   },
   {
-    find: /^@arcp\/node$/,
+    find: /^@agentruntimecontrolprotocol\/node$/,
     replacement: fromRoot("packages/middleware/node/src/index.ts"),
   },
   {
-    find: /^@arcp\/express$/,
+    find: /^@agentruntimecontrolprotocol\/express$/,
     replacement: fromRoot("packages/middleware/express/src/index.ts"),
   },
   {
-    find: /^@arcp\/fastify$/,
+    find: /^@agentruntimecontrolprotocol\/fastify$/,
     replacement: fromRoot("packages/middleware/fastify/src/index.ts"),
   },
   {
-    find: /^@arcp\/hono$/,
+    find: /^@agentruntimecontrolprotocol\/hono$/,
     replacement: fromRoot("packages/middleware/hono/src/index.ts"),
   },
   {
-    find: /^@arcp\/bun$/,
+    find: /^@agentruntimecontrolprotocol\/bun$/,
     replacement: fromRoot("packages/middleware/bun/src/index.ts"),
   },
   {
-    find: /^@arcp\/middleware-otel$/,
+    find: /^@agentruntimecontrolprotocol\/middleware-otel$/,
     replacement: fromRoot("packages/middleware/otel/src/index.ts"),
   },
 ];

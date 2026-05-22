@@ -2,7 +2,7 @@ import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vitest";
 import { WebSocket, WebSocketServer } from "ws";
 
-import { websocketTransportEffect } from "@arcp/core";
+import { websocketTransportEffect } from "@agentruntimecontrolprotocol/core";
 
 /**
  * Open an ephemeral WS server on 127.0.0.1, accept one connection, and

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 
-import type { SessionId, TraceId } from "@arcp/core";
-import type { BaseEnvelope } from "@arcp/core/envelope";
+import type { SessionId, TraceId } from "@agentruntimecontrolprotocol/core";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 /* eslint-disable max-lines, max-depth */
 import {
   AgentNotAvailableError,
@@ -9,7 +9,7 @@ import {
   InternalError,
   InvalidRequestError,
   LeaseExpiredError,
-} from "@arcp/core/errors";
+} from "@agentruntimecontrolprotocol/core/errors";
 import {
   type DelegateBody,
   type Envelope,
@@ -17,7 +17,7 @@ import {
   type LeaseConstraints,
   type MetricBody,
   parseAgentRef,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";
 
 import {
   type DelegateOutcome,

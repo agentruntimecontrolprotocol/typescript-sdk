@@ -1,4 +1,4 @@
-# Fastify example (`@arcp/fastify`)
+# Fastify example (`@agentruntimecontrolprotocol/fastify`)
 
 Same pattern as the Express example, but the HTTP side is Fastify so
 you also see its structured pino logger and per-request `req.id`.

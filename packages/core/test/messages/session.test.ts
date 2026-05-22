@@ -18,7 +18,7 @@ import {
   SessionPongPayloadSchema,
   SessionResumeSchema,
   SessionWelcomePayloadSchema,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 // Pin JSON shapes accepted/rejected by the Effect schemas in session.ts.
 

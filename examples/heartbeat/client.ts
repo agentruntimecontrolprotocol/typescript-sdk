@@ -12,7 +12,7 @@ import {
   type FrameHandler,
   WebSocketTransport,
   type WireFrame,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7885/arcp";
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

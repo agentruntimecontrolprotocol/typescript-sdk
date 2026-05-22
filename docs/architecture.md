@@ -11,25 +11,25 @@ The SDK is a pnpm monorepo. Every package is ESM-only and strictly
 typed against TypeScript 5.6 with `exactOptionalPropertyTypes`.
 
 ```
-@arcp/sdk           — meta, re-exports the three below; ships `arcp` CLI
-├── @arcp/client    — ARCPClient (consumer side)
-├── @arcp/runtime   — ARCPServer + Job + Lease + BearerVerifier
-└── @arcp/core      — wire primitives shared by client + runtime
+@agentruntimecontrolprotocol/sdk           — meta, re-exports the three below; ships `arcp` CLI
+├── @agentruntimecontrolprotocol/client    — ARCPClient (consumer side)
+├── @agentruntimecontrolprotocol/runtime   — ARCPServer + Job + Lease + BearerVerifier
+└── @agentruntimecontrolprotocol/core      — wire primitives shared by client + runtime
 ```
 
-Middleware packages are optional adapters around `@arcp/core`'s
+Middleware packages are optional adapters around `@agentruntimecontrolprotocol/core`'s
 `Transport` contract:
 
 ```
-@arcp/node          — Node http.Server WS upgrade
-@arcp/express       — Express app + DNS-rebind protection
-@arcp/fastify       — Fastify upgrade
-@arcp/hono          — Hono app for @hono/node-server
-@arcp/bun           — Bun.serve({ websocket }) wrapper
-@arcp/middleware-otel — OTel span emission + W3C trace propagation
+@agentruntimecontrolprotocol/node          — Node http.Server WS upgrade
+@agentruntimecontrolprotocol/express       — Express app + DNS-rebind protection
+@agentruntimecontrolprotocol/fastify       — Fastify upgrade
+@agentruntimecontrolprotocol/hono          — Hono app for @hono/node-server
+@agentruntimecontrolprotocol/bun           — Bun.serve({ websocket }) wrapper
+@agentruntimecontrolprotocol/middleware-otel — OTel span emission + W3C trace propagation
 ```
 
-## `@arcp/core`
+## `@agentruntimecontrolprotocol/core`
 
 The shared kernel: nothing in here knows about being a client or a
 runtime. It exports:
@@ -60,7 +60,7 @@ runtime. It exports:
 
 See [packages/core.md](./packages/core.md).
 
-## `@arcp/client`
+## `@agentruntimecontrolprotocol/client`
 
 A single class: `ARCPClient`. It owns one transport at a time, drives
 the handshake, manages the pending-request map, dispatches inbound
@@ -78,7 +78,7 @@ envelopes to registered handlers, and exposes:
 
 See [packages/client.md](./packages/client.md).
 
-## `@arcp/runtime`
+## `@agentruntimecontrolprotocol/runtime`
 
 Two main classes: `ARCPServer` and `SessionContext`. `ARCPServer`
 holds the agent registry and shared resources (event log, bearer
@@ -108,13 +108,13 @@ runtime transitions it through
 
 See [packages/runtime.md](./packages/runtime.md).
 
-## `@arcp/sdk`
+## `@agentruntimecontrolprotocol/sdk`
 
 Meta-package. Drop-in replacement for the pre-split
 `@agentruntimecontrolprotocol/sdk`:
 
 ```ts
-import { ARCPClient, ARCPServer, pairMemoryTransports } from "@arcp/sdk";
+import { ARCPClient, ARCPServer, pairMemoryTransports } from "@agentruntimecontrolprotocol/sdk";
 ```
 
 It also ships the `arcp` CLI binary — see [cli.md](./cli.md).

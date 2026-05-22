@@ -1,7 +1,7 @@
 /**
  * Tracing example — server.
  *
- * Wires `@arcp/middleware-otel` into the runtime side so every inbound
+ * Wires `@agentruntimecontrolprotocol/middleware-otel` into the runtime side so every inbound
  * frame extracts the W3C trace context from `extensions["x.otel"]` and
  * every outbound frame injects one. Spans are exported to the console
  * via `ConsoleSpanExporter` — no collector required.
@@ -20,8 +20,8 @@ import {
   ARCPServer,
   StaticBearerVerifier,
   startWebSocketServer,
-} from "@arcp/sdk";
-import { withTracing } from "@arcp/middleware-otel";
+} from "@agentruntimecontrolprotocol/sdk";
+import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
 
 const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7895);
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

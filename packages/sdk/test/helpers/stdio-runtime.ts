@@ -17,7 +17,7 @@ import {
   StaticBearerVerifier,
   StdioTransport,
   silentLogger,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const path = process.argv[2];
 if (path === undefined) {

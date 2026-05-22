@@ -1,5 +1,5 @@
 // Unit coverage for `client-effect.ts`. These tests stay scoped to the
-// client package (no @arcp/runtime devDep) by driving the legacy
+// client package (no @agentruntimecontrolprotocol/runtime devDep) by driving the legacy
 // `ARCPClient` against a hand-rolled "fake runtime" wired through
 // `pairMemoryTransports()`. The fake handshakes with `session.welcome`,
 // echoes a `job.accepted`, then emits a `job.event` and a `job.result` —
@@ -20,7 +20,7 @@ import {
   silentLogger,
   type Transport,
   type WireFrame,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vitest";
 

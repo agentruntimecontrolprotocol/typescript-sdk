@@ -20,7 +20,7 @@ import {
   StaticBearerVerifier,
   startWebSocketServer,
   validateLeaseOp,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const anthropic = new Anthropic();
 

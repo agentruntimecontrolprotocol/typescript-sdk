@@ -10,7 +10,7 @@ import {
   JobStateSchema,
   JobSubmitPayloadSchema,
   JobUnsubscribePayloadSchema,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 // Pin the JSON shapes accepted/rejected by the Effect schemas in execution.ts.
 

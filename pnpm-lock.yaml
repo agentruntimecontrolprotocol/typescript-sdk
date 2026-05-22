@@ -83,19 +83,19 @@ importers:
 
   examples:
     dependencies:
-      '@arcp/bun':
+      '@agentruntimecontrolprotocol/bun':
         specifier: workspace:*
         version: link:../packages/middleware/bun
-      '@arcp/express':
+      '@agentruntimecontrolprotocol/express':
         specifier: workspace:*
         version: link:../packages/middleware/express
-      '@arcp/fastify':
+      '@agentruntimecontrolprotocol/fastify':
         specifier: workspace:*
         version: link:../packages/middleware/fastify
-      '@arcp/middleware-otel':
+      '@agentruntimecontrolprotocol/middleware-otel':
         specifier: workspace:*
         version: link:../packages/middleware/otel
-      '@arcp/sdk':
+      '@agentruntimecontrolprotocol/sdk':
         specifier: workspace:*
         version: link:../packages/sdk
       '@modelcontextprotocol/sdk':
@@ -147,7 +147,7 @@ importers:
 
   packages/client:
     dependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../core
       '@effect/platform':
@@ -215,10 +215,10 @@ importers:
 
   packages/middleware/bun:
     devDependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../../core
-      '@arcp/runtime':
+      '@agentruntimecontrolprotocol/runtime':
         specifier: workspace:*
         version: link:../../runtime
       '@types/node':
@@ -236,14 +236,14 @@ importers:
 
   packages/middleware/express:
     dependencies:
-      '@arcp/node':
+      '@agentruntimecontrolprotocol/node':
         specifier: workspace:*
         version: link:../node
     devDependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../../core
-      '@arcp/runtime':
+      '@agentruntimecontrolprotocol/runtime':
         specifier: workspace:*
         version: link:../../runtime
       '@types/express':
@@ -264,14 +264,14 @@ importers:
 
   packages/middleware/fastify:
     dependencies:
-      '@arcp/node':
+      '@agentruntimecontrolprotocol/node':
         specifier: workspace:*
         version: link:../node
     devDependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../../core
-      '@arcp/runtime':
+      '@agentruntimecontrolprotocol/runtime':
         specifier: workspace:*
         version: link:../../runtime
       '@fastify/websocket':
@@ -298,14 +298,14 @@ importers:
 
   packages/middleware/hono:
     dependencies:
-      '@arcp/node':
+      '@agentruntimecontrolprotocol/node':
         specifier: workspace:*
         version: link:../node
     devDependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../../core
-      '@arcp/runtime':
+      '@agentruntimecontrolprotocol/runtime':
         specifier: workspace:*
         version: link:../../runtime
       '@types/node':
@@ -327,10 +327,10 @@ importers:
         specifier: ^8.20.1
         version: 8.20.1
     devDependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../../core
-      '@arcp/runtime':
+      '@agentruntimecontrolprotocol/runtime':
         specifier: workspace:*
         version: link:../../runtime
       '@types/node':
@@ -348,7 +348,7 @@ importers:
 
   packages/middleware/otel:
     devDependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../../core
       '@effect/opentelemetry':
@@ -378,7 +378,7 @@ importers:
 
   packages/runtime:
     dependencies:
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../core
       '@effect/platform':
@@ -403,13 +403,13 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@arcp/client':
+      '@agentruntimecontrolprotocol/client':
         specifier: workspace:*
         version: link:../client
-      '@arcp/core':
+      '@agentruntimecontrolprotocol/core':
         specifier: workspace:*
         version: link:../core
-      '@arcp/runtime':
+      '@agentruntimecontrolprotocol/runtime':
         specifier: workspace:*
         version: link:../runtime
       '@effect/platform':

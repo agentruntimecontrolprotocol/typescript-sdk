@@ -14,7 +14,7 @@ import {
   startWebSocketServer,
   type Transport,
   WebSocketTransport,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sdkRoot = path.resolve(here, "..", "..");

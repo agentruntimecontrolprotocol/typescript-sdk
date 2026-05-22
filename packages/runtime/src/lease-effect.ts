@@ -15,9 +15,9 @@ import {
   type TaggedLeaseSubsetViolation,
   type TaggedPermissionDenied,
   type TaggedSdkError,
-} from "@arcp/core";
-import { ARCPError as ARCPErrorClass } from "@arcp/core/errors";
-import type { Lease, LeaseConstraints } from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core";
+import { ARCPError as ARCPErrorClass } from "@agentruntimecontrolprotocol/core/errors";
+import type { Lease, LeaseConstraints } from "@agentruntimecontrolprotocol/core/messages";
 import { Effect } from "effect";
 
 import {

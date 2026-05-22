@@ -1,20 +1,20 @@
-import type { JobId, SessionId, TraceId } from "@arcp/core";
-import { buildEnvelope } from "@arcp/core/envelope";
+import type { JobId, SessionId, TraceId } from "@agentruntimecontrolprotocol/core";
+import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   CancelledError,
   HeartbeatLostError,
   InternalError,
   InvalidRequestError,
-} from "@arcp/core/errors";
-import type { Logger } from "@arcp/core/logger";
+} from "@agentruntimecontrolprotocol/core/errors";
+import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import type {
   JobErrorPayload,
   JobResultPayload,
   JobStateName,
   Lease,
   LeaseConstraints,
-} from "@arcp/core/messages";
-import { newJobId, newMessageId, nowTimestamp } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/messages";
+import { newJobId, newMessageId, nowTimestamp } from "@agentruntimecontrolprotocol/core/util";
 
 import type { CredentialProvisioner, IssuedCredential } from "./credential-provisioner.js";
 import type { CredentialStore, CredentialStoreEntry } from "./credential-store.js";
@@ -519,4 +519,4 @@ export {
   CancelledError,
   HeartbeatLostError,
   InternalError,
-} from "@arcp/core/errors";
+} from "@agentruntimecontrolprotocol/core/errors";

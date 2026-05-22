@@ -3,7 +3,7 @@ import {
   PROTOCOL_VERSION,
   silentLogger,
   type TransportEffect,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 import { Effect, Fiber, Option, Stream } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
@@ -22,7 +22,7 @@ const TEST_RUNTIME = { name: "test-runtime", version: "0.1.0" } as const;
 
 // `session.hello` envelope used to drive the handshake. We send raw frames
 // over the client transport — this test exercises the Effect-shape entry
-// path end-to-end without bringing in @arcp/client.
+// path end-to-end without bringing in @agentruntimecontrolprotocol/client.
 function makeHelloFrame(token: string): Record<string, unknown> {
   return {
     arcp: PROTOCOL_VERSION,
@@ -149,9 +149,9 @@ describe("resumeSweepDaemon", () => {
 describe("legacy ARCPServer unchanged (smoke)", () => {
   it("constructs, registers an agent, accepts a memory transport, and welcomes", async () => {
     // This mirrors the existing SDK integration-test setup pattern (without
-    // pulling in @arcp/client) — it asserts the legacy class is unchanged.
+    // pulling in @agentruntimecontrolprotocol/client) — it asserts the legacy class is unchanged.
     const { pairMemoryTransports, StaticBearerVerifier } =
-      await import("@arcp/core");
+      await import("@agentruntimecontrolprotocol/core");
     const server = new ARCPServer({
       runtime: TEST_RUNTIME,
       capabilities: { encodings: ["json"] },

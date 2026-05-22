@@ -39,7 +39,7 @@ digraph ARCPTypescriptSDK {
 
   // Transport cluster
   subgraph cluster_transport {
-    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Transport (@arcp/core)</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>Transport (@agentruntimecontrolprotocol/core)</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
     style="rounded,filled";
     fillcolor="#F1F5F9";
     color="#E2E8F0";
@@ -59,7 +59,7 @@ digraph ARCPTypescriptSDK {
 
   // Runtime cluster
   subgraph cluster_runtime {
-    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>@arcp/runtime</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
+    label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0"><TR><TD COLSPAN="3" HEIGHT="8"></TD></TR><TR><TD WIDTH="8"></TD><TD><FONT POINT-SIZE="12"><B>@agentruntimecontrolprotocol/runtime</B></FONT></TD><TD WIDTH="8"></TD></TR></TABLE>>;
     style="rounded,filled";
     fillcolor="#F8FAFC";
     color="#E2E8F0";

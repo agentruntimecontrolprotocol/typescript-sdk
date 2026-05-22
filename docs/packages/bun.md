@@ -1,4 +1,4 @@
-# @arcp/bun
+# @agentruntimecontrolprotocol/bun
 
 Bun-native ARCP listener built on `Bun.serve({ websocket })`. Skips
 the Node `http.Server` shape entirely.
@@ -6,14 +6,14 @@ the Node `http.Server` shape entirely.
 ## Install
 
 ```sh
-bun add @arcp/bun @arcp/runtime
+bun add @agentruntimecontrolprotocol/bun @agentruntimecontrolprotocol/runtime
 ```
 
 ## Use
 
 ```ts
-import { ARCPServer } from "@arcp/runtime";
-import { serveArcp } from "@arcp/bun";
+import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+import { serveArcp } from "@agentruntimecontrolprotocol/bun";
 
 const arcp = new ARCPServer({
   /* … */
@@ -60,7 +60,7 @@ The transport implementation used internally. Exported in case you
 want to wrap a Bun WebSocket from outside `serveArcp`:
 
 ```ts
-import { BunWebSocketTransport } from "@arcp/bun";
+import { BunWebSocketTransport } from "@agentruntimecontrolprotocol/bun";
 
 // inside a Bun.serve websocket handler:
 {
@@ -78,7 +78,7 @@ import { BunWebSocketTransport } from "@arcp/bun";
 ## When to use
 
 - Anything running on Bun.
-- Hono apps under Bun (in preference to [`@arcp/hono`](./hono.md),
+- Hono apps under Bun (in preference to [`@agentruntimecontrolprotocol/hono`](./hono.md),
   which targets `@hono/node-server`).
 
 ## Source

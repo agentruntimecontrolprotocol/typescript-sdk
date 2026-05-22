@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Envelope, JobEventPayload } from "@arcp/sdk";
+import type { Envelope, JobEventPayload } from "@agentruntimecontrolprotocol/sdk";
 
 import { makePairedHarness } from "../helpers/fixtures.js";
 

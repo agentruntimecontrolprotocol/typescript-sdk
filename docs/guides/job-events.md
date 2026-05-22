@@ -87,7 +87,7 @@ client.on("job.event", (env) => {
 For typed dispatch you can narrow with `asEnvelopeOfType`:
 
 ```ts
-import { asEnvelopeOfType } from "@arcp/client";
+import { asEnvelopeOfType } from "@agentruntimecontrolprotocol/client";
 
 client.on("job.event", (env) => {
   const e = asEnvelopeOfType(env, "job.event");

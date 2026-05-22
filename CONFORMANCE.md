@@ -159,10 +159,10 @@ Host integrations (one example per middleware):
 
 | Directory  | Middleware              |
 | ---------- | ----------------------- |
-| `tracing/` | `@arcp/middleware-otel` |
-| `express/` | `@arcp/express`         |
-| `fastify/` | `@arcp/fastify`         |
-| `bun/`     | `@arcp/bun`             |
+| `tracing/` | `@agentruntimecontrolprotocol/middleware-otel` |
+| `express/` | `@agentruntimecontrolprotocol/express`         |
+| `fastify/` | `@agentruntimecontrolprotocol/fastify`         |
+| `bun/`     | `@agentruntimecontrolprotocol/bun`             |
 
 ## §14. Security Considerations
 
@@ -413,13 +413,13 @@ The package set:
 
 | Package                 | Status                   |
 | ----------------------- | ------------------------ |
-| `@arcp/core`            | Implemented (v1.1)       |
-| `@arcp/client`          | Implemented (v1.1)       |
-| `@arcp/runtime`         | Implemented (v1.1)       |
-| `@arcp/sdk`             | Implemented (v1.1)       |
-| `@arcp/node`            | Implemented              |
-| `@arcp/express`         | Implemented              |
-| `@arcp/fastify`         | Implemented              |
-| `@arcp/hono`            | Implemented              |
-| `@arcp/bun`             | Implemented              |
-| `@arcp/middleware-otel` | Implemented (v1.1 attrs) |
+| `@agentruntimecontrolprotocol/core`            | Implemented (v1.1)       |
+| `@agentruntimecontrolprotocol/client`          | Implemented (v1.1)       |
+| `@agentruntimecontrolprotocol/runtime`         | Implemented (v1.1)       |
+| `@agentruntimecontrolprotocol/sdk`             | Implemented (v1.1)       |
+| `@agentruntimecontrolprotocol/node`            | Implemented              |
+| `@agentruntimecontrolprotocol/express`         | Implemented              |
+| `@agentruntimecontrolprotocol/fastify`         | Implemented              |
+| `@agentruntimecontrolprotocol/hono`            | Implemented              |
+| `@agentruntimecontrolprotocol/bun`             | Implemented              |
+| `@agentruntimecontrolprotocol/middleware-otel` | Implemented (v1.1 attrs) |

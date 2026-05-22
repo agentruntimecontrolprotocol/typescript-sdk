@@ -1,11 +1,11 @@
-import type { JobId } from "@arcp/core";
-import { TaggedHeartbeatLost, TaggedInvalidRequest } from "@arcp/core";
-import { InvalidRequestError } from "@arcp/core/errors";
+import type { JobId } from "@agentruntimecontrolprotocol/core";
+import { TaggedHeartbeatLost, TaggedInvalidRequest } from "@agentruntimecontrolprotocol/core";
+import { InvalidRequestError } from "@agentruntimecontrolprotocol/core/errors";
 import type {
   JobErrorPayload,
   JobResultPayload,
   JobStateName,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";
 import { Cause, Effect, Exit, Fiber, Option } from "effect";
 import { describe, expect, it } from "vitest";
 

@@ -1,4 +1,4 @@
-# @arcp/express
+# @agentruntimecontrolprotocol/express
 
 Express integration: a pre-configured `Express` app and a WS upgrade
 attachment helper that defaults to DNS-rebind protection.
@@ -6,15 +6,15 @@ attachment helper that defaults to DNS-rebind protection.
 ## Install
 
 ```sh
-pnpm add @arcp/express @arcp/runtime
+pnpm add @agentruntimecontrolprotocol/express @agentruntimecontrolprotocol/runtime
 ```
 
 ## Use
 
 ```ts
 import { createServer } from "node:http";
-import { ARCPServer } from "@arcp/runtime";
-import { createArcpExpressApp, attachArcpToExpress } from "@arcp/express";
+import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+import { createArcpExpressApp, attachArcpToExpress } from "@agentruntimecontrolprotocol/express";
 
 const app = createArcpExpressApp({
   allowedHosts: ["arcp.example.com"],
@@ -62,7 +62,7 @@ Most apps that already exist as Express can skip this and just call
 ### `attachArcpToExpress(server, options)`
 
 Thin wrapper around `attachArcpUpgrade` from
-[`@arcp/node`](./node.md). Accepts the same options:
+[`@agentruntimecontrolprotocol/node`](./node.md). Accepts the same options:
 
 | Field                                   | Notes                                    |
 | --------------------------------------- | ---------------------------------------- |
@@ -72,15 +72,15 @@ Thin wrapper around `attachArcpUpgrade` from
 
 Returns an `ArcpUpgradeHandle` with `close()`.
 
-## When to use this vs `@arcp/node`
+## When to use this vs `@agentruntimecontrolprotocol/node`
 
-Use `@arcp/express` when:
+Use `@agentruntimecontrolprotocol/express` when:
 
 - You're already running Express and want `Host` validation applied
   to both HTTP requests and the WS upgrade.
 - You want `createArcpExpressApp` as a starting point.
 
-Use [`@arcp/node`](./node.md) directly when:
+Use [`@agentruntimecontrolprotocol/node`](./node.md) directly when:
 
 - Your HTTP framework is something else (Fastify, Hono, Koa) and
   you're just borrowing the upgrade helper.

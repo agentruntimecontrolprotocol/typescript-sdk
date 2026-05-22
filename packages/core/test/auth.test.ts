@@ -8,7 +8,7 @@ import {
   staticBearerVerifierLayer,
   TaggedUnauthenticated,
   UnauthenticatedError,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 const ALICE: BearerIdentity = { principal: "alice" };
 

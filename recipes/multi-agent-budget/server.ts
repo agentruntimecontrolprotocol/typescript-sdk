@@ -18,7 +18,7 @@ import {
   StaticBearerVerifier,
   startWebSocketServer,
   validateLeaseOp,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const openai = new OpenAI();
 const PHASES = ["gather", "analyze", "summarize"];

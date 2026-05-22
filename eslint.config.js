@@ -120,7 +120,7 @@ export default tseslint.config(
       "import/namespace": "off", // TS handles this
       "import/no-named-as-default-member": "off", // false positives on tseslint
       // `export *` from multiple modules that re-export the same symbol is a
-      // legitimate pattern for meta-packages (@arcp/sdk).
+      // legitimate pattern for meta-packages (@agentruntimecontrolprotocol/sdk).
       "import/export": "off",
 
       // Node plugin

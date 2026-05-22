@@ -1,5 +1,5 @@
 {
-  "name": "@arcp/workspace",
+  "name": "@agentruntimecontrolprotocol/workspace",
   "version": "0.1.0",
   "private": true,
   "description": "Workspace root for the Agent Runtime Control Protocol (ARCP) TypeScript SDK packages.",

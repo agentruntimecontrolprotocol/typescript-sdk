@@ -15,7 +15,7 @@ import {
   silentLogger,
   StaticBearerVerifier,
   pairMemoryTransports,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 import { describe, expect, it, vi } from "vitest";
 
 import type {

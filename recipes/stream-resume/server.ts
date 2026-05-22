@@ -19,7 +19,7 @@ import {
   EventLog,
   StaticBearerVerifier,
   startWebSocketServer,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 // GLM-5 via z.ai's OpenAI-compatible API. Swap baseURL for BigModel or
 // another GLM provider; the OpenAI SDK shape stays the same.

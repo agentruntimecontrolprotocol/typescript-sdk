@@ -7,7 +7,7 @@ import {
   matchGlob,
   validateLeaseOp,
   validateLeaseShape,
-} from "@arcp/runtime";
+} from "@agentruntimecontrolprotocol/runtime";
 
 describe("glob matcher (§9.2)", () => {
   it("single * matches one segment", () => {

@@ -6,7 +6,7 @@ import {
   LogLevelSchema,
   LogPayloadSchema,
   MetricPayloadSchema,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 // Pin the JSON shapes accepted/rejected by the Effect-`Schema` definitions
 // of the §8.2 `log` and `metric` event-kind bodies. The legacy zod twins

@@ -1,1 +1,1 @@
-export * from "@arcp/core/transport";
+export * from "@agentruntimecontrolprotocol/core/transport";

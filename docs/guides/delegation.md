@@ -116,7 +116,7 @@ semantic you want.
 ## Trace propagation
 
 Children inherit `trace_id`. With
-[`@arcp/middleware-otel`](../packages/middleware-otel.md) on both
+[`@agentruntimecontrolprotocol/middleware-otel`](../packages/middleware-otel.md) on both
 sides, every child job becomes a child span of the parent — your
 observability stack reconstructs the orchestration tree
 automatically.

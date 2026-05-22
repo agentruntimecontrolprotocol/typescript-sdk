@@ -1,5 +1,5 @@
 /**
- * Aggregated type-only barrel for `@arcp/core`.
+ * Aggregated type-only barrel for `@agentruntimecontrolprotocol/core`.
  *
  * Use this entry point for a single import path covering the public TS type
  * surface of the package:
@@ -7,11 +7,11 @@
  * ```ts
  * import type {
  *   Envelope, JobEvent, Lease, ErrorCode, SessionId, JobId, EventSeq,
- * } from "@arcp/core/types";
+ * } from "@agentruntimecontrolprotocol/core/types";
  * ```
  *
- * The per-subpath entry points (`@arcp/core/envelope`, `@arcp/core/errors`,
- * `@arcp/core/messages`, ...) stay; this barrel is purely additive.
+ * The per-subpath entry points (`@agentruntimecontrolprotocol/core/envelope`, `@agentruntimecontrolprotocol/core/errors`,
+ * `@agentruntimecontrolprotocol/core/messages`, ...) stay; this barrel is purely additive.
  */
 
 export type {

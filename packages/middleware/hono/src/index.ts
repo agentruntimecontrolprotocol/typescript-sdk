@@ -1,11 +1,11 @@
 // Implementation note (Effect migration, issue #48):
-// `@arcp/hono` re-exports `attachArcpUpgrade` from `@arcp/node` against the
+// `@agentruntimecontrolprotocol/hono` re-exports `attachArcpUpgrade` from `@agentruntimecontrolprotocol/node` against the
 // `http.Server` returned by `@hono/node-server`'s `serve()` — Hono itself is
 // not consulted for the upgrade event. There is no runtime state, no scoped
 // lifecycle, and no concurrent resource graph that an `Effect`/`Layer` twin
 // would help compose. Effect-graph consumers should keep using
 // `attachArcpToHono`; see the Effect-integration note in
-// `@arcp/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
+// `@agentruntimecontrolprotocol/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
 
 import type { Server as HttpServer } from "node:http";
 
@@ -13,7 +13,7 @@ import {
   type ArcpUpgradeHandle,
   type AttachArcpUpgradeOptions,
   attachArcpUpgrade,
-} from "@arcp/node";
+} from "@agentruntimecontrolprotocol/node";
 import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 
@@ -33,8 +33,8 @@ export type { CreateArcpHonoAppOptions } from "./types.js";
  * Example:
  * ```ts
  * import { serve } from "@hono/node-server";
- * import { createArcpHonoApp, attachArcpToHono } from "@arcp/hono";
- * import { ARCPServer } from "@arcp/runtime";
+ * import { createArcpHonoApp, attachArcpToHono } from "@agentruntimecontrolprotocol/hono";
+ * import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
  *
  * const app = createArcpHonoApp({ allowedHosts: ["localhost"] });
  * const arcp = new ARCPServer({ ... });

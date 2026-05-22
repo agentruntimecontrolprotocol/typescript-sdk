@@ -1,4 +1,4 @@
-# @arcp/middleware-otel
+# @agentruntimecontrolprotocol/middleware-otel
 
 OpenTelemetry middleware. Wraps any `Transport` to emit spans for
 every frame and propagate W3C trace context end-to-end. Implements
@@ -7,7 +7,7 @@ ARCP §11 trace propagation.
 ## Install
 
 ```sh
-pnpm add @arcp/middleware-otel @arcp/core @opentelemetry/api
+pnpm add @agentruntimecontrolprotocol/middleware-otel @agentruntimecontrolprotocol/core @opentelemetry/api
 ```
 
 You also need an OTel SDK setup (`@opentelemetry/sdk-node` or
@@ -17,7 +17,7 @@ spans; it doesn't bootstrap exporters.
 ## Use
 
 ```ts
-import { withTracing } from "@arcp/middleware-otel";
+import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
 import { trace } from "@opentelemetry/api";
 
 const tracer = trace.getTracer("arcp-client", "1.0.0");

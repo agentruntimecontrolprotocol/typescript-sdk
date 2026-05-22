@@ -1,5 +1,5 @@
 // Logger module — preserves the legacy pino-shaped `Logger` interface used
-// throughout `@arcp/client` and `@arcp/runtime`, and bridges Effect's
+// throughout `@agentruntimecontrolprotocol/client` and `@agentruntimecontrolprotocol/runtime`, and bridges Effect's
 // `Effect.log*` API onto the same pino instance so observability output
 // stays byte-identical regardless of which surface produced the line.
 //

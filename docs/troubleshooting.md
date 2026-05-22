@@ -195,7 +195,7 @@ is fine but optional.
 
 ## Lint / typecheck errors after upgrade
 
-If you upgrade `@arcp/*` and hit type errors, check:
+If you upgrade `@agentruntimecontrolprotocol/*` and hit type errors, check:
 
 - `exactOptionalPropertyTypes` interactions — the SDK treats
   optional-and-undefined as distinct types.

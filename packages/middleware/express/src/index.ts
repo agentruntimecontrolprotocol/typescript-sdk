@@ -1,10 +1,10 @@
 // Implementation note (Effect migration, issue #48):
-// `@arcp/express` is a re-export of `attachArcpUpgrade` from `@arcp/node`
+// `@agentruntimecontrolprotocol/express` is a re-export of `attachArcpUpgrade` from `@agentruntimecontrolprotocol/node`
 // wrapped with a tiny Host-header guard middleware. The upgrade event is
 // emitted by Node's `http.Server` before Express's request pipeline runs, so
 // nothing here owns runtime state. Effect-graph consumers should keep using
 // `attachArcpToExpress`; see the Effect-integration note in
-// `@arcp/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
+// `@agentruntimecontrolprotocol/node/src/index.ts` for the recommended `ManagedRuntime` wiring.
 // Adding a dedicated `effect` twin here would only re-wrap the Node helper
 // it already delegates to.
 
@@ -14,7 +14,7 @@ import {
   type ArcpUpgradeHandle,
   type AttachArcpUpgradeOptions,
   attachArcpUpgrade,
-} from "@arcp/node";
+} from "@agentruntimecontrolprotocol/node";
 import express, { type Express, type RequestHandler } from "express";
 
 import type { CreateArcpExpressAppOptions } from "./types.js";
@@ -51,8 +51,8 @@ export function createArcpExpressApp(
  *
  * Example:
  * ```ts
- * import { createArcpExpressApp, attachArcpToExpress } from "@arcp/express";
- * import { ARCPServer } from "@arcp/runtime";
+ * import { createArcpExpressApp, attachArcpToExpress } from "@agentruntimecontrolprotocol/express";
+ * import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
  *
  * const app = createArcpExpressApp({ allowedHosts: ["localhost"] });
  * const arcp = new ARCPServer({ ... });

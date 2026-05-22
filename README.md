@@ -3,9 +3,9 @@
 <p align="center"><strong>TypeScript SDK for the Agent Runtime Control Protocol (ARCP) — submit, observe, and control long-running agent jobs from TypeScript.</strong></p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@arcp/sdk"><img alt="npm" src="https://img.shields.io/npm/v/@arcp/sdk.svg"></a>
+  <a href="https://www.npmjs.com/package/@agentruntimecontrolprotocol/sdk"><img alt="npm" src="https://img.shields.io/npm/v/@agentruntimecontrolprotocol/sdk.svg"></a>
   <a href="https://github.com/agentruntimecontrolprotocol/typescript-sdk/actions/workflows/test.yml"><img alt="CI" src="https://github.com/agentruntimecontrolprotocol/typescript-sdk/actions/workflows/test.yml/badge.svg"></a>
-  <a href="https://codecov.io/gh/agentruntimecontrolprotocol/typescript-sdk"><img alt="codecov" src="https://codecov.io/gh/agentruntimecontrolprotocol/typescript-sdk/branch/main/graph/badge.svg"></a>
+  <a href="https://codecov.io/gh/agentruntimecontrolprotocol/typescript-sdk"><img alt="codecov" src="https://codecov.io/gh/agentruntimecontrolprotocol/typescript-sdk/graph/badge.svg?token=7AK1DZRWGZ"></a>
   <a href="https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md"><img alt="ARCP" src="https://img.shields.io/badge/ARCP-v1.1%20draft-blue"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-lightgrey"></a>
 </p>
@@ -21,7 +21,7 @@
 
 ---
 
-`@arcp/sdk` is the TypeScript reference implementation of [ARCP](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md), the Agent Runtime Control Protocol. It covers both sides of the wire — `@arcp/client` for submitting and observing jobs, `@arcp/runtime` for hosting agents — so either side can talk to any conformant peer in any language without hand-rolling the envelope, sequencing, or lease enforcement.
+`@agentruntimecontrolprotocol/sdk` is the TypeScript reference implementation of [ARCP](https://github.com/agentruntimecontrolprotocol/spec/blob/main/docs/draft-arcp-1.1.md), the Agent Runtime Control Protocol. It covers both sides of the wire — `@agentruntimecontrolprotocol/client` for submitting and observing jobs, `@agentruntimecontrolprotocol/runtime` for hosting agents — so either side can talk to any conformant peer in any language without hand-rolling the envelope, sequencing, or lease enforcement.
 
 ARCP itself is a transport-agnostic wire protocol for long-running AI agent jobs. It owns the parts of agent infrastructure that don't change between products — sessions, durable event streams, capability leases, budgets, resume — and stays out of the parts that do. ARCP wraps the agent function; it does not define how agents are built, how tools are exposed (that's MCP), or how telemetry is exported (that's OpenTelemetry).
 
@@ -30,20 +30,20 @@ ARCP itself is a transport-agnostic wire protocol for long-running AI agent jobs
 Requires Node.js 22 or later. The SDK is shipped as a pnpm workspace of independently-versioned, ESM-only packages. Install the meta-package for everything (client, runtime, core types, and the `arcp` CLI), or pick à la carte if you only need one side of the wire:
 
 ```sh
-npm install @arcp/sdk
+npm install @agentruntimecontrolprotocol/sdk
 # or, à la carte:
-npm install @arcp/client @arcp/core            # client side
-npm install @arcp/runtime @arcp/core           # runtime side
+npm install @agentruntimecontrolprotocol/client @agentruntimecontrolprotocol/core            # client side
+npm install @agentruntimecontrolprotocol/runtime @agentruntimecontrolprotocol/core           # runtime side
 ```
 
-Optional host integrations live in separate middleware packages: `@arcp/node`, `@arcp/express`, `@arcp/fastify`, `@arcp/hono`, `@arcp/bun`, and `@arcp/middleware-otel`.
+Optional host integrations live in separate middleware packages: `@agentruntimecontrolprotocol/node`, `@agentruntimecontrolprotocol/express`, `@agentruntimecontrolprotocol/fastify`, `@agentruntimecontrolprotocol/hono`, `@agentruntimecontrolprotocol/bun`, and `@agentruntimecontrolprotocol/middleware-otel`.
 
 ## Quick start
 
 Connect to a runtime, submit a job, stream its events to completion:
 
 ```ts
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const client = new ARCPClient({
   client: { name: "quickstart", version: "1.0.0" },
@@ -91,7 +91,7 @@ The SDK models each of these as first-class objects; the rest of this README sho
 Open a session, negotiate features, and reconnect transparently after a transport drop using the resume token — jobs keep running server-side while you're gone.
 
 ```ts
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const client = new ARCPClient({
   client: { name: "resumable", version: "1.0.0" },
@@ -237,7 +237,7 @@ await sub.unsubscribe();
 Catch the typed error taxonomy and respect the `retryable` flag — `LEASE_EXPIRED` and `BUDGET_EXHAUSTED` are never retryable; a naive retry fails identically.
 
 ```ts
-import { ARCPError } from "@arcp/sdk";
+import { ARCPError } from "@agentruntimecontrolprotocol/sdk";
 
 try {
   const handle = await client.submit({ agent: "flaky", input: {} });

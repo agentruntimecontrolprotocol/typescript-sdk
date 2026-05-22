@@ -6,7 +6,7 @@
 // monotonic event_seq so parent + child streams interleave in one
 // session; the client doesn't have to demultiplex.
 
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const client = new ARCPClient({
   client: { name: "research-client", version: "1.0.0" },

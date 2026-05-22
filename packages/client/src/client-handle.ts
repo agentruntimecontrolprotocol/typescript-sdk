@@ -1,5 +1,5 @@
-import type { JobId, TraceId } from "@arcp/core";
-import { InvalidRequestError } from "@arcp/core/errors";
+import type { JobId, TraceId } from "@agentruntimecontrolprotocol/core";
+import { InvalidRequestError } from "@agentruntimecontrolprotocol/core/errors";
 import type {
   JobAcceptedPayload,
   JobEventPayload,
@@ -8,8 +8,8 @@ import type {
   LeaseConstraints,
   ResultChunkBody,
   Credential,
-} from "@arcp/core/messages";
-import type { Deferred } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/messages";
+import type { Deferred } from "@agentruntimecontrolprotocol/core/util";
 
 import type { JobHandle } from "./types.js";
 

@@ -1,1 +1,1 @@
-export * from "@arcp/core/messages";
+export * from "@agentruntimecontrolprotocol/core/messages";

@@ -1,7 +1,7 @@
 {
-  "name": "@arcp/core",
+  "name": "@agentruntimecontrolprotocol/core",
   "version": "0.1.0",
-  "description": "Shared primitives for the Agent Runtime Control Protocol (ARCP): envelope, errors, messages, transports, store, auth, and session state. Used by @arcp/client and @arcp/runtime.",
+  "description": "Shared primitives for the Agent Runtime Control Protocol (ARCP): envelope, errors, messages, transports, store, auth, and session state. Used by @agentruntimecontrolprotocol/client and @agentruntimecontrolprotocol/runtime.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

@@ -37,7 +37,7 @@ import {
   TaggedUnauthenticated,
   TimeoutError,
   UnauthenticatedError,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 // One row per canonical error code. Each row pairs the legacy class with its
 // Effect-native `Schema.TaggedError` twin and pins the `_tag` literal the

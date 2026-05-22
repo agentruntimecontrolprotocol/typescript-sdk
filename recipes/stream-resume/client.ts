@@ -10,7 +10,7 @@
 // every envelope with seq > last_event_seq from its EventLog, and we
 // reassemble the article from the union of what both sessions saw.
 
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const URL = "ws://127.0.0.1:7901/arcp";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

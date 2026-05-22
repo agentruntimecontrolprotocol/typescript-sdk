@@ -1,13 +1,13 @@
-import type { JobId } from "@arcp/core";
-import type { BaseEnvelope } from "@arcp/core/envelope";
-import { buildEnvelope } from "@arcp/core/envelope";
-import { PermissionDeniedError } from "@arcp/core/errors";
+import type { JobId } from "@agentruntimecontrolprotocol/core";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import { PermissionDeniedError } from "@agentruntimecontrolprotocol/core/errors";
 import type {
   Envelope,
   JobListEntry,
   SessionListJobsFilter,
-} from "@arcp/core/messages";
-import { newMessageId } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/messages";
+import { newMessageId } from "@agentruntimecontrolprotocol/core/util";
 
 import { forwardEventToSubscriber } from "./job-runner-helpers.js";
 import type { Job } from "./job.js";

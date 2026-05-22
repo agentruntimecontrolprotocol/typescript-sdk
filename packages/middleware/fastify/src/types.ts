@@ -1,8 +1,8 @@
 /**
- * Public type surface for `@arcp/fastify`.
+ * Public type surface for `@agentruntimecontrolprotocol/fastify`.
  *
  * Re-exports the `AttachArcpUpgradeOptions` / `ArcpUpgradeHandle` pair from
- * `@arcp/node`: the contract is identical (the Node upgrade event vs the
+ * `@agentruntimecontrolprotocol/node`: the contract is identical (the Node upgrade event vs the
  * Fastify route is an internal detail).
  */
-export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "@arcp/node";
+export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "@agentruntimecontrolprotocol/node";

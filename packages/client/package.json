@@ -1,7 +1,7 @@
 {
-  "name": "@arcp/client",
+  "name": "@agentruntimecontrolprotocol/client",
   "version": "0.1.0",
-  "description": "Client implementation of the Agent Runtime Control Protocol (ARCP). Install alongside a transport from @arcp/core to talk to an @arcp/runtime server.",
+  "description": "Client implementation of the Agent Runtime Control Protocol (ARCP). Install alongside a transport from @agentruntimecontrolprotocol/core to talk to an @agentruntimecontrolprotocol/runtime server.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -42,7 +42,7 @@
     "test:coverage": "vitest run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "@arcp/core": "workspace:*",
+    "@agentruntimecontrolprotocol/core": "workspace:*",
     "@effect/platform": "^0.96.1",
     "effect": "^3.21.2"
   },

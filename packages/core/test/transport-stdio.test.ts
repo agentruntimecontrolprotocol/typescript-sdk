@@ -3,7 +3,7 @@ import { PassThrough } from "node:stream";
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { StdioTransport, stdioTransportEffect } from "@arcp/core";
+import { StdioTransport, stdioTransportEffect } from "@agentruntimecontrolprotocol/core";
 
 /**
  * Build a pair of {@link StdioTransport}s wired via in-memory `PassThrough`

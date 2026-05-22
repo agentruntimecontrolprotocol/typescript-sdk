@@ -9,7 +9,7 @@ import {
   EventLogService,
   eventLogLayer,
   type SessionId,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 const SESSION = "sess_test" as SessionId;
 

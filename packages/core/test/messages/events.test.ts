@@ -14,7 +14,7 @@ import {
   ThoughtBodySchema,
   ToolCallBodySchema,
   ToolResultBodySchema,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 import { decode } from "../decode-schema.js";
 

@@ -1,4 +1,4 @@
-# @arcp/runtime
+# @agentruntimecontrolprotocol/runtime
 
 The runtime/server side. Hosts agents, accepts transports, runs the
 session and job machinery, enforces leases.
@@ -6,13 +6,13 @@ session and job machinery, enforces leases.
 ## Install
 
 ```sh
-pnpm add @arcp/runtime @arcp/core
+pnpm add @agentruntimecontrolprotocol/runtime @agentruntimecontrolprotocol/core
 ```
 
 ## `ARCPServer`
 
 ```ts
-import { ARCPServer, StaticBearerVerifier } from "@arcp/runtime";
+import { ARCPServer, StaticBearerVerifier } from "@agentruntimecontrolprotocol/runtime";
 
 const server = new ARCPServer({
   runtime: { name: "my-runtime", version: "1.0.0" },
@@ -202,7 +202,7 @@ import {
   isValidCapabilityName,
   isReservedCapabilityName,
   initialBudgetFromLease,
-} from "@arcp/runtime";
+} from "@agentruntimecontrolprotocol/runtime";
 ```
 
 `validateLeaseOp(lease, capability, target, ctx?)` is the core

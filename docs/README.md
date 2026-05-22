@@ -12,9 +12,9 @@ go deeper into each subsystem.
 ## Start here
 
 - [Getting started](./getting-started.md) — install, build a runtime + client, run the example.
-- [Architecture](./architecture.md) — how `@arcp/core`, `@arcp/client`, and `@arcp/runtime` fit together.
+- [Architecture](./architecture.md) — how `@agentruntimecontrolprotocol/core`, `@agentruntimecontrolprotocol/client`, and `@agentruntimecontrolprotocol/runtime` fit together.
 - [Transports](./transports.md) — WebSocket, stdio, in-memory; when to pick each.
-- [CLI](./cli.md) — the `arcp` binary shipped by `@arcp/sdk`.
+- [CLI](./cli.md) — the `arcp` binary shipped by `@agentruntimecontrolprotocol/sdk`.
 
 ## Guides (one per spec section)
 
@@ -35,16 +35,16 @@ go deeper into each subsystem.
 
 | Package                 | Page                                                      |
 | ----------------------- | --------------------------------------------------------- |
-| `@arcp/sdk`             | [packages/sdk](./packages/sdk.md)                         |
-| `@arcp/core`            | [packages/core](./packages/core.md)                       |
-| `@arcp/client`          | [packages/client](./packages/client.md)                   |
-| `@arcp/runtime`         | [packages/runtime](./packages/runtime.md)                 |
-| `@arcp/node`            | [packages/node](./packages/node.md)                       |
-| `@arcp/express`         | [packages/express](./packages/express.md)                 |
-| `@arcp/fastify`         | [packages/fastify](./packages/fastify.md)                 |
-| `@arcp/hono`            | [packages/hono](./packages/hono.md)                       |
-| `@arcp/bun`             | [packages/bun](./packages/bun.md)                         |
-| `@arcp/middleware-otel` | [packages/middleware-otel](./packages/middleware-otel.md) |
+| `@agentruntimecontrolprotocol/sdk`             | [packages/sdk](./packages/sdk.md)                         |
+| `@agentruntimecontrolprotocol/core`            | [packages/core](./packages/core.md)                       |
+| `@agentruntimecontrolprotocol/client`          | [packages/client](./packages/client.md)                   |
+| `@agentruntimecontrolprotocol/runtime`         | [packages/runtime](./packages/runtime.md)                 |
+| `@agentruntimecontrolprotocol/node`            | [packages/node](./packages/node.md)                       |
+| `@agentruntimecontrolprotocol/express`         | [packages/express](./packages/express.md)                 |
+| `@agentruntimecontrolprotocol/fastify`         | [packages/fastify](./packages/fastify.md)                 |
+| `@agentruntimecontrolprotocol/hono`            | [packages/hono](./packages/hono.md)                       |
+| `@agentruntimecontrolprotocol/bun`             | [packages/bun](./packages/bun.md)                         |
+| `@agentruntimecontrolprotocol/middleware-otel` | [packages/middleware-otel](./packages/middleware-otel.md) |
 
 ## Reference
 

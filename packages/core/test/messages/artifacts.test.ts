@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { ArtifactRefSchema } from "@arcp/core";
+import { ArtifactRefSchema } from "@agentruntimecontrolprotocol/core";
 
 // `ArtifactRefSchema` is the migrated Effect-`Schema` definition of the
 // §8.2 `artifact_ref` event-kind body. Tests pin the JSON shapes accepted

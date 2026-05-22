@@ -5,7 +5,7 @@
 // but deliberately omits send_reply, so Claude's eventual attempt to
 // send hits PERMISSION_DENIED and degrades gracefully.
 
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const client = new ARCPClient({
   client: { name: "triage-client", version: "1.0.0" },

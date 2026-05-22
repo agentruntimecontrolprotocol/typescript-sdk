@@ -1,4 +1,4 @@
-import { type BaseEnvelope, buildEnvelope } from "@arcp/core/envelope";
+import { type BaseEnvelope, buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   AgentNotAvailableError,
   AgentVersionNotAvailableError,
@@ -7,14 +7,14 @@ import {
   InternalError,
   InvalidRequestError,
   LeaseSubsetViolationError,
-} from "@arcp/core/errors";
+} from "@agentruntimecontrolprotocol/core/errors";
 import type {
   DelegateBody,
   Envelope,
   Lease,
   MetricBody,
-} from "@arcp/core/messages";
-import { newJobId, newMessageId } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/messages";
+import { newJobId, newMessageId } from "@agentruntimecontrolprotocol/core/util";
 
 import type { Job } from "./job.js";
 import {

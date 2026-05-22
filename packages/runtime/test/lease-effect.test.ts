@@ -1,5 +1,5 @@
-import { TaggedInvalidRequest, TaggedPermissionDenied } from "@arcp/core";
-import type { Lease } from "@arcp/core/messages";
+import { TaggedInvalidRequest, TaggedPermissionDenied } from "@agentruntimecontrolprotocol/core";
+import type { Lease } from "@agentruntimecontrolprotocol/core/messages";
 import { Cause, Effect, Exit, Option } from "effect";
 import { describe, expect, it } from "vitest";
 

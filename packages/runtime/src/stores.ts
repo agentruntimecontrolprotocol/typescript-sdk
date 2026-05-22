@@ -4,7 +4,7 @@ import {
   type JobId,
   type ResumeToken,
   TaggedResumeWindowExpired,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 import { Effect, SynchronizedRef } from "effect";
 
 export interface IdempotencyEntry {

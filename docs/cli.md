@@ -1,15 +1,15 @@
 # CLI
 
-The `@arcp/sdk` package ships an `arcp` binary. It's a thin
+The `@agentruntimecontrolprotocol/sdk` package ships an `arcp` binary. It's a thin
 operational tool for running runtimes, submitting jobs, and replaying
 event logs.
 
 ## Install
 
 ```sh
-pnpm add @arcp/sdk
+pnpm add @agentruntimecontrolprotocol/sdk
 # or globally:
-pnpm add -g @arcp/sdk
+pnpm add -g @agentruntimecontrolprotocol/sdk
 ```
 
 If you've cloned the monorepo, the binary is at

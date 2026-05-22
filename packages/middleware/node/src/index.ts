@@ -1,5 +1,5 @@
 // Implementation note (Effect migration, issue #48):
-// `@arcp/node` is a thin adapter (~30 lines of upgrade-handler glue) that
+// `@agentruntimecontrolprotocol/node` is a thin adapter (~30 lines of upgrade-handler glue) that
 // hands each accepted WebSocket to a user-supplied `onTransport` callback as
 // a legacy `WebSocketTransport`. The runtime contract — handshake, dispatch
 // loop, back-pressure — lives entirely inside `ARCPServer.accept` and the
@@ -16,8 +16,8 @@
 //   import {
 //     ARCPRuntimeLayer,
 //     ARCPServerService,
-//   } from "@arcp/runtime"
-//   import { attachArcpUpgrade } from "@arcp/node"
+//   } from "@agentruntimecontrolprotocol/runtime"
+//   import { attachArcpUpgrade } from "@agentruntimecontrolprotocol/node"
 //
 //   const runtime = ManagedRuntime.make(ARCPRuntimeLayer({ ... }))
 //   attachArcpUpgrade(httpServer, {
@@ -31,7 +31,7 @@
 //       ),
 //   })
 //
-// `acceptSessionEffect` (from `@arcp/runtime`) is the right call-site when
+// `acceptSessionEffect` (from `@agentruntimecontrolprotocol/runtime`) is the right call-site when
 // the consumer is driving sessions from an already-Effect-shape transport
 // (e.g. `websocketTransportEffect` over their own socket); it is NOT a
 // better fit for this adapter's `ws`-server-owned socket — that socket is
@@ -41,7 +41,7 @@
 import type { Server as HttpServer, IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 
-import { WebSocketTransport } from "@arcp/core/transport";
+import { WebSocketTransport } from "@agentruntimecontrolprotocol/core/transport";
 import { WebSocketServer } from "ws";
 
 import type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
@@ -58,8 +58,8 @@ export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
  * Example:
  * ```ts
  * import { createServer } from "node:http";
- * import { ARCPServer } from "@arcp/runtime";
- * import { attachArcpUpgrade } from "@arcp/node";
+ * import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+ * import { attachArcpUpgrade } from "@agentruntimecontrolprotocol/node";
  *
  * const httpServer = createServer((_, res) => res.end("hello"));
  * const arcpServer = new ARCPServer({ ... });

@@ -1,1 +1,1 @@
-export * from "@arcp/runtime";
+export * from "@agentruntimecontrolprotocol/runtime";

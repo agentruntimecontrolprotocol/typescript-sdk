@@ -14,7 +14,7 @@ import {
   ARCPServer,
   InMemoryCredentialStore,
   type CredentialProvisioner,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const provisioner: CredentialProvisioner = {
   async issue(ctx) {

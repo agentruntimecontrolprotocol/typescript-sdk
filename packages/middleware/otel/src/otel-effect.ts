@@ -1,5 +1,5 @@
 /**
- * Effect-shape integration for `@arcp/middleware-otel`.
+ * Effect-shape integration for `@agentruntimecontrolprotocol/middleware-otel`.
  *
  * Slice #49 of the Effect migration. This module sits alongside the legacy
  * Transport-level {@link withTracing} wrapper (preserved unchanged in
@@ -46,8 +46,8 @@
  * import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
  * import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
  * import { Layer } from "effect";
- * import { ARCPRuntimeLayer } from "@arcp/runtime";
- * import { OtelTracerLayer } from "@arcp/middleware-otel";
+ * import { ARCPRuntimeLayer } from "@agentruntimecontrolprotocol/runtime";
+ * import { OtelTracerLayer } from "@agentruntimecontrolprotocol/middleware-otel";
  *
  * const provider = new NodeTracerProvider();
  * provider.addSpanProcessor(new BatchSpanProcessor(new OTLPTraceExporter()));

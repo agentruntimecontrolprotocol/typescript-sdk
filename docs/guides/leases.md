@@ -123,7 +123,7 @@ A lease `A` is a subset of lease `B` if every capability/pattern in
 `A` is covered by `B`:
 
 ```ts
-import { isLeaseSubset } from "@arcp/sdk";
+import { isLeaseSubset } from "@agentruntimecontrolprotocol/sdk";
 
 const parent = {
   "net.fetch": ["https://api.example.com/**"],
@@ -215,7 +215,7 @@ patterns to the upstream provider's allowed-model list.
 from vendor ones. Useful when accepting leases from upstream services:
 
 ```ts
-import { validateLeaseShape, isReservedCapabilityName } from "@arcp/sdk";
+import { validateLeaseShape, isReservedCapabilityName } from "@agentruntimecontrolprotocol/sdk";
 
 const incoming = JSON.parse(req.body.lease);
 validateLeaseShape(incoming); // throws on malformed

@@ -7,7 +7,7 @@ import {
   LeaseConstraintsSchema,
   LeaseSchema,
   RESERVED_CAPABILITY_NAMES,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 // Pin JSON shapes accepted/rejected by the Effect lease schemas.
 

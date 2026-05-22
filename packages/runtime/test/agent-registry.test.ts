@@ -1,7 +1,7 @@
 import {
   TaggedAgentNotAvailable,
   TaggedAgentVersionNotAvailable,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 import { Cause, Effect, Exit } from "effect";
 import { describe, expect, it } from "vitest";
 

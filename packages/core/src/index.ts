@@ -1,5 +1,5 @@
-// Public surface of @arcp/core — shared primitives consumed by @arcp/client
-// and @arcp/runtime. See ARCP v1.1 for the protocol spec.
+// Public surface of @agentruntimecontrolprotocol/core — shared primitives consumed by @agentruntimecontrolprotocol/client
+// and @agentruntimecontrolprotocol/runtime. See ARCP v1.1 for the protocol spec.
 
 export * from "./auth/index.js";
 export type {

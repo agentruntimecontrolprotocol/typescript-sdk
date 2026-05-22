@@ -1,7 +1,7 @@
-import type { EventSeq, JobId, SessionId, TraceId } from "@arcp/core";
-import type { BearerVerifier } from "@arcp/core/auth";
-import type { BaseEnvelope } from "@arcp/core/envelope";
-import type { Logger } from "@arcp/core/logger";
+import type { EventSeq, JobId, SessionId, TraceId } from "@agentruntimecontrolprotocol/core";
+import type { BearerVerifier } from "@agentruntimecontrolprotocol/core/auth";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import type {
   ArtifactRefBody,
   Capabilities,
@@ -15,8 +15,8 @@ import type {
   RuntimeIdentity,
   ToolCallBody,
   ToolResultBody,
-} from "@arcp/core/messages";
-import type { EventLog } from "@arcp/core/store";
+} from "@agentruntimecontrolprotocol/core/messages";
+import type { EventLog } from "@agentruntimecontrolprotocol/core/store";
 
 import type {
   CredentialProvisioner,
@@ -177,7 +177,7 @@ export type {
   ThoughtBody,
   ToolCallBody,
   ToolResultBody,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";
 
 /**
  * Optional extra context surfaced to `validateLeaseOp` for v1.1 enforcement:

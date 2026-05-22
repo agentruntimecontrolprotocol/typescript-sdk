@@ -16,7 +16,7 @@
  * runtime simply ignores it from a non-owning session, per §7.4).
  */
 
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7888/arcp";
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

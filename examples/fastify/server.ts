@@ -9,8 +9,8 @@
 
 import Fastify from "fastify";
 
-import { attachArcpToFastify } from "@arcp/fastify";
-import { ARCPServer, StaticBearerVerifier } from "@arcp/sdk";
+import { attachArcpToFastify } from "@agentruntimecontrolprotocol/fastify";
+import { ARCPServer, StaticBearerVerifier } from "@agentruntimecontrolprotocol/sdk";
 
 const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7897);
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

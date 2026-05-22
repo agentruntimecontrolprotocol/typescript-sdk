@@ -1,7 +1,7 @@
-import type { JobId, MessageId, SessionId } from "@arcp/core";
-import { type BaseEnvelope, buildEnvelope } from "@arcp/core/envelope";
-import type { Capabilities, SessionResume } from "@arcp/core/messages";
-import { newMessageId } from "@arcp/core/util";
+import type { JobId, MessageId, SessionId } from "@agentruntimecontrolprotocol/core";
+import { type BaseEnvelope, buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import type { Capabilities, SessionResume } from "@agentruntimecontrolprotocol/core/messages";
+import { newMessageId } from "@agentruntimecontrolprotocol/core/util";
 
 import type { ARCPClientOptions, SubmitOptions } from "./types.js";
 

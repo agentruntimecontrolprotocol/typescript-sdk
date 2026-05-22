@@ -1,5 +1,5 @@
 /**
- * @arcp/middleware-otel — OpenTelemetry tracing middleware for ARCP.
+ * @agentruntimecontrolprotocol/middleware-otel — OpenTelemetry tracing middleware for ARCP.
  *
  * The seam ARCP exposes is the {@link Transport} interface. This package
  * wraps any transport so that:
@@ -15,20 +15,20 @@
  * Wire it on either side:
  * ```ts
  * import { trace } from "@opentelemetry/api";
- * import { withTracing } from "@arcp/middleware-otel";
+ * import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
  *
  * const tracer = trace.getTracer("my-arcp-runtime");
  * const traced = withTracing(rawTransport, { tracer });
  * server.accept(traced); // or client.connect(traced);
  * ```
  */
-import type { BaseEnvelope } from "@arcp/core/envelope";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import type {
   FrameHandler,
   SendableFrame,
   Transport,
   WireFrame,
-} from "@arcp/core/transport";
+} from "@agentruntimecontrolprotocol/core/transport";
 import {
   context,
   propagation,

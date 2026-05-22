@@ -1,5 +1,5 @@
-import type { JobId, TraceId } from "@arcp/core";
-import type { Logger } from "@arcp/core/logger";
+import type { JobId, TraceId } from "@agentruntimecontrolprotocol/core";
+import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import type {
   AuthScheme,
   Capabilities,
@@ -9,7 +9,7 @@ import type {
   Lease,
   LeaseConstraints,
   Credential,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";
 
 /**
  * v1.1 §6.5 — automatic event acknowledgement options. When enabled, the

@@ -8,7 +8,7 @@ import {
   SessionStateService,
   TaggedInvalidRequest,
   TaggedUnauthenticated,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 const ID = "sess_test" as SessionId;
 const IDENTITY: BearerIdentity = { principal: "alice" };

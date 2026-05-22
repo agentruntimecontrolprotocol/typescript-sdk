@@ -74,7 +74,7 @@ See [resume guide](./guides/resume.md) and [jobs guide](./guides/jobs.md#idempot
 ## Retry with backoff
 
 ```ts
-import { ARCPError, isRetryableByDefault } from "@arcp/core";
+import { ARCPError, isRetryableByDefault } from "@agentruntimecontrolprotocol/core";
 
 async function withRetry<T>(fn: () => Promise<T>, max = 3): Promise<T> {
   for (let attempt = 0; ; attempt++) {
@@ -138,7 +138,7 @@ attachArcpUpgrade(httpServer, {
 ## Custom auth verifier
 
 ```ts
-import type { BearerVerifier, BearerIdentity } from "@arcp/core";
+import type { BearerVerifier, BearerIdentity } from "@agentruntimecontrolprotocol/core";
 
 class JwtVerifier implements BearerVerifier {
   constructor(private jwks: JwksClient) {}
@@ -163,7 +163,7 @@ Throw anything to reject the handshake. See
 ## Lease enforcement in a custom tool
 
 ```ts
-import { validateLeaseOp } from "@arcp/runtime";
+import { validateLeaseOp } from "@agentruntimecontrolprotocol/runtime";
 
 server.registerAgent("strict-fetcher", async (input, ctx) => {
   // canonical target check (the SDK's net.fetch validator does this)
@@ -180,7 +180,7 @@ exhaustion. See [leases guide](./guides/leases.md).
 ## In-process client + runtime for tests
 
 ```ts
-import { ARCPClient, ARCPServer, pairMemoryTransports } from "@arcp/sdk";
+import { ARCPClient, ARCPServer, pairMemoryTransports } from "@agentruntimecontrolprotocol/sdk";
 
 async function makePair() {
   const server = new ARCPServer({
@@ -213,7 +213,7 @@ Parent (client) spawns a child (runtime over stdio):
 
 ```ts
 import { spawn } from "node:child_process";
-import { StdioTransport } from "@arcp/sdk";
+import { StdioTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const child = spawn("node", ["./agent.js"], {
   stdio: ["pipe", "pipe", "inherit"], // stderr passes through

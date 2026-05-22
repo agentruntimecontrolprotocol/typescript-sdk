@@ -5,16 +5,16 @@
   "fixed": [],
   "linked": [
     [
-      "@arcp/core",
-      "@arcp/client",
-      "@arcp/runtime",
-      "@arcp/sdk",
-      "@arcp/node",
-      "@arcp/express",
-      "@arcp/fastify",
-      "@arcp/hono",
-      "@arcp/bun",
-      "@arcp/middleware-otel"
+      "@agentruntimecontrolprotocol/core",
+      "@agentruntimecontrolprotocol/client",
+      "@agentruntimecontrolprotocol/runtime",
+      "@agentruntimecontrolprotocol/sdk",
+      "@agentruntimecontrolprotocol/node",
+      "@agentruntimecontrolprotocol/express",
+      "@agentruntimecontrolprotocol/fastify",
+      "@agentruntimecontrolprotocol/hono",
+      "@agentruntimecontrolprotocol/bun",
+      "@agentruntimecontrolprotocol/middleware-otel"
     ]
   ],
   "access": "public",

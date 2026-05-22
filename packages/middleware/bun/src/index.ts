@@ -1,5 +1,5 @@
 // Implementation note (Effect migration, issue #48):
-// `@arcp/bun` is a single-file `Bun.serve({ websocket })` adapter that
+// `@agentruntimecontrolprotocol/bun` is a single-file `Bun.serve({ websocket })` adapter that
 // terminates ARCP connections on Bun's native WS server (no `ws` dep) and
 // hands each accepted socket to `onTransport` as a `BunWebSocketTransport`.
 // All runtime state — handshake, dispatch loop, back-pressure, resume — is
@@ -18,8 +18,8 @@
 //   import {
 //     ARCPRuntimeLayer,
 //     ARCPServerService,
-//   } from "@arcp/runtime"
-//   import { serveArcp } from "@arcp/bun"
+//   } from "@agentruntimecontrolprotocol/runtime"
+//   import { serveArcp } from "@agentruntimecontrolprotocol/bun"
 //
 //   const runtime = ManagedRuntime.make(ARCPRuntimeLayer({ ... }))
 //   const handle = serveArcp({
@@ -33,7 +33,7 @@
 //       ),
 //   })
 //
-// `acceptSessionEffect` (from `@arcp/runtime`) remains the right call-site
+// `acceptSessionEffect` (from `@agentruntimecontrolprotocol/runtime`) remains the right call-site
 // when the consumer is driving sessions from an already-Effect-shape
 // transport (e.g. their own `TransportEffect` over a stdio pipe); it is not
 // a better fit for the Bun adapter's `ServerWebSocket`-owned socket — that
@@ -68,8 +68,8 @@ interface ArcpUpgradeData {
  *
  * Example:
  * ```ts
- * import { serveArcp } from "@arcp/bun";
- * import { ARCPServer } from "@arcp/runtime";
+ * import { serveArcp } from "@agentruntimecontrolprotocol/bun";
+ * import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
  *
  * const arcp = new ARCPServer({ ... });
  * const handle = serveArcp({
@@ -83,7 +83,7 @@ interface ArcpUpgradeData {
 export function serveArcp(options: BunServeArcpOptions): ArcpServeHandle {
   if (typeof Bun === "undefined") {
     throw new TypeError(
-      "@arcp/bun requires the Bun runtime (`Bun.serve` is unavailable in Node)",
+      "@agentruntimecontrolprotocol/bun requires the Bun runtime (`Bun.serve` is unavailable in Node)",
     );
   }
   const path = options.path ?? "/arcp";

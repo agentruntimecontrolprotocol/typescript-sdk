@@ -1,4 +1,4 @@
-# Tracing example (`@arcp/middleware-otel`)
+# Tracing example (`@agentruntimecontrolprotocol/middleware-otel`)
 
 End-to-end OpenTelemetry: every envelope on the wire (in either
 direction) emits a span, and W3C trace context (`traceparent` /

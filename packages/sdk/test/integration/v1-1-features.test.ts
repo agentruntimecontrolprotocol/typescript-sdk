@@ -18,7 +18,7 @@ import {
   V1_1_FEATURES,
   validateLeaseConstraints,
   validateLeaseOp,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 import { makePairedHarness, waitFor } from "../helpers/fixtures.js";
 

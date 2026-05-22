@@ -9,7 +9,7 @@ import {
   type RuntimeIdentity,
   silentLogger,
   StaticBearerVerifier,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 export const TEST_CLIENT: ClientIdentity = {
   name: "test-client",

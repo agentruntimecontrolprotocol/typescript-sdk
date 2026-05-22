@@ -1,4 +1,4 @@
-# @arcp/hono
+# @agentruntimecontrolprotocol/hono
 
 Hono integration for `@hono/node-server`. Provides a starter Hono app
 and a WS upgrade attachment helper.
@@ -6,7 +6,7 @@ and a WS upgrade attachment helper.
 ## Install
 
 ```sh
-pnpm add @arcp/hono @arcp/runtime @hono/node-server
+pnpm add @agentruntimecontrolprotocol/hono @agentruntimecontrolprotocol/runtime @hono/node-server
 ```
 
 ## Use
@@ -14,8 +14,8 @@ pnpm add @arcp/hono @arcp/runtime @hono/node-server
 ```ts
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { ARCPServer } from "@arcp/runtime";
-import { createArcpHonoApp, attachArcpToHono } from "@arcp/hono";
+import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+import { createArcpHonoApp, attachArcpToHono } from "@agentruntimecontrolprotocol/hono";
 
 const app: Hono = createArcpHonoApp({
   allowedHosts: ["arcp.example.com"],
@@ -56,7 +56,7 @@ middleware. Skip this if you already have a Hono app — call
 
 ### `attachArcpToHono(server, options)`
 
-Thin wrapper around `attachArcpUpgrade` from [`@arcp/node`](./node.md).
+Thin wrapper around `attachArcpUpgrade` from [`@agentruntimecontrolprotocol/node`](./node.md).
 
 | Field                                   | Notes                      |
 | --------------------------------------- | -------------------------- |
@@ -66,7 +66,7 @@ Thin wrapper around `attachArcpUpgrade` from [`@arcp/node`](./node.md).
 
 ## Bun + Hono
 
-If you're running Hono under Bun, prefer [`@arcp/bun`](./bun.md) —
+If you're running Hono under Bun, prefer [`@agentruntimecontrolprotocol/bun`](./bun.md) —
 it's a Bun-native listener built on `Bun.serve({ websocket })` and
 side-steps the Node `http.Server` shape entirely.
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateAgainstSchema } from "@arcp/core/util";
+import { validateAgainstSchema } from "@agentruntimecontrolprotocol/core/util";
 
 describe("validateAgainstSchema (JSON-Schema subset)", () => {
   it("returns no errors for an empty schema", () => {

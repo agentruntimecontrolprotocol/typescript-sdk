@@ -23,7 +23,7 @@ WebSocket, stdio, or in-memory.
 `StaticBearerVerifier` accepts a map of `token → identity`:
 
 ```ts
-import { StaticBearerVerifier } from "@arcp/sdk";
+import { StaticBearerVerifier } from "@agentruntimecontrolprotocol/sdk";
 
 const bearer = new StaticBearerVerifier(
   new Map([
@@ -53,7 +53,7 @@ For real deployments, write your own verifier. The contract is one
 async method:
 
 ```ts
-import type { BearerVerifier, BearerIdentity } from "@arcp/core";
+import type { BearerVerifier, BearerIdentity } from "@agentruntimecontrolprotocol/core";
 
 class JwtVerifier implements BearerVerifier {
   constructor(private readonly jwks: JwksClient) {}
@@ -120,11 +120,11 @@ rejects if `principal` doesn't match the session owner. See
 ## DNS-rebind protection
 
 When you host the WS upgrade on a public HTTP server, validate `Host`
-to prevent DNS-rebind attacks. The `@arcp/express` helper does this
+to prevent DNS-rebind attacks. The `@agentruntimecontrolprotocol/express` helper does this
 for you (`allowedHosts`). For other hosts:
 
 ```ts
-import { attachArcpUpgrade } from "@arcp/node";
+import { attachArcpUpgrade } from "@agentruntimecontrolprotocol/node";
 
 attachArcpUpgrade(httpServer, {
   allowedHosts: ["api.example.com"],

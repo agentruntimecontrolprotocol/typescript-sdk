@@ -1,29 +1,29 @@
-import type { JobId } from "@arcp/core";
-import type { BearerIdentity } from "@arcp/core/auth";
-import { buildEnvelope } from "@arcp/core/envelope";
+import type { JobId } from "@agentruntimecontrolprotocol/core";
+import type { BearerIdentity } from "@agentruntimecontrolprotocol/core/auth";
+import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   ARCPError,
   InvalidRequestError,
   ResumeWindowExpiredError,
   UnauthenticatedError,
-} from "@arcp/core/errors";
+} from "@agentruntimecontrolprotocol/core/errors";
 import {
   type Logger,
   sessionLogger as makeSessionLogger,
   rootLogger,
-} from "@arcp/core/logger";
+} from "@agentruntimecontrolprotocol/core/logger";
 import type {
   AgentInventoryEntry,
   Capabilities,
   Envelope,
   SessionHelloPayload,
   SessionWelcomePayload,
-} from "@arcp/core/messages";
-import { negotiateCapabilities } from "@arcp/core/state";
-import { EventLog } from "@arcp/core/store";
-import type { Transport } from "@arcp/core/transport";
-import { newMessageId, newSessionId } from "@arcp/core/util";
-import { intersectFeatures, V1_1_FEATURES } from "@arcp/core/version";
+} from "@agentruntimecontrolprotocol/core/messages";
+import { negotiateCapabilities } from "@agentruntimecontrolprotocol/core/state";
+import { EventLog } from "@agentruntimecontrolprotocol/core/store";
+import type { Transport } from "@agentruntimecontrolprotocol/core/transport";
+import { newMessageId, newSessionId } from "@agentruntimecontrolprotocol/core/util";
+import { intersectFeatures, V1_1_FEATURES } from "@agentruntimecontrolprotocol/core/version";
 
 import { AgentRegistry } from "./agent-registry.js";
 import { JobRunner } from "./job-runner.js";

@@ -1,5 +1,5 @@
 {
-  "name": "@arcp/fastify",
+  "name": "@agentruntimecontrolprotocol/fastify",
   "version": "0.1.0",
   "description": "Fastify helpers for the Agent Runtime Control Protocol (ARCP). Registers @fastify/websocket and attaches the ARCP upgrade handler at a configurable path.",
   "license": "Apache-2.0",
@@ -42,17 +42,17 @@
     "test:coverage": "vitest run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "@arcp/node": "workspace:*"
+    "@agentruntimecontrolprotocol/node": "workspace:*"
   },
   "peerDependencies": {
-    "@arcp/core": "workspace:^",
-    "@arcp/runtime": "workspace:^",
+    "@agentruntimecontrolprotocol/core": "workspace:^",
+    "@agentruntimecontrolprotocol/runtime": "workspace:^",
     "@fastify/websocket": "^11.0.0",
     "fastify": "^4.28.0 || ^5.0.0"
   },
   "devDependencies": {
-    "@arcp/core": "workspace:*",
-    "@arcp/runtime": "workspace:*",
+    "@agentruntimecontrolprotocol/core": "workspace:*",
+    "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@fastify/websocket": "^11.2.0",
     "@types/node": "^25.9.1",
     "@types/ws": "^8.5.12",

@@ -1,4 +1,4 @@
-// Public surface of @arcp/runtime. See ARCP v1.1.
+// Public surface of @agentruntimecontrolprotocol/runtime. See ARCP v1.1.
 export {
   negotiateCapabilities,
   type PendingMeta,
@@ -6,7 +6,7 @@ export {
   type SessionPhase,
   type SessionSnapshot,
   SessionState,
-} from "@arcp/core/state";
+} from "@agentruntimecontrolprotocol/core/state";
 export { Job, JobManager, makeJobContext } from "./job.js";
 export {
   type JobEffect,

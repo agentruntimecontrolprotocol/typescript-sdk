@@ -11,12 +11,12 @@
 <g id="clust1" class="cluster">
 <title>cluster_transport</title>
 <path fill="#f1f5f9" stroke="#e2e8f0" d="M20,-332.76C20,-332.76 337,-332.76 337,-332.76 343,-332.76 349,-338.76 349,-344.76 349,-344.76 349,-415.76 349,-415.76 349,-421.76 343,-427.76 337,-427.76 337,-427.76 20,-427.76 20,-427.76 14,-427.76 8,-421.76 8,-415.76 8,-415.76 8,-344.76 8,-344.76 8,-338.76 14,-332.76 20,-332.76"/>
-<text xml:space="preserve" text-anchor="start" x="24" y="-405.37" font-family="TT Commons Pro Trial" font-weight="bold" font-size="12.00" fill="#475569">Transport (@arcp/core)</text>
+<text xml:space="preserve" text-anchor="start" x="24" y="-405.37" font-family="TT Commons Pro Trial" font-weight="bold" font-size="12.00" fill="#475569">Transport (@agentruntimecontrolprotocol/core)</text>
 </g>
 <g id="clust3" class="cluster">
 <title>cluster_runtime</title>
 <path fill="#f8fafc" stroke="#e2e8f0" d="M91,-8C91,-8 268,-8 268,-8 274,-8 280,-14 280,-20 280,-20 280,-293.51 280,-293.51 280,-299.51 274,-305.51 268,-305.51 268,-305.51 91,-305.51 91,-305.51 85,-305.51 79,-299.51 79,-293.51 79,-293.51 79,-20 79,-20 79,-14 85,-8 91,-8"/>
-<text xml:space="preserve" text-anchor="start" x="95" y="-283.12" font-family="TT Commons Pro Trial" font-weight="bold" font-size="12.00" fill="#475569">@arcp/runtime</text>
+<text xml:space="preserve" text-anchor="start" x="95" y="-283.12" font-family="TT Commons Pro Trial" font-weight="bold" font-size="12.00" fill="#475569">@agentruntimecontrolprotocol/runtime</text>
 </g>
 <g id="clust4" class="cluster">
 <title>cluster_agents</title>

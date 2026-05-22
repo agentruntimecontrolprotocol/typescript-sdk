@@ -5,7 +5,7 @@
  * same port.
  */
 
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7897);
 const URL = process.env.ARCP_DEMO_URL ?? `ws://127.0.0.1:${PORT}/arcp`;

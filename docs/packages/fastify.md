@@ -1,4 +1,4 @@
-# @arcp/fastify
+# @agentruntimecontrolprotocol/fastify
 
 Fastify integration: attach the ARCP WebSocket upgrade to the
 underlying `app.server`.
@@ -6,15 +6,15 @@ underlying `app.server`.
 ## Install
 
 ```sh
-pnpm add @arcp/fastify @arcp/runtime
+pnpm add @agentruntimecontrolprotocol/fastify @agentruntimecontrolprotocol/runtime
 ```
 
 ## Use
 
 ```ts
 import Fastify from "fastify";
-import { ARCPServer } from "@arcp/runtime";
-import { attachArcpToFastify } from "@arcp/fastify";
+import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+import { attachArcpToFastify } from "@agentruntimecontrolprotocol/fastify";
 
 const app = Fastify({ logger: true });
 const arcp = new ARCPServer({
@@ -47,7 +47,7 @@ function attachArcpToFastify(
 ```
 
 Delegates to `attachArcpUpgrade(app.server, options)`. Options match
-[`@arcp/node`](./node.md):
+[`@agentruntimecontrolprotocol/node`](./node.md):
 
 | Field                                   | Notes                           |
 | --------------------------------------- | ------------------------------- |

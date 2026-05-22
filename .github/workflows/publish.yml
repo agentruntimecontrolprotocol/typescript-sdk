@@ -1,11 +1,11 @@
-# Publishes all @arcp/* workspace packages to npm after the `test` workflow
+# Publishes all @agentruntimecontrolprotocol/* workspace packages to npm after the `test` workflow
 # succeeds on main, skipping any package whose local version is already on the
 # registry. The workspace root (package.json `"private": true`) is never
 # published.
 #
 # Required repo configuration:
 #   - Secret: NPM_TOKEN (npm automation token with publish rights to the
-#     @arcp scope — create at npmjs.com → Access Tokens → Automation)
+#     @agentruntimecontrolprotocol scope — create at npmjs.com → Access Tokens → Automation)
 #   - Settings > Actions > General > Workflow permissions: "Read and write"
 #     is NOT required; this workflow only needs id-token:write (set below)
 #     for npm provenance.

@@ -7,8 +7,8 @@
  * `upgrade` event of the underlying `http.Server`.
  */
 
-import { attachArcpToExpress, createArcpExpressApp } from "@arcp/express";
-import { ARCPServer, StaticBearerVerifier } from "@arcp/sdk";
+import { attachArcpToExpress, createArcpExpressApp } from "@agentruntimecontrolprotocol/express";
+import { ARCPServer, StaticBearerVerifier } from "@agentruntimecontrolprotocol/sdk";
 
 const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7896);
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

@@ -16,7 +16,7 @@ import {
   ARCPServer,
   StaticBearerVerifier,
   startWebSocketServer,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7884);
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

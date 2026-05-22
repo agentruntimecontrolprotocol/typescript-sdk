@@ -1,4 +1,4 @@
-import type { Transport } from "@arcp/core/transport";
+import type { Transport } from "@agentruntimecontrolprotocol/core/transport";
 
 /**
  * Options for `serveArcp`.

@@ -14,15 +14,15 @@ back from agent to client.
 ## Install
 
 ```sh
-pnpm add @arcp/sdk
+pnpm add @agentruntimecontrolprotocol/sdk
 ```
 
-`@arcp/sdk` re-exports `@arcp/core`, `@arcp/client`, and `@arcp/runtime`,
+`@agentruntimecontrolprotocol/sdk` re-exports `@agentruntimecontrolprotocol/core`, `@agentruntimecontrolprotocol/client`, and `@agentruntimecontrolprotocol/runtime`,
 and ships the `arcp` CLI. If bundle size matters (typical browser
 clients), install just the package you need:
 
 ```sh
-pnpm add @arcp/client @arcp/core
+pnpm add @agentruntimecontrolprotocol/client @agentruntimecontrolprotocol/core
 ```
 
 ## In-process demo (no network)
@@ -36,7 +36,7 @@ import {
   ARCPServer,
   pairMemoryTransports,
   StaticBearerVerifier,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const TOKEN = "tok-demo";
 
@@ -91,7 +91,7 @@ Same code, real network. Swap `pairMemoryTransports()` for a WebSocket
 server and `WebSocketTransport.connect()`:
 
 ```ts
-import { startWebSocketServer, WebSocketTransport } from "@arcp/sdk";
+import { startWebSocketServer, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 // server side
 const wss = await startWebSocketServer({

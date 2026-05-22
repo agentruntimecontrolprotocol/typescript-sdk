@@ -1,7 +1,7 @@
 /**
  * Tracing example — client.
  *
- * Wires `@arcp/middleware-otel` into the client transport so spans on
+ * Wires `@agentruntimecontrolprotocol/middleware-otel` into the client transport so spans on
  * the submit path link end-to-end with the server's spans via W3C trace
  * context carried in `extensions["x.otel"]`.
  *
@@ -18,8 +18,8 @@ import { trace } from "@opentelemetry/api";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { SEMRESATTRS_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
-import { ARCPClient, type Envelope, WebSocketTransport } from "@arcp/sdk";
-import { withTracing } from "@arcp/middleware-otel";
+import { ARCPClient, type Envelope, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
+import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
 
 const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7895/arcp";
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

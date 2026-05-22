@@ -4,13 +4,13 @@ import {
   LeaseExpiredError,
   LeaseSubsetViolationError,
   PermissionDeniedError,
-} from "@arcp/core/errors";
+} from "@agentruntimecontrolprotocol/core/errors";
 import {
   isValidCapabilityName,
   type Lease,
   type LeaseConstraints,
   parseBudgetAmount,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";
 
 import type { LeaseOpContext } from "./types.js";
 
@@ -475,4 +475,4 @@ export {
   isReservedCapabilityName,
   type Lease,
   isValidCapabilityName,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";

@@ -17,7 +17,7 @@ import {
   StaticBearerVerifier,
   StdioTransport,
   silentLogger,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
 

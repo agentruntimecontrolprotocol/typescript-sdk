@@ -39,10 +39,10 @@ real `Transport`. No mocks. No in-memory shortcuts. Each example exits
 
 | Example                  | Demonstrates                                                                                                                                                                  | Spec |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| [`tracing/`](./tracing/) | `@arcp/middleware-otel` wired on BOTH sides; W3C trace context propagated through `extensions["x-vendor.opentelemetry.tracecontext"]`; spans printed via ConsoleSpanExporter. | §11  |
-| [`express/`](./express/) | `@arcp/express` — one Node HTTP server serving both Express routes and the ARCP WS upgrade at `/arcp`, with `allowedHosts` DNS-rebind protection.                             | §4.1 |
-| [`fastify/`](./fastify/) | `@arcp/fastify` — Fastify HTTP routes alongside ARCP on a single port, with Fastify's pino logger and per-request `req.id`.                                                   | §4.1 |
-| [`bun/`](./bun/)         | `@arcp/bun` — `serveArcp({...})` listener running under Bun (no `ws` dependency); Node and Bun clients both interoperate.                                                     | §4.1 |
+| [`tracing/`](./tracing/) | `@agentruntimecontrolprotocol/middleware-otel` wired on BOTH sides; W3C trace context propagated through `extensions["x-vendor.opentelemetry.tracecontext"]`; spans printed via ConsoleSpanExporter. | §11  |
+| [`express/`](./express/) | `@agentruntimecontrolprotocol/express` — one Node HTTP server serving both Express routes and the ARCP WS upgrade at `/arcp`, with `allowedHosts` DNS-rebind protection.                             | §4.1 |
+| [`fastify/`](./fastify/) | `@agentruntimecontrolprotocol/fastify` — Fastify HTTP routes alongside ARCP on a single port, with Fastify's pino logger and per-request `req.id`.                                                   | §4.1 |
+| [`bun/`](./bun/)         | `@agentruntimecontrolprotocol/bun` — `serveArcp({...})` listener running under Bun (no `ws` dependency); Node and Bun clients both interoperate.                                                     | §4.1 |
 
 ## Running
 

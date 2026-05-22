@@ -1,11 +1,11 @@
-import type { JobId } from "@arcp/core";
+import type { JobId } from "@agentruntimecontrolprotocol/core";
 import {
   type BaseEnvelope,
   buildEnvelope,
   RoundTripEnvelopeSchema,
-} from "@arcp/core/envelope";
-import { ARCPError } from "@arcp/core/errors";
-import type { Logger } from "@arcp/core/logger";
+} from "@agentruntimecontrolprotocol/core/envelope";
+import { ARCPError } from "@agentruntimecontrolprotocol/core/errors";
+import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import {
   type Envelope,
   EnvelopeSchema,
@@ -28,10 +28,10 @@ import {
   SessionWelcomePayloadSchema,
   type SessionWelcomePayload,
   SessionErrorPayloadSchema,
-} from "@arcp/core/messages";
-import type { SessionState } from "@arcp/core/state";
-import type { Transport, WireFrame } from "@arcp/core/transport";
-import { type Deferred, newMessageId } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/messages";
+import type { SessionState } from "@agentruntimecontrolprotocol/core/state";
+import type { Transport, WireFrame } from "@agentruntimecontrolprotocol/core/transport";
+import { type Deferred, newMessageId } from "@agentruntimecontrolprotocol/core/util";
 import { type Schema as EffectSchema, Schema } from "effect";
 
 import type { InvocationState } from "./client-handle.js";

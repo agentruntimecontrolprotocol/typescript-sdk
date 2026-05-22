@@ -1,4 +1,4 @@
-import { TaggedResumeWindowExpired } from "@arcp/core";
+import { TaggedResumeWindowExpired } from "@agentruntimecontrolprotocol/core";
 import { Effect, Exit } from "effect";
 import { describe, expect, it } from "vitest";
 

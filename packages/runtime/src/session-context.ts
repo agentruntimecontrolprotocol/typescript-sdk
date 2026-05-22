@@ -1,25 +1,25 @@
-import type { EventSeq, JobId } from "@arcp/core";
+import type { EventSeq, JobId } from "@agentruntimecontrolprotocol/core";
 import {
   type BaseEnvelope,
   buildEnvelope,
   RoundTripEnvelopeSchema,
-} from "@arcp/core/envelope";
+} from "@agentruntimecontrolprotocol/core/envelope";
 import {
   ARCPError,
   HeartbeatLostError,
   InternalError,
   InvalidRequestError,
-} from "@arcp/core/errors";
-import { classifyUnknownType, CORE_MESSAGE_TYPES } from "@arcp/core/extensions";
-import type { Logger } from "@arcp/core/logger";
+} from "@agentruntimecontrolprotocol/core/errors";
+import { classifyUnknownType, CORE_MESSAGE_TYPES } from "@agentruntimecontrolprotocol/core/extensions";
+import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import {
   type Envelope,
   EnvelopeSchema,
   type JobErrorPayload,
-} from "@arcp/core/messages";
-import { PendingRegistry, SessionState } from "@arcp/core/state";
-import type { Transport, WireFrame } from "@arcp/core/transport";
-import { newMessageId } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/messages";
+import { PendingRegistry, SessionState } from "@agentruntimecontrolprotocol/core/state";
+import type { Transport, WireFrame } from "@agentruntimecontrolprotocol/core/transport";
+import { newMessageId } from "@agentruntimecontrolprotocol/core/util";
 import { Either, Schema } from "effect";
 
 import { JobManager } from "./job.js";

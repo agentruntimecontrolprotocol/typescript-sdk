@@ -1,7 +1,7 @@
-# Express example (`@arcp/express`)
+# Express example (`@agentruntimecontrolprotocol/express`)
 
 Run an ARCP runtime side-by-side with normal Express HTTP routes on a
-single port. `@arcp/express` provides:
+single port. `@agentruntimecontrolprotocol/express` provides:
 
 - `createArcpExpressApp({ allowedHosts })` — an Express instance with
   `x-powered-by` disabled and a Host-header DNS-rebind guard on the

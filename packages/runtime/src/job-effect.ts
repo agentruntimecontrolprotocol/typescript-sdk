@@ -21,13 +21,13 @@ import {
   type TaggedInvalidRequest,
   type TaggedSdkError,
   taggedFromARCP,
-} from "@arcp/core";
-import { ARCPError as ARCPErrorClass } from "@arcp/core/errors";
+} from "@agentruntimecontrolprotocol/core";
+import { ARCPError as ARCPErrorClass } from "@agentruntimecontrolprotocol/core/errors";
 import type {
   JobErrorPayload,
   JobResultPayload,
   JobStateName,
-} from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core/messages";
 import { Effect, Layer, Ref, Schedule } from "effect";
 
 // Doc-only reference: Job/JobManager are the concrete legacy classes this

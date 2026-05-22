@@ -1,22 +1,22 @@
-# @arcp/node
+# @agentruntimecontrolprotocol/node
 
 Attach the ARCP WebSocket upgrade to an existing Node `http.Server`
 or `https.Server`. The lowest-level host integration — every other
-Node-based middleware (`@arcp/express`, `@arcp/fastify`,
-`@arcp/hono`) layers on top of this one.
+Node-based middleware (`@agentruntimecontrolprotocol/express`, `@agentruntimecontrolprotocol/fastify`,
+`@agentruntimecontrolprotocol/hono`) layers on top of this one.
 
 ## Install
 
 ```sh
-pnpm add @arcp/node @arcp/runtime
+pnpm add @agentruntimecontrolprotocol/node @agentruntimecontrolprotocol/runtime
 ```
 
 ## Use
 
 ```ts
 import { createServer } from "node:http";
-import { ARCPServer } from "@arcp/runtime";
-import { attachArcpUpgrade } from "@arcp/node";
+import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+import { attachArcpUpgrade } from "@agentruntimecontrolprotocol/node";
 
 const httpServer = createServer((req, res) => {
   // your regular HTTP handler (REST, static, etc.)

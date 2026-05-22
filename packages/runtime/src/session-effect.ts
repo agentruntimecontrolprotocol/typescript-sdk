@@ -19,10 +19,10 @@ import {
   type TaggedSdkError,
   type TaggedUnauthenticated,
   taggedFromARCP,
-} from "@arcp/core";
-import type { BaseEnvelope } from "@arcp/core/envelope";
-import { ARCPError as ARCPErrorClass } from "@arcp/core/errors";
-import type { JobErrorPayload } from "@arcp/core/messages";
+} from "@agentruntimecontrolprotocol/core";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import { ARCPError as ARCPErrorClass } from "@agentruntimecontrolprotocol/core/errors";
+import type { JobErrorPayload } from "@agentruntimecontrolprotocol/core/messages";
 import { Effect, Layer } from "effect";
 
 // Doc-only reference: SessionContext is the concrete legacy class this

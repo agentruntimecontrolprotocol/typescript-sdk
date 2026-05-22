@@ -8,7 +8,7 @@ import {
   pairMemoryTransports,
   StaticBearerVerifier,
   silentLogger,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 import { TEST_CLIENT, TEST_RUNTIME, TEST_TOKEN } from "../helpers/fixtures.js";
 

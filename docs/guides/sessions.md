@@ -31,7 +31,7 @@ Three things happen in `session.welcome`:
 ## Client side
 
 ```ts
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const client = new ARCPClient({
   client: { name: "my-client", version: "1.0.0" },
@@ -63,7 +63,7 @@ import {
   ARCPServer,
   StaticBearerVerifier,
   startWebSocketServer,
-} from "@arcp/sdk";
+} from "@agentruntimecontrolprotocol/sdk";
 
 const server = new ARCPServer({
   runtime: { name: "my-runtime", version: "1.0.0" },

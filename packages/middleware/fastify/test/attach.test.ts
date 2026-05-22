@@ -1,11 +1,11 @@
-import type { WebSocketTransport } from "@arcp/core/transport";
+import type { WebSocketTransport } from "@agentruntimecontrolprotocol/core/transport";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
 import { attachArcpToFastify } from "../src/index.js";
 
-describe("@arcp/fastify", () => {
+describe("@agentruntimecontrolprotocol/fastify", () => {
   it("upgrades a websocket at the configured path", async () => {
     const app = Fastify();
     app.get("/healthz", (_req, reply) => reply.send({ ok: true }));

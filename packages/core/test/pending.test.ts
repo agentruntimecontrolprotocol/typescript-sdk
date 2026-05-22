@@ -10,7 +10,7 @@ import {
   TaggedInternal,
   TaggedTimeout,
   TimeoutError,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
 describe("PendingRegistry", () => {
   it("starts empty", () => {

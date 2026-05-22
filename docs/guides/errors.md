@@ -1,7 +1,7 @@
 # Errors (§12)
 
 ARCP defines twelve error codes. Each has a corresponding TypeScript
-class in `@arcp/core`. Errors carry a structured payload and serialize
+class in `@agentruntimecontrolprotocol/core`. Errors carry a structured payload and serialize
 to the wire identically whether they surface as `session.error`,
 `job.error`, or as the `error` body inside a `tool_result`.
 
@@ -47,7 +47,7 @@ Every wire emission of an error — `session.error.payload`,
 ## Throwing from an agent
 
 ```ts
-import { ARCPError, PermissionDeniedError } from "@arcp/core";
+import { ARCPError, PermissionDeniedError } from "@agentruntimecontrolprotocol/core";
 
 server.registerAgent("strict", async (input, ctx) => {
   if (!input.allowed) {
@@ -77,7 +77,7 @@ throw new PermissionDeniedError("net.fetch denied for s3://other/", {
 `handle.done` rejects with an `ARCPError` on terminal `job.error`:
 
 ```ts
-import { ARCPError, isRetryableByDefault } from "@arcp/core";
+import { ARCPError, isRetryableByDefault } from "@agentruntimecontrolprotocol/core";
 
 try {
   const result = await handle.done;

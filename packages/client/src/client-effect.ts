@@ -30,12 +30,12 @@
 // installed by this module — by design, the legacy `Map<string, ClientHandler>`
 // is one-handler-per-type. Pick one shape per type per client.
 
-import { type JobId, LoggerLayer } from "@arcp/core";
-import type { Envelope } from "@arcp/core/messages";
+import { type JobId, LoggerLayer } from "@agentruntimecontrolprotocol/core";
+import type { Envelope } from "@agentruntimecontrolprotocol/core/messages";
 import {
   type TaggedTransportError,
   transportSendError,
-} from "@arcp/core/transport-error";
+} from "@agentruntimecontrolprotocol/core/transport-error";
 import { Effect, Layer, ManagedRuntime, type Scope, Stream } from "effect";
 
 import { ARCPClient } from "./client.js";

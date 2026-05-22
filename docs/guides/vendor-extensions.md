@@ -33,7 +33,7 @@ x-vendor.opentelemetry.tracecontext
 ```
 
 `validateExtensionsObject(obj)` and `isVendorExtensionName(s)` in
-`@arcp/core` enforce these rules at runtime.
+`@agentruntimecontrolprotocol/core` enforce these rules at runtime.
 
 ## Round-trip guarantee (§15)
 

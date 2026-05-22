@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 
-import type { WebSocketTransport } from "@arcp/core/transport";
+import type { WebSocketTransport } from "@agentruntimecontrolprotocol/core/transport";
 
 /**
  * Options for `attachArcpUpgrade`.

@@ -1,15 +1,15 @@
 {
-  "name": "@arcp/examples",
+  "name": "@agentruntimecontrolprotocol/examples",
   "version": "0.0.0",
   "private": true,
   "description": "Runnable examples for the ARCP TypeScript SDK. Not published.",
   "type": "module",
   "dependencies": {
-    "@arcp/bun": "workspace:*",
-    "@arcp/express": "workspace:*",
-    "@arcp/fastify": "workspace:*",
-    "@arcp/middleware-otel": "workspace:*",
-    "@arcp/sdk": "workspace:*",
+    "@agentruntimecontrolprotocol/bun": "workspace:*",
+    "@agentruntimecontrolprotocol/express": "workspace:*",
+    "@agentruntimecontrolprotocol/fastify": "workspace:*",
+    "@agentruntimecontrolprotocol/middleware-otel": "workspace:*",
+    "@agentruntimecontrolprotocol/sdk": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0"
   },

@@ -12,7 +12,7 @@
  * boot-time Effect dependency to a published binary without changing any
  * observable behavior, so #47 was scoped out. Consumers who want an
  * Effect-native entry point should compose `makeARCPServerRuntime` (from
- * `@arcp/runtime`) and `makeARCPClientRuntime` (from `@arcp/client`)
+ * `@agentruntimecontrolprotocol/runtime`) and `makeARCPClientRuntime` (from `@agentruntimecontrolprotocol/client`)
  * themselves; the building blocks are public.
  */
 import { readFileSync } from "node:fs";

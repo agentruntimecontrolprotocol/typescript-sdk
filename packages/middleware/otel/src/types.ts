@@ -1,5 +1,5 @@
-import type { BaseEnvelope } from "@arcp/core/envelope";
-import type { WireFrame } from "@arcp/core/transport";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import type { WireFrame } from "@agentruntimecontrolprotocol/core/transport";
 import type { Tracer } from "@opentelemetry/api";
 
 export interface WithTracingOptions {

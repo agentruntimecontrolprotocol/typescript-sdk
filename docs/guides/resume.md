@@ -26,7 +26,7 @@ the client must start a new session.
 ## API
 
 ```ts
-import { WebSocketTransport } from "@arcp/sdk";
+import { WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 // Original connect
 const welcome = await client.connect(transport);

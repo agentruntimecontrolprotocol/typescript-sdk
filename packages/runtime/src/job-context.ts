@@ -1,12 +1,12 @@
-import { InvalidRequestError } from "@arcp/core/errors";
+import { InvalidRequestError } from "@agentruntimecontrolprotocol/core/errors";
 import type {
   LogPayload,
   ProgressBody,
   ResultChunkBody,
   StatusBody,
   ThoughtBody,
-} from "@arcp/core/messages";
-import { newJobId } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/messages";
+import { newJobId } from "@agentruntimecontrolprotocol/core/util";
 
 import type { Job } from "./job.js";
 import type { JobContext, ResultStream } from "./types.js";

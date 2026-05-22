@@ -1,12 +1,12 @@
-import type { SessionId } from "@arcp/core";
-import type { BearerIdentity } from "@arcp/core/auth";
-import { buildEnvelope } from "@arcp/core/envelope";
+import type { SessionId } from "@agentruntimecontrolprotocol/core";
+import type { BearerIdentity } from "@agentruntimecontrolprotocol/core/auth";
+import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   InvalidRequestError,
   ResumeWindowExpiredError,
-} from "@arcp/core/errors";
-import type { SessionHelloPayload } from "@arcp/core/messages";
-import { newMessageId } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/errors";
+import type { SessionHelloPayload } from "@agentruntimecontrolprotocol/core/messages";
+import { newMessageId } from "@agentruntimecontrolprotocol/core/util";
 
 import type { ARCPServer } from "./server.js";
 import type { SessionContext } from "./session-context.js";

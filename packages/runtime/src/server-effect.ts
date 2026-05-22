@@ -47,9 +47,9 @@ import {
   IdGen,
   LoggerLayer,
   staticBearerVerifierLayer,
-} from "@arcp/core";
-import { UnauthenticatedError } from "@arcp/core/errors";
-import type { Transport, TransportEffect } from "@arcp/core/transport";
+} from "@agentruntimecontrolprotocol/core";
+import { UnauthenticatedError } from "@agentruntimecontrolprotocol/core/errors";
+import type { Transport, TransportEffect } from "@agentruntimecontrolprotocol/core/transport";
 import {
   Effect,
   Layer,
@@ -526,9 +526,9 @@ export function makeARCPServerRuntime(
 // Note: convenience re-exports were intentionally omitted. Effect-shape
 // consumers should import services (`IdGen`, `BearerVerifierService`,
 // `EventLogService`, `LoggerLayer`, `staticBearerVerifierLayer`,
-// `rootLogger`) directly from `@arcp/core`, and runtime services
+// `rootLogger`) directly from `@agentruntimecontrolprotocol/core`, and runtime services
 // (`AgentRegistryService`, `IdempotencyStoreService`, `ResumeStoreService`,
-// `ARCPServer`) from `@arcp/runtime`. Keeping the surface narrow avoids
+// `ARCPServer`) from `@agentruntimecontrolprotocol/runtime`. Keeping the surface narrow avoids
 // dual-import ambiguity.
 // `Scope` is imported above as a type to keep `Layer.scoped`'s requirement
 // callable from user code that composes additional scoped layers.

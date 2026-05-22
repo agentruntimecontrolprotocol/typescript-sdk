@@ -1,6 +1,6 @@
-import type { JobId, TraceId } from "@arcp/core";
-import { BudgetExhaustedError } from "@arcp/core/errors";
-import type { Credential, Lease, LeaseConstraints } from "@arcp/core/messages";
+import type { JobId, TraceId } from "@agentruntimecontrolprotocol/core";
+import { BudgetExhaustedError } from "@agentruntimecontrolprotocol/core/errors";
+import type { Credential, Lease, LeaseConstraints } from "@agentruntimecontrolprotocol/core/messages";
 
 /**
  * ARCP v1.1 §9.7–§9.8 — Credential provisioner interface.
@@ -65,7 +65,7 @@ export interface CredentialIssueContext {
  *
  * @example
  * ```ts
- * import type { CredentialProvisioner, IssuedCredential, CredentialIssueContext } from "@arcp/runtime";
+ * import type { CredentialProvisioner, IssuedCredential, CredentialIssueContext } from "@agentruntimecontrolprotocol/runtime";
  *
  * class LiteLLMProvisioner implements CredentialProvisioner {
  *   async issue(ctx: CredentialIssueContext): Promise<IssuedCredential[]> {

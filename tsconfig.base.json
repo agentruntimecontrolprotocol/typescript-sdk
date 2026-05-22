@@ -26,20 +26,20 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@arcp/core": ["packages/core/src/index.ts"],
-      "@arcp/core/*": [
+      "@agentruntimecontrolprotocol/core": ["packages/core/src/index.ts"],
+      "@agentruntimecontrolprotocol/core/*": [
         "packages/core/src/*/index.ts",
         "packages/core/src/*.ts"
       ],
-      "@arcp/client": ["packages/client/src/index.ts"],
-      "@arcp/runtime": ["packages/runtime/src/index.ts"],
-      "@arcp/sdk": ["packages/sdk/src/index.ts"],
-      "@arcp/node": ["packages/middleware/node/src/index.ts"],
-      "@arcp/express": ["packages/middleware/express/src/index.ts"],
-      "@arcp/fastify": ["packages/middleware/fastify/src/index.ts"],
-      "@arcp/hono": ["packages/middleware/hono/src/index.ts"],
-      "@arcp/bun": ["packages/middleware/bun/src/index.ts"],
-      "@arcp/middleware-otel": ["packages/middleware/otel/src/index.ts"]
+      "@agentruntimecontrolprotocol/client": ["packages/client/src/index.ts"],
+      "@agentruntimecontrolprotocol/runtime": ["packages/runtime/src/index.ts"],
+      "@agentruntimecontrolprotocol/sdk": ["packages/sdk/src/index.ts"],
+      "@agentruntimecontrolprotocol/node": ["packages/middleware/node/src/index.ts"],
+      "@agentruntimecontrolprotocol/express": ["packages/middleware/express/src/index.ts"],
+      "@agentruntimecontrolprotocol/fastify": ["packages/middleware/fastify/src/index.ts"],
+      "@agentruntimecontrolprotocol/hono": ["packages/middleware/hono/src/index.ts"],
+      "@agentruntimecontrolprotocol/bun": ["packages/middleware/bun/src/index.ts"],
+      "@agentruntimecontrolprotocol/middleware-otel": ["packages/middleware/otel/src/index.ts"]
     }
   }
 }

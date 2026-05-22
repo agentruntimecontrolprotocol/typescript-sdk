@@ -1,1 +1,1 @@
-export * from "@arcp/core/errors";
+export * from "@agentruntimecontrolprotocol/core/errors";

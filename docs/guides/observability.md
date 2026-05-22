@@ -1,7 +1,7 @@
 # Observability (§11)
 
 ARCP carries W3C trace context end to end. With
-[`@arcp/middleware-otel`](../packages/middleware-otel.md), every
+[`@agentruntimecontrolprotocol/middleware-otel`](../packages/middleware-otel.md), every
 envelope generates a span and every job becomes a unit of work in
 your tracing backend.
 
@@ -33,7 +33,7 @@ the runtime side starts a child span linked to the client's span.
 ## Setup
 
 ```ts
-import { withTracing } from "@arcp/middleware-otel";
+import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
 import { trace } from "@opentelemetry/api";
 
 const tracer = trace.getTracer("arcp-client", "1.0.0");
@@ -117,7 +117,7 @@ If you don't want OTel, you can still set `trace_id` manually on every
 `submit`:
 
 ```ts
-import { newId } from "@arcp/core";
+import { newId } from "@agentruntimecontrolprotocol/core";
 
 const traceId = newId({ length: 32 }) as TraceId; // 32 hex
 await client.submit({
@@ -140,10 +140,10 @@ default.
 
 ## Per-session log binding
 
-`@arcp/core`'s logger is `pino`-shaped:
+`@agentruntimecontrolprotocol/core`'s logger is `pino`-shaped:
 
 ```ts
-import { rootLogger, sessionLogger } from "@arcp/core";
+import { rootLogger, sessionLogger } from "@agentruntimecontrolprotocol/core";
 
 const log = sessionLogger(rootLogger, { session_id: ctx.sessionId });
 log.info({ job_id: ctx.jobId }, "starting");

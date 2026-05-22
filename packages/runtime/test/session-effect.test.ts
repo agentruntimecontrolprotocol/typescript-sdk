@@ -1,8 +1,8 @@
-import type { EventSeq, JobId } from "@arcp/core";
-import { TaggedUnauthenticated } from "@arcp/core";
-import type { BaseEnvelope } from "@arcp/core/envelope";
-import { UnauthenticatedError } from "@arcp/core/errors";
-import type { JobErrorPayload } from "@arcp/core/messages";
+import type { EventSeq, JobId } from "@agentruntimecontrolprotocol/core";
+import { TaggedUnauthenticated } from "@agentruntimecontrolprotocol/core";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import { UnauthenticatedError } from "@agentruntimecontrolprotocol/core/errors";
+import type { JobErrorPayload } from "@agentruntimecontrolprotocol/core/messages";
 import { Cause, Effect, Exit, Option } from "effect";
 import { describe, expect, it } from "vitest";
 

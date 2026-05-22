@@ -7,7 +7,7 @@
  * fall behind and emits a `status { phase: "back_pressure" }` event.
  */
 
-import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7886/arcp";
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

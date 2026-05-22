@@ -1,13 +1,13 @@
 import {
   TaggedAgentNotAvailable,
   TaggedAgentVersionNotAvailable,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 import {
   AgentNotAvailableError,
   AgentVersionNotAvailableError,
-} from "@arcp/core/errors";
-import type { AgentInventoryEntry } from "@arcp/core/messages";
-import { getOrCreate } from "@arcp/core/util";
+} from "@agentruntimecontrolprotocol/core/errors";
+import type { AgentInventoryEntry } from "@agentruntimecontrolprotocol/core/messages";
+import { getOrCreate } from "@agentruntimecontrolprotocol/core/util";
 import { Effect, Ref } from "effect";
 
 import type { AgentHandler } from "./types.js";

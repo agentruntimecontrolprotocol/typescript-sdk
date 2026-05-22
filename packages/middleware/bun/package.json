@@ -1,5 +1,5 @@
 {
-  "name": "@arcp/bun",
+  "name": "@agentruntimecontrolprotocol/bun",
   "version": "0.1.0",
   "description": "Bun runtime helpers for the Agent Runtime Control Protocol (ARCP). Uses Bun's native WebSocket server (Bun.serve) to terminate ARCP connections; no external dependency on `ws`.",
   "license": "Apache-2.0",
@@ -43,12 +43,12 @@
     "test:coverage": "vitest run --coverage --passWithNoTests"
   },
   "peerDependencies": {
-    "@arcp/core": "workspace:^",
-    "@arcp/runtime": "workspace:^"
+    "@agentruntimecontrolprotocol/core": "workspace:^",
+    "@agentruntimecontrolprotocol/runtime": "workspace:^"
   },
   "devDependencies": {
-    "@arcp/core": "workspace:*",
-    "@arcp/runtime": "workspace:*",
+    "@agentruntimecontrolprotocol/core": "workspace:*",
+    "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@types/node": "^25.9.1",
     "bun-types": "^1.1.30",
     "typescript": "^6.0.3",

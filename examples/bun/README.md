@@ -1,10 +1,10 @@
-# Bun example (`@arcp/bun`)
+# Bun example (`@agentruntimecontrolprotocol/bun`)
 
-Run an ARCP runtime under Bun via `serveArcp({...})`. `@arcp/bun` uses
+Run an ARCP runtime under Bun via `serveArcp({...})`. `@agentruntimecontrolprotocol/bun` uses
 `Bun.serve({ websocket })` directly — no `ws` dependency — and is the
 only listener helper in the repo that runs in a non-Node environment.
 
-The client side is unchanged: it's a normal `@arcp/sdk` `ARCPClient`
+The client side is unchanged: it's a normal `@agentruntimecontrolprotocol/sdk` `ARCPClient`
 talking over WebSocket. The wire protocol is runtime-agnostic, so the
 client can be Node or Bun and the server still works.
 
@@ -42,14 +42,14 @@ server with `Ctrl+C`.
 
 ## Known limitation
 
-`@arcp/runtime`'s default event log uses `better-sqlite3`, a native
+`@agentruntimecontrolprotocol/runtime`'s default event log uses `better-sqlite3`, a native
 Node module that does not yet load under Bun (see
 [oven-sh/bun#4290](https://github.com/oven-sh/bun/issues/4290)). The
-`@arcp/bun` listener itself is Bun-native; the gap is one level up, in
+`@agentruntimecontrolprotocol/bun` listener itself is Bun-native; the gap is one level up, in
 the runtime's storage. Once `better-sqlite3` ships Bun support — or
 `ARCPServer` gains a `bun:sqlite` adapter — this example will run
 end-to-end. The wire surface, the listener, and the `serveArcp` API
-are all exercised by `@arcp/bun`'s own unit tests in the meantime.
+are all exercised by `@agentruntimecontrolprotocol/bun`'s own unit tests in the meantime.
 
 ## Configuration
 

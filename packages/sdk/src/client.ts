@@ -1,1 +1,1 @@
-export * from "@arcp/client";
+export * from "@agentruntimecontrolprotocol/client";

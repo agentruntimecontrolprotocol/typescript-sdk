@@ -1,5 +1,5 @@
 {
-  "name": "@arcp/node",
+  "name": "@agentruntimecontrolprotocol/node",
   "version": "0.1.0",
   "description": "Node.js HTTP server integration for the ARCP WebSocket transport. Wires the WS upgrade handshake onto an existing `http.Server` with Host-header DNS-rebinding protection.",
   "license": "Apache-2.0",
@@ -45,12 +45,12 @@
     "ws": "^8.20.1"
   },
   "peerDependencies": {
-    "@arcp/core": "workspace:^",
-    "@arcp/runtime": "workspace:^"
+    "@agentruntimecontrolprotocol/core": "workspace:^",
+    "@agentruntimecontrolprotocol/runtime": "workspace:^"
   },
   "devDependencies": {
-    "@arcp/core": "workspace:*",
-    "@arcp/runtime": "workspace:*",
+    "@agentruntimecontrolprotocol/core": "workspace:*",
+    "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@types/node": "^25.9.1",
     "@types/ws": "^8.5.12",
     "typescript": "^6.0.3",

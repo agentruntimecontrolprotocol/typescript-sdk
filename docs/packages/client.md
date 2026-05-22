@@ -1,4 +1,4 @@
-# @arcp/client
+# @agentruntimecontrolprotocol/client
 
 The client side of the protocol. One class: `ARCPClient`. Owns one
 transport at a time, drives the handshake, dispatches inbound
@@ -8,13 +8,13 @@ job submission, cancellation, listing, and subscription.
 ## Install
 
 ```sh
-pnpm add @arcp/client @arcp/core
+pnpm add @agentruntimecontrolprotocol/client @agentruntimecontrolprotocol/core
 ```
 
 ## Constructor
 
 ```ts
-import { ARCPClient } from "@arcp/client";
+import { ARCPClient } from "@agentruntimecontrolprotocol/client";
 
 const client = new ARCPClient({
   client: { name: "my-client", version: "1.0.0" },
@@ -216,8 +216,8 @@ Returned by `subscribe()`.
 
 ## Tree-shaking
 
-The package is ESM-only. No imports pull in `@arcp/runtime` — a
-client-only browser bundle is small (`@arcp/core` + `@arcp/client`).
+The package is ESM-only. No imports pull in `@agentruntimecontrolprotocol/runtime` — a
+client-only browser bundle is small (`@agentruntimecontrolprotocol/core` + `@agentruntimecontrolprotocol/client`).
 
 ## Source
 

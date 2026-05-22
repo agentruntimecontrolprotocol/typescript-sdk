@@ -32,7 +32,7 @@ Section-by-section status lives in
 | §9.5 Lease expiry          | full   | Negotiated via `lease_expires_at` feature flag.                    |
 | §9.6 Lease budgets         | full   | Negotiated via `lease_budgets` feature flag.                       |
 | §10 Delegation             | full   | Subset validation, trace inheritance.                              |
-| §11 Trace propagation      | full   | W3C via `@arcp/middleware-otel`.                                   |
+| §11 Trace propagation      | full   | W3C via `@agentruntimecontrolprotocol/middleware-otel`.                                   |
 | §12 Error taxonomy         | full   | All 12 codes implemented.                                          |
 | §14 Security               | full   | Resume sweep, per-session DoS caps, canonicalization.              |
 | §15 Vendor extensions      | full   | Validation + round-trip.                                           |

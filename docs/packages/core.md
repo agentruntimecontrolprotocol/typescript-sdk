@@ -1,4 +1,4 @@
-# @arcp/core
+# @agentruntimecontrolprotocol/core
 
 Wire-level primitives shared by client and runtime. If you're writing
 a custom transport, a custom auth verifier, or a third-party
@@ -8,11 +8,11 @@ on.
 ## Install
 
 ```sh
-pnpm add @arcp/core
+pnpm add @agentruntimecontrolprotocol/core
 ```
 
 Most apps don't install this explicitly — it's a transitive of
-`@arcp/client`, `@arcp/runtime`, and `@arcp/sdk`.
+`@agentruntimecontrolprotocol/client`, `@agentruntimecontrolprotocol/runtime`, and `@agentruntimecontrolprotocol/sdk`.
 
 ## Public surface
 
@@ -27,7 +27,7 @@ import {
   messageEnvelope, // build per-message-type envelope
   isPreSessionType, // checks if a type may flow before session.welcome
   isValidTraceId, // 32-hex check
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 Every message type has a corresponding Zod schema in
@@ -45,9 +45,9 @@ import type {
   ResumeToken,
   SessionId,
   TraceId,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 
-import { newId, newJobId, newMessageId, newSessionId } from "@arcp/core";
+import { newId, newJobId, newMessageId, newSessionId } from "@agentruntimecontrolprotocol/core";
 ```
 
 Brand types prevent accidental cross-assignment between e.g.
@@ -78,7 +78,7 @@ import {
   ERROR_CODES,
   isErrorCode,
   isRetryableByDefault,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 See [errors guide](../guides/errors.md) for shape, retryability, and
@@ -98,7 +98,7 @@ import {
   WebSocketTransport,
   startWebSocketServer,
   WebSocketServerHandle,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 `Transport` is a four-method interface. See [transports.md](../transports.md)
@@ -114,7 +114,7 @@ import {
   PendingRegistry, // pending-request correlation
   PendingMeta,
   negotiateCapabilities,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 `SessionState` is the source of truth for what a session can do at
@@ -130,7 +130,7 @@ import {
   EventLogOptions,
   ParsedRowEnvelope,
   EventRowEnvelopeSchema,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 `EventLog` is the interface for resume-buffer persistence. The
@@ -144,7 +144,7 @@ import {
   BearerVerifier,
   BearerIdentity,
   StaticBearerVerifier,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 See [auth guide](../guides/auth.md) for custom verifier patterns.
@@ -157,7 +157,7 @@ import {
   rootLogger,
   sessionLogger,
   silentLogger,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 `sessionLogger(parent, bindings)` returns a child logger with the
@@ -176,7 +176,7 @@ import {
   validateExtensionsObject,
   UnknownTypeDisposition,
   VendorExtensionName,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 See [vendor-extensions guide](../guides/vendor-extensions.md) for the
@@ -193,7 +193,7 @@ import {
   isCompatibleVersion,
   V1_1_FEATURES, // tuple of v1.1 feature names
   V1_1_Feature, // union type
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 `negotiateCapabilities()` uses these to compute the intersection of
@@ -209,7 +209,7 @@ import {
   safeSetInterval, // unref'd + clearable interval
   safeSetTimeout,
   nowTimestamp,
-} from "@arcp/core";
+} from "@agentruntimecontrolprotocol/core";
 ```
 
 ## Module layout
@@ -233,7 +233,7 @@ packages/core/src/
 
 ## Stability
 
-`@arcp/core` is the most stable part of the SDK — its shapes are
+`@agentruntimecontrolprotocol/core` is the most stable part of the SDK — its shapes are
 implementations of the spec. Breaking changes here mean a spec
 revision. Minor additions (v1.1 features) are gated behind the
 feature negotiation system.

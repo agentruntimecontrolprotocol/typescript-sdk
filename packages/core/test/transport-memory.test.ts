@@ -1,7 +1,7 @@
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { pairMemoryTransports, pairMemoryTransportsEffect } from "@arcp/core";
+import { pairMemoryTransports, pairMemoryTransportsEffect } from "@agentruntimecontrolprotocol/core";
 
 describe("pairMemoryTransports", () => {
   it("delivers frames in FIFO order from a to b", async () => {

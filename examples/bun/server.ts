@@ -1,7 +1,7 @@
 /**
  * Bun example — server.
  *
- * Uses `serveArcp({...})` from `@arcp/bun`. Bun's native WebSocket
+ * Uses `serveArcp({...})` from `@agentruntimecontrolprotocol/bun`. Bun's native WebSocket
  * support means no `ws` dependency — `Bun.serve({ websocket })` is
  * doing the work under the hood.
  *
@@ -12,8 +12,8 @@
  * protocol is runtime-agnostic.
  */
 
-import { serveArcp } from "@arcp/bun";
-import { ARCPServer, StaticBearerVerifier } from "@arcp/sdk";
+import { serveArcp } from "@agentruntimecontrolprotocol/bun";
+import { ARCPServer, StaticBearerVerifier } from "@agentruntimecontrolprotocol/sdk";
 
 const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7898);
 const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";

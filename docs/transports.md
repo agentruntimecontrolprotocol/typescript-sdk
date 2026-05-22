@@ -26,7 +26,7 @@ Production default. Bidirectional, framed, fits naturally over TLS.
 ### Server
 
 ```ts
-import { startWebSocketServer } from "@arcp/sdk";
+import { startWebSocketServer } from "@agentruntimecontrolprotocol/sdk";
 
 const wss = await startWebSocketServer({
   host: "127.0.0.1",
@@ -40,10 +40,10 @@ await wss.close();
 ```
 
 For an existing Node `http.Server`, use the
-[`@arcp/node` middleware](./packages/node.md):
+[`@agentruntimecontrolprotocol/node` middleware](./packages/node.md):
 
 ```ts
-import { attachArcpUpgrade } from "@arcp/node";
+import { attachArcpUpgrade } from "@agentruntimecontrolprotocol/node";
 
 const handle = attachArcpUpgrade(httpServer, {
   path: "/arcp",
@@ -54,7 +54,7 @@ const handle = attachArcpUpgrade(httpServer, {
 ### Client
 
 ```ts
-import { WebSocketTransport } from "@arcp/sdk";
+import { WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const transport = await WebSocketTransport.connect(
   "wss://runtime.example.com/arcp",
@@ -81,7 +81,7 @@ the standard library's `WebSocket` (Node ≥22) is used; no `ws` dep.
 
 When attaching to an existing HTTP server you can browse to from a
 DNS-pinned name, the WS upgrade handshake should validate `Host`. The
-`@arcp/express` helper does this for you; pass `allowedHosts` to the
+`@agentruntimecontrolprotocol/express` helper does this for you; pass `allowedHosts` to the
 others.
 
 ## stdio
@@ -98,7 +98,7 @@ pnpm tsx packages/sdk/src/cli.ts serve --transport stdio \
 ```
 
 ```ts
-import { StdioTransport, ARCPClient } from "@arcp/sdk";
+import { StdioTransport, ARCPClient } from "@agentruntimecontrolprotocol/sdk";
 import { spawn } from "node:child_process";
 
 const child = spawn("pnpm", [
@@ -142,7 +142,7 @@ await client.connect(transport);
 connected to each other:
 
 ```ts
-import { pairMemoryTransports } from "@arcp/sdk";
+import { pairMemoryTransports } from "@agentruntimecontrolprotocol/sdk";
 
 const [c, s] = pairMemoryTransports();
 await server.accept(s);
@@ -176,10 +176,10 @@ it exactly once even if `close()` is called on your side first.
 ## With OTel tracing
 
 Wrap any transport with `withTracing()` from
-[`@arcp/middleware-otel`](./packages/middleware-otel.md):
+[`@agentruntimecontrolprotocol/middleware-otel`](./packages/middleware-otel.md):
 
 ```ts
-import { withTracing } from "@arcp/middleware-otel";
+import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
 import { trace } from "@opentelemetry/api";
 
 const traced = withTracing(transport, {

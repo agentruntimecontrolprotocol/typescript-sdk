@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import * as bunMiddleware from "../src/index.js";
 
-describe("@arcp/bun", () => {
+describe("@agentruntimecontrolprotocol/bun", () => {
   it("exports the expected surface", () => {
     expect(typeof bunMiddleware.serveArcp).toBe("function");
     expect(typeof bunMiddleware.BunWebSocketTransport).toBe("function");

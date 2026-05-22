@@ -1,10 +1,10 @@
-import { InvalidRequestError } from "@arcp/core/errors";
+import { InvalidRequestError } from "@agentruntimecontrolprotocol/core/errors";
 import type {
   FrameHandler,
   SendableFrame,
   Transport,
   WireFrame,
-} from "@arcp/core/transport";
+} from "@agentruntimecontrolprotocol/core/transport";
 import type { ServerWebSocket } from "bun";
 
 /**
