@@ -361,6 +361,7 @@ export class ARCPClient {
       agent: undefined,
       leaseConstraints: undefined,
       budget: undefined,
+      credentials: undefined,
       traceId: opts.traceId,
       events: [],
       acceptance: new Deferred<JobAcceptedPayload>(),

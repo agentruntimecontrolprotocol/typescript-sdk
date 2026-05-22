@@ -348,6 +348,7 @@ function onJobAccepted(
   inv.agent = payload.agent;
   inv.leaseConstraints = payload.lease_constraints;
   inv.budget = payload.budget;
+  inv.credentials = payload.credentials;
   inv.traceId = payload.trace_id ?? inv.traceId;
   target.invocationsByJobId.set(payload.job_id, inv);
   inv.acceptance.resolve(payload);

@@ -59,7 +59,12 @@ export {
 export type {
   AgentHandler,
   ARCPServerOptions,
+  CredentialIssueContext,
+  CredentialProvisioner,
+  CredentialStore,
+  CredentialStoreEntry,
   Handler,
+  IssuedCredential,
   JobAuthorizationPolicy,
   JobContext,
   JobOptions,
@@ -68,3 +73,5 @@ export type {
   ResultStream,
   SessionCaps,
 } from "./types.js";
+export { InMemoryCredentialStore } from "./credential-store.js";
+export { toBudgetExhausted } from "./credential-provisioner.js";

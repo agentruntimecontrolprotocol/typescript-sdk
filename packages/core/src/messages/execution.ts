@@ -7,11 +7,18 @@ import {
   InvalidRequestError,
 } from "../errors.js";
 
+import { CredentialSchema } from "./credentials.js";
 import { JobEventPayloadSchema } from "./events.js";
 import { LeaseConstraintsSchema, LeaseSchema } from "./lease-schema.js";
 
 // ARCP v1.1 §7-§8 job-related envelopes.
 
+export {
+  type Credential,
+  CredentialConstraintsSchema,
+  type CredentialConstraints,
+  CredentialSchema,
+} from "./credentials.js";
 export {
   isReservedCapabilityName,
   isValidCapabilityName,
@@ -171,6 +178,17 @@ export const JobAcceptedPayloadSchema = Schema.Struct({
   lease_constraints: Schema.optional(LeaseConstraintsSchema),
   /** v1.1 §9.6 — initial budget counters, when `cost.budget` is in the lease. */
   budget: Schema.optional(JobBudgetSchema),
+  /**
+   * v1.1 §9.7–§9.8 — short-lived credentials minted by the runtime for the
+   * job. Only present when `provisioned_credentials` is in the negotiated
+   * feature set and the runtime has a `CredentialProvisioner` configured.
+   *
+   * SECURITY: `credential.value` is a secret. Subscribers that are not the
+   * job submitter MUST NOT receive this field.
+   */
+  credentials: Schema.optional(
+    Schema.mutable(Schema.Array(CredentialSchema)),
+  ),
   accepted_at: Schema.String.pipe(Schema.nonEmptyString()),
   parent_job_id: Schema.optional(Schema.String),
   delegate_id: Schema.optional(Schema.String),
@@ -314,6 +332,16 @@ export const JobSubscribedPayloadSchema = Schema.Struct({
   lease: LeaseSchema,
   lease_constraints: Schema.optional(LeaseConstraintsSchema),
   budget: Schema.optional(JobBudgetSchema),
+  /**
+   * v1.1 §9.7–§9.8 — provisioned credentials, present only when the
+   * subscriber IS the job's original submitter (same principal check).
+   * Redacted for all other subscribers per §14.
+   *
+   * SECURITY: `credential.value` is a secret. Never forward to non-submitters.
+   */
+  credentials: Schema.optional(
+    Schema.mutable(Schema.Array(CredentialSchema)),
+  ),
   parent_job_id: Schema.optional(Schema.NullOr(Schema.String)),
   trace_id: Schema.optional(Schema.String),
   subscribed_from: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import type { SessionId, TraceId } from "@arcp/core";
 import type { BaseEnvelope } from "@arcp/core/envelope";
+/* eslint-disable max-lines, max-depth */
 import {
   AgentNotAvailableError,
   ARCPError,
@@ -42,7 +43,7 @@ import {
 } from "./lease.js";
 import type { ARCPServer, SessionContext } from "./server.js";
 import { digest, type IdempotencyEntry } from "./stores.js";
-import type { AgentHandler, JobContext } from "./types.js";
+import type { AgentHandler, IssuedCredential, JobContext } from "./types.js";
 
 const DEFAULT_HEARTBEAT_SECONDS = 30;
 const DEFAULT_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -168,6 +169,7 @@ export class JobRunner {
       payload: env.payload,
       idempotencyHit: idempotency,
     });
+    if (!(await this.issueCredentials(ctx, job))) return;
     await job.emitAccepted();
     await job.emitRunning();
     void this.runHandler({
@@ -318,6 +320,115 @@ export class JobRunner {
     });
   }
 
+  /**
+   * §9.7 — mint credentials for a newly accepted job.
+   *
+   * Returns `true` if provisioning succeeded (or if no provisioner is
+   * configured). Returns `false` if provisioning or store-recording failed;
+   * the caller MUST treat `false` as "job already rejected" and return
+   * without further work.
+   *
+   * On failure this method:
+   *   1. Emits a `job.error` envelope with `INTERNAL_ERROR`.
+   *   2. Revokes any already-issued credentials (best-effort).
+   *   3. Retires the job from `ctx.jobs` and `globalJobs`.
+   */
+  // Credential provisioning has several cleanup paths; keep them co-located so
+  // issuance, store persistence, rejection, and best-effort revocation stay in
+  // the same transaction-shaped block.
+  // eslint-disable-next-line max-lines-per-function
+  private async issueCredentials(
+    ctx: SessionContext,
+    job: Job,
+  ): Promise<boolean> {
+    const provisioner = this.server.options.credentialProvisioner;
+    if (provisioner === undefined) return true;
+    // `credentialStore` is always present when `credentialProvisioner` is set
+    // (validated in ARCPServer constructor).
+    const store = this.server.options.credentialStore;
+    if (store === undefined) {
+      job.logger.error(
+        { jobId: job.jobId },
+        "credential store missing; rejecting job",
+      );
+      await job.emitErrorEnvelope({
+        final_status: "error",
+        code: "INTERNAL_ERROR",
+        message: "Credential store unavailable",
+        retryable: true,
+      });
+      ctx.jobs.retire(job.jobId);
+      this.server.globalJobs.delete(job.jobId);
+      return false;
+    }
+
+    let issued: IssuedCredential[];
+    try {
+      issued = await provisioner.issue({
+        jobId: job.jobId,
+        parentJobId: job.parentJobId,
+        lease: job.lease,
+        leaseConstraints: job.leaseConstraints,
+        initialBudget: job.initialBudget,
+        principal: job.submitterPrincipal,
+        traceId: job.traceId,
+      });
+    } catch (error) {
+      job.logger.error(
+        { err: error, jobId: job.jobId },
+        "credential provisioner threw; rejecting job",
+      );
+      await job.emitErrorEnvelope({
+        final_status: "error",
+        code: "INTERNAL_ERROR",
+        message: "Credential provisioning failed",
+        retryable: true,
+      });
+      ctx.jobs.retire(job.jobId);
+      this.server.globalJobs.delete(job.jobId);
+      return false;
+    }
+
+    if (issued.length === 0) return true;
+
+    const issuedAt = new Date().toISOString();
+    for (const cred of issued) {
+      try {
+        await store.add({
+          jobId: job.jobId,
+          credentialId: cred.wire.id,
+          provisionerId: cred.provisionerId,
+          issuedAt,
+        });
+      } catch (error) {
+        job.logger.error(
+          { err: error, jobId: job.jobId, credentialId: cred.wire.id },
+          "credential store add failed; rejecting job",
+        );
+        // Revoke all already-issued credentials (best-effort).
+        for (const c of issued) {
+          try {
+            await provisioner.revoke(c.provisionerId);
+          } catch {
+            /* swallow — revocation is best-effort */
+          }
+        }
+        await job.emitErrorEnvelope({
+          final_status: "error",
+          code: "INTERNAL_ERROR",
+          message: "Credential store unavailable",
+          retryable: true,
+        });
+        ctx.jobs.retire(job.jobId);
+        this.server.globalJobs.delete(job.jobId);
+        return false;
+      }
+    }
+
+    job.credentials = issued;
+    return true;
+  }
+
   public async runHandler(args: RunHandlerArgs): Promise<void> {
     const { ctx, job, handler, input, jobCtx, maxRuntimeSec } = args;
     const timeoutTimer = scheduleRuntimeTimeout(job, maxRuntimeSec);
@@ -341,6 +452,11 @@ export class JobRunner {
       ctx.jobs.retire(job.jobId);
       this.server.globalJobs.delete(job.jobId);
       this.server.subscribers.delete(job.jobId);
+      const provisioner = this.server.options.credentialProvisioner;
+      const store = this.server.options.credentialStore;
+      if (provisioner !== undefined && store !== undefined) {
+        await job.revokeAll(provisioner, store);
+      }
     }
   }
 
@@ -408,6 +524,9 @@ export class JobRunner {
       parsedAgentName: agent.parsedAgent.name,
       resolvedVersion: agent.resolvedVersion,
     });
+    if (!(await this.issueCredentials(ctx, child))) {
+      return { ok: false, error: new InternalError("Credential provisioning failed") };
+    }
     await child.emitAccepted();
     await child.emitRunning();
     void this.runHandler({

@@ -76,6 +76,24 @@ describe("validateLeaseOp", () => {
       });
     }).toThrow();
   });
+  it("permits model.use with model glob patterns", () => {
+    expect(() => {
+      validateLeaseOp({
+        lease: { "model.use": ["gpt-4*"] },
+        capability: "model.use",
+        target: "gpt-4o-mini",
+      });
+    }).not.toThrow();
+  });
+  it("rejects model.use misses with PERMISSION_DENIED", () => {
+    expect(() => {
+      validateLeaseOp({
+        lease: { "model.use": ["gpt-3.*"] },
+        capability: "model.use",
+        target: "claude-3-haiku",
+      });
+    }).toThrow(/PERMISSION_DENIED|denies/);
+  });
 });
 
 describe("isLeaseSubset (§9.4)", () => {
@@ -106,12 +124,27 @@ describe("isLeaseSubset (§9.4)", () => {
       );
     }).toThrow(/LEASE_SUBSET_VIOLATION|subset/);
   });
+  it("treats narrower model.use globs as a subset", () => {
+    expect(
+      isLeaseSubset({ "model.use": ["gpt-4*"] }, { "model.use": ["**"] }),
+    ).toBe(true);
+  });
+  it("rejects broader model.use globs than the parent", () => {
+    expect(
+      isLeaseSubset({ "model.use": ["**"] }, { "model.use": ["gpt-4*"] }),
+    ).toBe(false);
+  });
 });
 
 describe("validateLeaseShape", () => {
   it("permits reserved namespaces", () => {
     expect(() => {
       validateLeaseShape({ "fs.read": ["/x"] });
+    }).not.toThrow();
+  });
+  it("permits model.use as a reserved namespace", () => {
+    expect(() => {
+      validateLeaseShape({ "model.use": ["gpt-4*"] });
     }).not.toThrow();
   });
   it("permits x-vendor.<vendor>.<name>", () => {

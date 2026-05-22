@@ -7,6 +7,7 @@ import type {
   Lease,
   LeaseConstraints,
   ResultChunkBody,
+  Credential,
 } from "@arcp/core/messages";
 import type { Deferred } from "@arcp/core/util";
 
@@ -18,6 +19,7 @@ export interface InvocationState {
   agent: string | undefined;
   leaseConstraints: LeaseConstraints | undefined;
   budget: Record<string, number> | undefined;
+  credentials: Credential[] | undefined;
   traceId: TraceId | undefined;
   events: JobEventPayload[];
   acceptance: Deferred<JobAcceptedPayload>;
@@ -42,6 +44,9 @@ export function makeHandleFromInvocation(inv: InvocationState): JobHandle {
     },
     get budget(): Record<string, number> | undefined {
       return inv.budget;
+    },
+    get credentials(): readonly Credential[] | undefined {
+      return inv.credentials;
     },
     get traceId(): TraceId | undefined {
       return inv.traceId;

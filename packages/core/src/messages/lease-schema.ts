@@ -14,6 +14,8 @@ export const RESERVED_CAPABILITY_NAMES = [
   "tool.call",
   "agent.delegate",
   "cost.budget",
+  /** v1.1 §9.7 — controls which LLM models a job may invoke. */
+  "model.use",
 ] as const;
 export type ReservedCapabilityName = (typeof RESERVED_CAPABILITY_NAMES)[number];
 

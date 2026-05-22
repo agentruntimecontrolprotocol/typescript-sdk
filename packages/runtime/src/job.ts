@@ -16,6 +16,8 @@ import type {
 } from "@arcp/core/messages";
 import { newJobId, newMessageId, nowTimestamp } from "@arcp/core/util";
 
+import type { CredentialProvisioner, IssuedCredential } from "./credential-provisioner.js";
+import type { CredentialStore, CredentialStoreEntry } from "./credential-store.js";
 import type { EventSeqSource, JobOptions, JobSend } from "./types.js";
 
 /** Constructor dependency bag for {@link Job}. */
@@ -101,6 +103,12 @@ export class Job {
   public readonly abortController = new AbortController();
   /** v1.1 §8.4 — set true after the first `result_chunk` event is emitted. */
   public chunkedResultStarted = false;
+  /**
+   * v1.1 §9.7–§9.8 — short-lived credentials issued by the provisioner at
+   * job acceptance. Wire shapes are included in `job.accepted`; provisioner
+   * ids are used for revocation. `wire.value` MUST NOT appear in logs.
+   */
+  public credentials: readonly IssuedCredential[] = [];
   /** Track last-emitted remaining per currency for chatty-emit debounce. */
   private readonly lastEmittedRemaining = new Map<string, number>();
 
@@ -131,6 +139,7 @@ export class Job {
     this.traceId = options.traceId;
     this.heartbeatIntervalMs = options.heartbeatIntervalSeconds * 1000;
     this.missesAllowed = options.missedHeartbeatsAllowed ?? 2;
+    this.credentials = options.credentials ?? [];
   }
 
   /** Wire-form `agent` string: `name@version` if a version is set, else bare name. */
@@ -257,6 +266,9 @@ export class Job {
           ? {}
           : { lease_constraints: this.leaseConstraints }),
         ...(hasBudget ? { budget: budgetObj } : {}),
+        ...(this.credentials.length > 0
+          ? { credentials: this.credentials.map((c) => c.wire) }
+          : {}),
         accepted_at: this.createdAt,
         ...(this.parentJobId === undefined
           ? {}
@@ -368,6 +380,47 @@ export class Job {
         { err: error, jobId: this.jobId },
         "failed to emit job.error envelope",
       );
+    }
+  }
+
+  // -------- Credential revocation (§9.7–§9.8) -------------------
+
+  /**
+   * Revoke all credentials issued for this job.
+   *
+   * Calls `store.removeByJob()` to atomically dequeue all outstanding
+   * entries, then calls `provisioner.revoke()` for each. Per §9.7,
+   * revocation failures MUST NOT propagate — each call is wrapped in a
+   * try/catch that logs a warning and continues. `wire.value` is NEVER
+   * referenced here.
+   */
+  public async revokeAll(
+    provisioner: CredentialProvisioner,
+    store: CredentialStore,
+  ): Promise<void> {
+    let entries: readonly CredentialStoreEntry[];
+    try {
+      entries = await store.removeByJob(this.jobId);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, jobId: this.jobId },
+        "credential store removeByJob failed; credentials may not be revoked",
+      );
+      return;
+    }
+    for (const entry of entries) {
+      try {
+        await provisioner.revoke(entry.provisionerId);
+        this.logger.debug(
+          { jobId: this.jobId, credentialId: entry.credentialId },
+          "revoked provisioned credential",
+        );
+      } catch (error) {
+        this.logger.warn(
+          { err: error, jobId: this.jobId, credentialId: entry.credentialId },
+          "credential revocation failed (non-fatal)",
+        );
+      }
     }
   }
 

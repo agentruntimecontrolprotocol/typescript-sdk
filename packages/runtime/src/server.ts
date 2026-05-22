@@ -93,6 +93,19 @@ export class ARCPServer {
   private resumeSweep: ReturnType<typeof setInterval> | null = null;
 
   public constructor(public readonly options: ARCPServerOptions) {
+    // §14 — credential revocation reliability: a provisioner without a store
+    // means credentials issued to crash-recovered jobs cannot be revoked.
+    // Fail fast at startup rather than silently losing revocation records.
+    if (
+      options.credentialProvisioner !== undefined &&
+      options.credentialStore === undefined
+    ) {
+      throw new TypeError(
+        "ARCPServer: credentialStore is required when credentialProvisioner is set " +
+          "(§14 — Credential revocation reliability). " +
+          "Pass an InMemoryCredentialStore for tests, or a durable implementation for production.",
+      );
+    }
     this.eventLog = options.eventLog ?? new EventLog();
     this.logger = options.logger ?? rootLogger;
     this.resumeSweep = setInterval(() => {
@@ -101,9 +114,19 @@ export class ARCPServer {
     this.resumeSweep.unref();
   }
 
-  /** v1.1 feature flags this runtime advertises. Defaults to every v1.1 feature. */
+  /**
+   * v1.1 feature flags this runtime advertises. Defaults to every v1.1
+   * feature, but filters out `provisioned_credentials` and `model.use` when
+   * no `credentialProvisioner` is configured (§9.7 — feature flag gating).
+   */
   public get advertisedFeatures(): readonly string[] {
-    return this.options.features ?? V1_1_FEATURES;
+    const base = this.options.features ?? V1_1_FEATURES;
+    if (this.options.credentialProvisioner !== undefined) return base;
+    // Strip credential-related feature flags — they MUST NOT be advertised
+    // when no provisioner is configured.
+    return base.filter(
+      (f) => f !== "provisioned_credentials" && f !== "model.use",
+    );
   }
 
   /**

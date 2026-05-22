@@ -31,6 +31,7 @@ real `Transport`. No mocks. No in-memory shortcuts. Each example exits
 | [`agent-versions/`](./agent-versions/)     | `name@version` grammar; default-version resolution for bare names; `AGENT_VERSION_NOT_AVAILABLE` on unregistered version.                                                                            | §7.5, §12  |
 | [`lease-expires-at/`](./lease-expires-at/) | `lease_constraints.expires_at` deadline; agent's `validateLeaseOp` and runtime watchdog both trip `LEASE_EXPIRED`.                                                                                   | §9.5, §12  |
 | [`cost-budget/`](./cost-budget/)           | `cost.budget` lease capability; `cost.*` metrics auto-decrement the counter; runtime emits debounced `cost.budget.remaining`; final call hits `BUDGET_EXHAUSTED`.                                    | §9.6, §12  |
+| [`provisioned-credentials/`](./provisioned-credentials/) | Runtime mints a model-bound bearer credential from `model.use` and revokes it when the job completes. | §9.7, §9.8 |
 | [`progress/`](./progress/)                 | `progress` event kind; client renders a text progress bar.                                                                                                                                           | §8.2.1     |
 | [`result-chunk/`](./result-chunk/)         | `ctx.streamResult()` writes ~30 chunks; terminal `job.result` carries `result_id` + `result_size`; client `handle.collectChunks()` reassembles.                                                      | §8.4       |
 

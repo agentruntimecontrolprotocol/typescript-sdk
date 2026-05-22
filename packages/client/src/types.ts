@@ -8,6 +8,7 @@ import type {
   JobResultPayload,
   Lease,
   LeaseConstraints,
+  Credential,
 } from "@arcp/core/messages";
 
 /**
@@ -78,6 +79,8 @@ export interface JobHandle {
   readonly leaseConstraints: LeaseConstraints | undefined;
   /** v1.1 — initial budget echoed by the runtime. */
   readonly budget: Readonly<Record<string, number>> | undefined;
+  /** v1.1 §9.8 — provisioned credentials minted for this job, if any. */
+  readonly credentials: readonly Credential[] | undefined;
   /** Promise that resolves to the final `job.result` payload. */
   readonly done: Promise<JobResultPayload>;
   /**

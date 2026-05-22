@@ -15,6 +15,7 @@ import { TELEMETRY_ENVELOPES } from "./telemetry.js";
 
 export * from "./artifacts.js";
 export * from "./control.js";
+export * from "./credentials.js";
 export * from "./execution.js";
 export * from "./session.js";
 export * from "./telemetry.js";

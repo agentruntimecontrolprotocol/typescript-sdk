@@ -1,0 +1,39 @@
+import { ARCPClient, WebSocketTransport } from "@arcp/sdk";
+
+const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7892";
+const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+
+async function main(): Promise<void> {
+  const client = new ARCPClient({
+    client: { name: "provisioned-credentials-demo-client", version: "1.0.0" },
+    capabilities: { encodings: ["json"] },
+    authScheme: "bearer",
+    token: TOKEN,
+  });
+
+  const transport = await WebSocketTransport.connect(URL);
+  await client.connect(transport);
+
+  const handle = await client.submit({
+    agent: "ask-model",
+    input: { prompt: "hello" },
+    lease: {
+      "model.use": ["gpt-4o-mini"],
+      "cost.budget": ["USD:0.10"],
+    },
+  });
+
+  const credential = handle.credentials?.[0];
+  process.stdout.write(
+    `accepted job_id=${handle.jobId} credential=${credential?.id ?? "none"} endpoint=${credential?.endpoint ?? "none"}\n`,
+  );
+
+  const result = await handle.done;
+  process.stdout.write(`${JSON.stringify(result.result)}\n`);
+  await client.close();
+}
+
+void main().catch((err) => {
+  process.stderr.write(`${err instanceof Error ? err.stack : String(err)}\n`);
+  process.exit(1);
+});

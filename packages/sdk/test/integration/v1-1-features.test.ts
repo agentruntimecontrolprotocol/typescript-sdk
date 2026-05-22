@@ -6,6 +6,7 @@ import {
   BudgetExhaustedError,
   type Envelope,
   formatAgentRef,
+  InMemoryCredentialStore,
   initialBudgetFromLease,
   intersectFeatures,
   isLeaseSubset,
@@ -13,6 +14,7 @@ import {
   LeaseExpiredError,
   parseAgentRef,
   parseBudgetAmount,
+  type CredentialProvisioner,
   V1_1_FEATURES,
   validateLeaseConstraints,
   validateLeaseOp,
@@ -33,15 +35,38 @@ describe("v1.1 §6.2 feature negotiation", () => {
     expect(intersectFeatures(["a"], undefined)).toEqual([]);
   });
 
-  it("negotiates V1_1_FEATURES between server and client by default", async () => {
+  it("negotiates default features, excluding provisioner-gated credentials", async () => {
     const h = makePairedHarness();
     h.server.registerAgent("echo", async (input) => input);
     await h.connect();
-    // Both peers advertise all v1.1 features → intersection equals the full set.
+    const expected = V1_1_FEATURES.filter(
+      (f) => f !== "model.use" && f !== "provisioned_credentials",
+    );
+    expect([...h.client.negotiatedFeatures].sort()).toEqual(
+      [...expected].sort(),
+    );
+    expect(h.client.hasFeature("ack")).toBe(true);
+    expect(h.client.hasFeature("model.use")).toBe(false);
+    expect(h.client.hasFeature("provisioned_credentials")).toBe(false);
+    await h.close();
+  });
+
+  it("negotiates credential features when the runtime has a provisioner", async () => {
+    const provisioner: CredentialProvisioner = {
+      issue: async () => [],
+      revoke: async () => undefined,
+    };
+    const h = makePairedHarness({
+      credentialProvisioner: provisioner,
+      credentialStore: new InMemoryCredentialStore(),
+    });
+    h.server.registerAgent("echo", async (input) => input);
+    await h.connect();
     expect([...h.client.negotiatedFeatures].sort()).toEqual(
       [...V1_1_FEATURES].sort(),
     );
-    expect(h.client.hasFeature("ack")).toBe(true);
+    expect(h.client.hasFeature("model.use")).toBe(true);
+    expect(h.client.hasFeature("provisioned_credentials")).toBe(true);
     await h.close();
   });
 

@@ -80,6 +80,9 @@ function buildListJobsCandidates(
   return out;
 }
 
+// Credential redaction adds a few lines to the subscription handshake; keep the
+// flow linear because every early return maps directly to a protocol response.
+// eslint-disable-next-line max-lines-per-function
 export async function handleJobSubscribe(
   server: ARCPServer,
   ctx: SessionContext,
@@ -113,7 +116,12 @@ export async function handleJobSubscribe(
     buildEnvelope({
       id: newMessageId(),
       type: "job.subscribed" as const,
-      payload: buildSubscribedPayload(job, ctx.latestEventSeq, replayed),
+      payload: buildSubscribedPayload({
+        job,
+        subscriberPrincipal: ctx.state.identity?.principal,
+        subscribedFrom: ctx.latestEventSeq,
+        replayed,
+      }),
       optional: { session_id: sessionId, job_id: jobId },
     }),
   );
@@ -220,11 +228,29 @@ function isReplayableForJob(env: BaseEnvelope, jobId: JobId): boolean {
   );
 }
 
-function buildSubscribedPayload(
-  job: Job,
-  subscribedFrom: number,
-  replayed: boolean,
-): Record<string, unknown> {
+/**
+ * Build the `job.subscribed` payload.
+ *
+ * §14 (Credential confidentiality): the `credentials` field MUST be included
+ * only when the subscribing principal is the job's original submitter. Any
+ * other principal — including observers authorized by a custom
+ * `jobAuthorizationPolicy` — receives the payload without credentials so that
+ * secret values are never broadcast to cross-session observers.
+ */
+function buildSubscribedPayload(args: {
+  job: Job;
+  subscriberPrincipal: string | undefined;
+  subscribedFrom: number;
+  replayed: boolean;
+}): Record<string, unknown> {
+  const { job, subscriberPrincipal, subscribedFrom, replayed } = args;
+  // §14 — Credential confidentiality: include credentials only for the
+  // original submitter. Compare by principal identity string; both being
+  // undefined (unauthenticated) does NOT qualify as "same principal".
+  const isSubmitter =
+    subscriberPrincipal !== undefined &&
+    job.submitterPrincipal === subscriberPrincipal;
+
   return {
     job_id: job.jobId,
     current_status: job.state,
@@ -237,5 +263,11 @@ function buildSubscribedPayload(
     ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
     subscribed_from: subscribedFrom,
     replayed,
+    // Credentials are present only when the runtime has a provisioner AND this
+    // subscriber is the original submitter. The empty-array guard avoids
+    // emitting an empty `credentials: []` field over the wire.
+    ...(isSubmitter && job.credentials.length > 0
+      ? { credentials: job.credentials.map((c) => c.wire) }
+      : {}),
   };
 }

@@ -29,6 +29,10 @@ export const V1_1_FEATURES = [
   "progress",
   "result_chunk",
   "agent_versions",
+  /** v1.1 §9.7 — runtime-enforced model capability gating. */
+  "model.use",
+  /** v1.1 §9.7–§9.8 — runtime mints + revokes short-lived credentials. */
+  "provisioned_credentials",
 ] as const satisfies readonly string[];
 
 /** Union of canonical v1.1 feature flag names. */

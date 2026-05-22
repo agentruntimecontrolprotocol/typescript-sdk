@@ -34,6 +34,13 @@ a drafted-but-unsent reply. Each `inbox_read` also emits an
 `x-vendor.acme.email.parsed` event so dashboards recognising the
 namespace can render parsed metadata specially.
 
+## [litellm-credentials/](litellm-credentials/) — Provisioned Credentials
+
+Maps ARCP `model.use`, `cost.budget`, and `lease_constraints.expires_at`
+onto LiteLLM virtual key generation and revocation. This stays in
+`recipes/` so provider-specific HTTP calls do not become core runtime
+coupling.
+
 ## [stream-resume/](stream-resume/) — GLM-5
 
 <picture>

@@ -18,6 +18,11 @@ import type {
 } from "@arcp/core/messages";
 import type { EventLog } from "@arcp/core/store";
 
+import type {
+  CredentialProvisioner,
+  IssuedCredential,
+} from "./credential-provisioner.js";
+import type { CredentialStore } from "./credential-store.js";
 import type { Job } from "./job.js";
 import type { SessionContext } from "./server.js";
 
@@ -52,6 +57,12 @@ export interface JobOptions {
   leaseConstraints?: LeaseConstraints | undefined;
   /** v1.1 §9.6 — initial per-currency budget counters. */
   initialBudget?: ReadonlyMap<string, number> | undefined;
+  /**
+   * v1.1 §9.7–§9.8 — short-lived credentials issued by the provisioner at
+   * job acceptance. Stored on the `Job` for inclusion in `job.accepted` and
+   * for revocation on termination. `wire.value` MUST NOT appear in logs.
+   */
+  credentials?: readonly IssuedCredential[];
   /** Parent job id when this is a delegated child (§10). */
   parentJobId?: JobId;
   /** Delegate id assigned by the parent in its `delegate` event (§10). */
@@ -244,4 +255,35 @@ export interface ARCPServerOptions {
    * `back_pressure` status event. Default 1000.
    */
   backPressureThreshold?: number;
+  /**
+   * v1.1 §9.7 — credential provisioner. When set, the runtime mints
+   * short-lived, scope-restricted credentials at job acceptance time and
+   * includes them in `job.accepted.payload.credentials`. Credentials are
+   * revoked when the job reaches any terminal state.
+   *
+   * When configured, `credentialStore` MUST also be provided (§14 —
+   * Credential revocation reliability).
+   *
+   * The `provisioned_credentials` and `model.use` feature flags are only
+   * advertised when this field is set.
+   */
+  credentialProvisioner?: CredentialProvisioner;
+  /**
+   * v1.1 §9.7 — durable revocation tracking for provisioned credentials.
+   * Required when `credentialProvisioner` is set. Use
+   * `InMemoryCredentialStore` for tests, but prefer a durable implementation
+   * for production (§14).
+   *
+   * The store records provisioner-side identifiers only — credential values
+   * (`wire.value`) are never persisted here.
+   */
+  credentialStore?: CredentialStore;
 }
+
+// Re-export for callers that don't import directly from the sub-module.
+export type {
+  CredentialProvisioner,
+  CredentialIssueContext,
+  IssuedCredential,
+} from "./credential-provisioner.js";
+export type { CredentialStore, CredentialStoreEntry } from "./credential-store.js";

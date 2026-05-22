@@ -81,7 +81,7 @@ new v1.1 subsections appear after them.
 | Requirement                                                                                               | Status      | Location                                                                                                  |
 | --------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
 | §9.1 Lease is IMMUTABLE, granted at submit; capability → glob pattern[]                                   | Implemented | `packages/core/src/messages/execution.ts:LeaseSchema`; `packages/runtime/src/lease.ts:validateLeaseShape` |
-| §9.2 Reserved namespaces `fs.read`, `fs.write`, `net.fetch`, `tool.call`, `agent.delegate`, `cost.budget` | Implemented | `packages/core/src/messages/execution.ts:RESERVED_CAPABILITY_NAMES`                                       |
+| §9.2 Reserved namespaces `fs.read`, `fs.write`, `net.fetch`, `tool.call`, `agent.delegate`, `cost.budget`, `model.use` | Implemented | `packages/core/src/messages/lease-schema.ts:RESERVED_CAPABILITY_NAMES`                                    |
 | §9.2 Glob `*` (single segment) / `**` (zero+ segments); anchored                                          | Implemented | `packages/runtime/src/lease.ts:compileGlob`/`matchGlob`                                                   |
 | §9.3 Runtime MUST validate every operation against the lease; `PERMISSION_DENIED` on fail                 | Implemented | `packages/runtime/src/lease.ts:validateLeaseOp`                                                           |
 | §9.4 Lease subsetting for delegation                                                                      | Implemented | `packages/runtime/src/lease.ts:isLeaseSubset`/`assertLeaseSubset`                                         |
@@ -201,6 +201,8 @@ capability list in `session.hello`/`session.welcome`.
 | `subscribe`        | §7.6     | Implemented | `packages/runtime/src/server.ts:handleJobSubscribe`; `ARCPClient.subscribe`                                                                              |
 | `lease_expires_at` | §9.5     | Implemented | `packages/runtime/src/lease.ts:validateLeaseConstraints`; expiry watchdog in `server.ts:runHandler`                                                      |
 | `cost.budget`      | §9.6     | Implemented | `packages/runtime/src/lease.ts:initialBudgetFromLease`; `Job.applyCostMetric`; `validateLeaseOp` budget check                                            |
+| `model.use`        | §9.7     | Implemented | `packages/core/src/messages/lease-schema.ts:RESERVED_CAPABILITY_NAMES`; `packages/runtime/src/lease.ts:validateLeaseOp`                                  |
+| `provisioned_credentials` | §9.8 | Implemented | `packages/runtime/src/credential-provisioner.ts`; `packages/runtime/src/job-runner.ts:issueCredentials`                                                   |
 | `progress`         | §8.2     | Implemented | `packages/core/src/messages/execution.ts:ProgressBodySchema`; `JobContext.progress`                                                                      |
 | `result_chunk`     | §8.4     | Implemented | `packages/core/src/messages/execution.ts:ResultChunkBodySchema`; `JobContext.streamResult` + `JobHandle.collectChunks`                                   |
 | `agent_versions`   | §7.5     | Implemented | `packages/core/src/messages/execution.ts:parseAgentRef`; `ARCPServer.registerAgentVersion`/`setDefaultAgentVersion`/`resolveAgent`                       |
@@ -344,6 +346,22 @@ Helpers:
 | Operations fail with `BUDGET_EXHAUSTED` when a counter ≤ 0                                                          | Implemented | `packages/runtime/src/lease.ts:validateLeaseOp`                                                                        |
 | Runtime MAY emit `cost.budget.remaining` metric events with debounce                                                | Implemented | `packages/runtime/src/server.ts:metricInterceptor` + `Job.shouldEmitBudgetRemaining` (5 % threshold)                   |
 | `JobContext.budget` read-only snapshot of remaining counters                                                        | Implemented | `packages/runtime/src/job.ts:makeJobContext`                                                                           |
+
+## §9.7 / §9.8 Model Use and Provisioned Credentials
+
+| Requirement                                                                    | Status      | Location                                                                                                        |
+| ------------------------------------------------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| Feature flags `model.use` and `provisioned_credentials`                        | Implemented | `packages/core/src/version.ts:V1_1_FEATURES`                                                                    |
+| `model.use` in `RESERVED_CAPABILITY_NAMES`                                      | Implemented | `packages/core/src/messages/lease-schema.ts:RESERVED_CAPABILITY_NAMES`                                          |
+| `model.use` glob matching and lease subsetting                                  | Implemented | `packages/runtime/src/lease.ts:validateLeaseOp`; `packages/runtime/src/lease.ts:isLeaseSubset`                  |
+| Credential wire shape `{ id, scheme, value, endpoint, profile?, constraints? }` | Implemented | `packages/core/src/messages/credentials.ts`; `packages/core/src/messages/execution.ts:JobAcceptedPayloadSchema` |
+| Runtime issues credentials before `job.accepted` when a provisioner is set      | Implemented | `packages/runtime/src/job-runner.ts:issueCredentials`                                                           |
+| Runtime revokes stored credential ids on terminal cleanup                       | Implemented | `packages/runtime/src/job.ts:revokeAll`; `packages/runtime/src/credential-store.ts`                             |
+| Runtime only advertises credential features when a provisioner is configured    | Implemented | `packages/runtime/src/server.ts:advertisedFeatures`                                                             |
+| `credentialProvisioner` requires `credentialStore`                              | Implemented | `packages/runtime/src/server.ts:ARCPServer` constructor                                                         |
+| `job.subscribed` redacts credentials for non-submitters                         | Implemented | `packages/runtime/src/server-subscribe.ts:buildSubscribedPayload`                                               |
+| Client surfaces accepted credentials on `JobHandle.credentials`                 | Implemented | `packages/client/src/client-handle.ts`; `packages/client/src/client-dispatch.ts`                                |
+| Upstream spend-cap failures can be translated to `BUDGET_EXHAUSTED`             | Implemented | `packages/runtime/src/credential-provisioner.ts:toBudgetExhausted`                                              |
 
 ## §11 Trace attributes (v1.1 additions)
 

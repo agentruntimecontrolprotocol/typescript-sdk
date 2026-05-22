@@ -22,6 +22,8 @@ A capability name is `<namespace>:<resource>`. Reserved namespaces:
 | `net.fetch`      | Outbound HTTP/S3/etc. Pattern is a URL glob.           |
 | `tool.call`      | Tool invocation. Pattern matches against `tool` name.  |
 | `agent.delegate` | Spawning child jobs. Pattern matches child agent name. |
+| `model.use`      | LLM model invocation. Pattern matches model id/name.   |
+| `cost.budget`    | Spend cap, encoded as `CURRENCY:amount` patterns.      |
 
 Custom namespaces MUST use `x-vendor.<vendor>.<cap>`:
 
@@ -181,6 +183,31 @@ budget currency, the runtime decrements. Exhaustion throws
 The runtime also emits a `metric` event with name `budget_remaining`
 when consumption crosses 5% deltas (debounced).
 
+## Model Use (v1.1, §9.7)
+
+`model.use` narrows which upstream model ids the job may invoke:
+
+```ts
+const handle = await client.submit({
+  agent: "research",
+  input: {},
+  lease: {
+    "model.use": ["gpt-4*", "claude-3-5-*"],
+    "cost.budget": ["USD:2.00"],
+  },
+});
+```
+
+The runtime treats model ids like other lease targets: `*` and `**`
+are glob wildcards, matching is anchored, and delegation may only
+narrow the model set. For example, a child with `model.use:
+["gpt-4o-mini"]` is a subset of a parent with `["gpt-4*"]`; a child
+with `["**"]` is not.
+
+When a credential provisioner is configured, `model.use` is also the
+source for credential constraints. Provisioners should map these
+patterns to the upstream provider's allowed-model list.
+
 ## Hand-written validation
 
 `validateLeaseShape(lease)` checks structural well-formedness;
@@ -204,4 +231,5 @@ for (const cap of Object.keys(incoming)) {
 - [`examples/lease-violation/`](../../examples/lease-violation/) — denied access surfaces as `tool_result.error`.
 - [`examples/lease-expires-at/`](../../examples/lease-expires-at/) — v1.1 expiration.
 - [`examples/cost-budget/`](../../examples/cost-budget/) — v1.1 budgets.
+- [`examples/provisioned-credentials/`](../../examples/provisioned-credentials/) — v1.1 model-bound credentials.
 - [`examples/delegate/`](../../examples/delegate/) — subset validation on child spawn.
