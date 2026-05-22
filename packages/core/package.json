@@ -104,7 +104,7 @@
     "jose": "^5.9.6",
     "pino": "^9.5.0",
     "ulid": "^2.3.0",
-    "ws": "^8.18.0"
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
