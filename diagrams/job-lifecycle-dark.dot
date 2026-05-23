@@ -86,6 +86,6 @@ digraph ARCPJobLifecycle {
   Running -> Submit [
     style=dashed, color="#F472B6", penwidth=1.1,
     constraint=false,
-    label=<<FONT COLOR="#F472B6">job.event[…]</FONT>>, fontsize=9
+    label=<<FONT COLOR="#F472B6">job.event[...]</FONT>>, fontsize=9
   ];
 }

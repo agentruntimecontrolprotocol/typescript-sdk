@@ -144,7 +144,7 @@
 <g id="node11" class="node">
 <title>AgentB</title>
 <path fill="#334155" stroke="#475569" d="M492.97,-63.27C492.97,-63.27 447.03,-63.27 447.03,-63.27 441.03,-63.27 435.03,-57.27 435.03,-51.27 435.03,-51.27 435.03,-39.27 435.03,-39.27 435.03,-33.27 441.03,-27.27 447.03,-27.27 447.03,-27.27 492.97,-27.27 492.97,-27.27 498.97,-27.27 504.97,-33.27 504.97,-39.27 504.97,-39.27 504.97,-51.27 504.97,-51.27 504.97,-57.27 498.97,-63.27 492.97,-63.27"/>
-<text xml:space="preserve" text-anchor="middle" x="470" y="-41.94" font-family="TT Commons Pro Trial" font-size="11.00" fill="#f1f5f9">agent: …</text>
+<text xml:space="preserve" text-anchor="middle" x="470" y="-41.94" font-family="TT Commons Pro Trial" font-size="11.00" fill="#f1f5f9">agent: ...</text>
 </g>
 <!-- AgentA&#45;&gt;AgentB -->
 </g>

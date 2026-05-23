@@ -90,7 +90,7 @@ describe("ArtifactRefSchema (Effect Schema)", () => {
   describe("encode — round-trip", () => {
     it("preserves the input shape through decode → encode", async () => {
       const input = {
-        uri: "ipfs://Qm…",
+        uri: "ipfs://Qm...",
         content_type: "image/png",
         byte_size: 42,
         sha256: "abc",

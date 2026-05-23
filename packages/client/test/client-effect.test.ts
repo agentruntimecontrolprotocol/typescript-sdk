@@ -105,7 +105,7 @@ function startFakeRuntime(server: Transport): {
       });
       return;
     }
-    // Other inbound types (session.bye, session.ack, …) are ignored by the
+    // Other inbound types (session.bye, session.ack, ...) are ignored by the
     // fake runtime.
   });
   return {

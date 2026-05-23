@@ -55,7 +55,7 @@
 <title>Running&#45;&gt;Submit</title>
 <path fill="none" stroke="#f472b6" stroke-width="1.1" stroke-dasharray="5,2" d="M310.82,-109.61C292.55,-101.13 269.58,-92.02 247.86,-87.75 211.26,-80.55 200.75,-81.74 163.93,-87.75 140.56,-91.56 115.59,-99.29 94.52,-106.97"/>
 <polygon fill="#f472b6" stroke="#f472b6" stroke-width="1.1" points="87.6,-109.54 93.45,-103.76 89.84,-108.66 94.61,-106.88 94.63,-106.93 94.64,-106.97 89.87,-108.75 95.8,-110.09 87.6,-109.54"/>
-<text xml:space="preserve" text-anchor="start" x="189.27" y="-90" font-family="TT Commons Pro Trial" font-size="9.00" fill="#db2777">job.event[…]</text>
+<text xml:space="preserve" text-anchor="start" x="189.27" y="-90" font-family="TT Commons Pro Trial" font-size="9.00" fill="#db2777">job.event[...]</text>
 </g>
 <!-- Success -->
 <g id="node4" class="node">

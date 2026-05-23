@@ -315,7 +315,7 @@ export function ARCPRuntimeLayer(
  * const runtime = makeARCPServerRuntime({...})
  * const [clientSide, serverSide] = pairMemoryTransportsEffect()
  * await runtime.runPromise(acceptSessionEffect(serverSide))
- * // …drive the client side from clientSide.send / clientSide.incoming…
+ * // ...drive the client side from clientSide.send / clientSide.incoming...
  * ```
  */
 export function acceptSessionEffect(
@@ -504,7 +504,7 @@ export function resumeSweepDaemon(
  * )
  * const [client, server] = pairMemoryTransportsEffect()
  * await runtime.runPromise(acceptSessionEffect(server))
- * // …drive the client side…
+ * // ...drive the client side...
  * await runtime.dispose()
  * ```
  */

@@ -14,7 +14,7 @@ tree.
 ## When to use
 
 - The user asks an open-ended research question ("What are the major
-  causes of X?", "How does Y compare to Z?", "Survey the landscape of …").
+  causes of X?", "How does Y compare to Z?", "Survey the landscape of ...").
 - The user explicitly wants structured / decomposed analysis with
   per-sub-question findings rather than one paragraph.
 - The user mentions a budget or wants to constrain cost.

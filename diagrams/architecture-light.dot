@@ -99,7 +99,7 @@ digraph ARCPTypescriptSDK {
     penwidth=1.0;
 
     AgentA [label="agent: echo"];
-    AgentB [label="agent: …"];
+    AgentB [label="agent: ..."];
 
     AgentA -> AgentB [style=invis];
     { rank=same; AgentA; AgentB; }

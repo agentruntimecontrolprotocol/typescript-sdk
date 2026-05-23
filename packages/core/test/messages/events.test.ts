@@ -102,8 +102,8 @@ describe("ResultChunkBodySchema (Effect Schema)", () => {
 describe("ThoughtBodySchema (Effect Schema)", () => {
   it("accepts text", async () => {
     await expect(
-      decode(ThoughtBodySchema)({ text: "thinking…" }),
-    ).resolves.toEqual({ text: "thinking…" });
+      decode(ThoughtBodySchema)({ text: "thinking..." }),
+    ).resolves.toEqual({ text: "thinking..." });
   });
 
   it("rejects missing text", async () => {
