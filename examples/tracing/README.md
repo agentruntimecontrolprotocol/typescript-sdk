@@ -2,8 +2,9 @@
 
 End-to-end OpenTelemetry: every envelope on the wire (in either
 direction) emits a span, and W3C trace context (`traceparent` /
-`tracestate`) rides along inside `envelope.extensions["x.otel"]` so
-the spans link into one distributed trace.
+`tracestate`) rides along inside
+`envelope.extensions["x-vendor.opentelemetry.tracecontext"]` so the
+spans link into one distributed trace.
 
 The middleware MUST be wired on **both** sides. If only one side wires
 it, that side's spans are correct in isolation, but the peer creates
@@ -70,5 +71,6 @@ Tempo, Honeycomb, or any OTLP receiver.
 
 ## Spec sections
 
-- §11 Trace propagation (W3C context via `extensions["x.otel"]`)
+- §11 Trace propagation (W3C context via
+  `extensions["x-vendor.opentelemetry.tracecontext"]`)
 - §10.3 trace inheritance on delegation

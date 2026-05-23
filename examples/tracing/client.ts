@@ -3,7 +3,7 @@
  *
  * Wires `@agentruntimecontrolprotocol/middleware-otel` into the client transport so spans on
  * the submit path link end-to-end with the server's spans via W3C trace
- * context carried in `extensions["x.otel"]`.
+ * context carried in `extensions["x-vendor.opentelemetry.tracecontext"]`.
  *
  * Run after `server.ts`:
  *   pnpm tsx examples/tracing/client.ts
