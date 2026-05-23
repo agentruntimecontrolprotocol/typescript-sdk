@@ -17,13 +17,13 @@ the runtime side starts a child span linked to the client's span.
 // envelope on the wire:
 {
   arcp: "1.1",
-  id: "01J…",
+  id: "01J...",
   type: "job.submit",
   trace_id: "0123456789abcdef0123456789abcdef",
   payload: { agent: "echo", input: {} },
   extensions: {
     "x-vendor.opentelemetry.tracecontext": {
-      traceparent: "00-0123…-…",
+      traceparent: "00-0123...-...",
       tracestate: "vendor=value",
     },
   },
@@ -38,7 +38,7 @@ import { trace } from "@opentelemetry/api";
 
 const tracer = trace.getTracer("arcp-client", "1.0.0");
 
-const transport = await WebSocketTransport.connect("wss://…/arcp");
+const transport = await WebSocketTransport.connect("wss://.../arcp");
 const traced = withTracing(transport, { tracer });
 
 await client.connect(traced);
@@ -58,22 +58,24 @@ startWebSocketServer({
 
 The middleware emits two span types per envelope:
 
-| Span        | Attributes                                                                   |
-| ----------- | ---------------------------------------------------------------------------- |
-| `arcp.send` | `arcp.type`, `arcp.id`, `arcp.session_id`, `arcp.job_id?`, `arcp.event_seq?` |
-| `arcp.recv` | same                                                                         |
+| Span                  | Attributes                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| `arcp.send <type>`    | `arcp.direction`, `arcp.type`, `arcp.id`, `arcp.session_id`, `arcp.job_id?`, `arcp.event_seq?`   |
+| `arcp.recv <type>`    | same                                                                                             |
 
-For `job.submit` / `job.accepted` / `job.result` / `job.error`, the
-middleware also attaches: `arcp.agent`, `arcp.lease`, `arcp.budget`
-(v1.1).
+For payloads that carry them, the middleware also attaches:
+`arcp.agent`, `arcp.lease.capabilities` (comma-joined keys),
+`arcp.lease.expires_at`, and `arcp.budget.remaining` (JSON-encoded
+per-currency totals).
 
-Customize span names via options:
+Customize span names via options. The defaults are
+`` `arcp.send ${type}` `` and `` `arcp.recv ${type}` ``:
 
 ```ts
 withTracing(transport, {
   tracer,
-  sendSpanName: (frame) => `arcp.send.${frame.type}`,
-  recvSpanName: (frame) => `arcp.recv.${frame.type}`,
+  sendSpanName: (frame) => `arcp.send.${(frame as { type?: string }).type ?? "unknown"}`,
+  recvSpanName: (frame) => `arcp.recv.${(frame as { type?: string }).type ?? "unknown"}`,
 });
 ```
 
@@ -114,12 +116,14 @@ See [delegation.md](./delegation.md#trace-propagation).
 ## Without OTel
 
 If you don't want OTel, you can still set `trace_id` manually on every
-`submit`:
+`submit`. Use any 32-hex generator — the runtime validates the format
+via `isValidTraceId`:
 
 ```ts
-import { newId } from "@agentruntimecontrolprotocol/core";
+import { randomBytes } from "node:crypto";
+import type { TraceId } from "@agentruntimecontrolprotocol/core";
 
-const traceId = newId({ length: 32 }) as TraceId; // 32 hex
+const traceId = randomBytes(16).toString("hex") as TraceId; // 32 hex
 await client.submit({
   agent: "x",
   input: {},
@@ -133,21 +137,31 @@ it for log correlation even without distributed tracing.
 
 ## Heartbeats vs spans
 
-The v1.1 heartbeat (§6.4) is for keep-alive, not observability. Don't
-emit a span per heartbeat — it's high-frequency, low-value noise. The
-OTel middleware filters out `session.heartbeat` / `session.pong` by
-default.
+The v1.1 heartbeat (§6.4) is for keep-alive, not observability. The
+OTel middleware emits a span per frame unconditionally — including
+`session.ping` and `session.pong`. If the heartbeat traffic is too
+noisy, suppress it at the OTel pipeline (sampler / view) rather than
+at the middleware: override `sendSpanName` / `recvSpanName` to fold
+heartbeat spans onto a name your sampler drops, or wrap the inner
+transport so heartbeats bypass the traced layer entirely.
 
 ## Per-session log binding
 
-`@agentruntimecontrolprotocol/core`'s logger is `pino`-shaped:
+`@agentruntimecontrolprotocol/core`'s logger is `pino`-shaped.
+`sessionLogger(parent, sessionId)` returns a child logger pre-bound
+to `session_id`:
 
 ```ts
 import { rootLogger, sessionLogger } from "@agentruntimecontrolprotocol/core";
 
-const log = sessionLogger(rootLogger, { session_id: ctx.sessionId });
+const log = sessionLogger(rootLogger, ctx.sessionId);
 log.info({ job_id: ctx.jobId }, "starting");
 ```
+
+For Effect-aware code, `LoggerLayer` replaces Effect's default logger
+with the pino-backed one, and `sessionLoggerEffect(sessionId,
+effect)` runs `effect` with `session_id` annotated on every log
+record produced inside its scope.
 
 `ctx.logger` is pre-bound to `session_id` and `job_id`. Log entries
 naturally correlate with traces if you emit `trace_id` as a field —

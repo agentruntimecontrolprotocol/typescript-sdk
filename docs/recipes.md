@@ -2,7 +2,10 @@
 
 Copy-paste solutions to common problems. Each recipe is a complete,
 runnable snippet; full two-process examples for most patterns live in
-[`examples/`](../examples/).
+[`examples/`](../examples/), and the larger end-to-end vignettes live
+in [`recipes/`](../recipes/) (`email-vendor-leases/`,
+`litellm-credentials/`, `mcp-skill/`, `multi-agent-budget/`,
+`stream-resume/`).
 
 ## Streaming progress
 
@@ -22,14 +25,14 @@ server.registerAgent("batch", async (input, ctx) => {
 });
 ```
 
-Client side:
+Client side — `progress` is its own event kind (§8.2.1), not a
+`status` phase:
 
 ```ts
 client.on("job.event", (env) => {
-  if (env.payload.kind === "status" && env.payload.body.phase === "progress") {
-    const { current, total, units, message } = env.payload.body;
-    console.log(`${current}/${total} ${units}: ${message}`);
-  }
+  if (env.type !== "job.event" || env.payload.kind !== "progress") return;
+  const { current, total, units, message } = env.payload.body;
+  console.log(`${current}/${total ?? "?"} ${units ?? ""}: ${message ?? ""}`);
 });
 ```
 
@@ -43,9 +46,9 @@ const key = `weekly-report-2026-W19`;
 
 async function runSafely() {
   const client = new ARCPClient({
-    /* … */
+    /* ... */
   });
-  const transport = await WebSocketTransport.connect("wss://…");
+  const transport = await WebSocketTransport.connect("wss://...");
   await client.connect(transport);
 
   const handle = await client.submit({
@@ -56,7 +59,7 @@ async function runSafely() {
 
   // Persist enough to resume on crash:
   await persistJobState({
-    sessionId: client.state.sessionId,
+    sessionId: client.state.id!,
     resumeToken: client.welcomePayload!.resume_token,
     jobId: handle.jobId,
   });
@@ -126,10 +129,14 @@ function getRuntime(tenant: string): ARCPServer {
   return r;
 }
 
+// `attachArcpUpgrade` only mounts a single literal `path`. To route on
+// the URL inside the WS, pass that path as a prefix and parse the rest:
 attachArcpUpgrade(httpServer, {
   path: "/arcp",
   onTransport: (t, req) => {
-    const tenant = req.url!.split("/")[2]; // /arcp/<tenant>
+    const url = new URL(req.url ?? "/", "http://placeholder");
+    // Use a query parameter for the tenant; the bare path is fixed.
+    const tenant = url.searchParams.get("tenant") ?? "default";
     getRuntime(tenant).accept(t);
   },
 });
@@ -152,7 +159,7 @@ class JwtVerifier implements BearerVerifier {
 }
 
 const server = new ARCPServer({
-  /* … */,
+  /* ... */,
   bearer: new JwtVerifier(jwks),
 });
 ```
@@ -167,15 +174,26 @@ import { validateLeaseOp } from "@agentruntimecontrolprotocol/runtime";
 
 server.registerAgent("strict-fetcher", async (input, ctx) => {
   // canonical target check (the SDK's net.fetch validator does this)
-  validateLeaseOp(ctx.lease, "net.fetch", input.url);
+  validateLeaseOp({
+    lease: ctx.lease,
+    capability: "net.fetch",
+    target: input.url,
+    ctx: {
+      constraints: ctx.leaseConstraints,
+      budgetRemaining: ctx.budget,
+    },
+  });
   const res = await fetch(input.url);
   return { status: res.status };
 });
 ```
 
-`validateLeaseOp` throws `PermissionDeniedError` on denial,
-`LeaseExpiredError` on expiration, `BudgetExhaustedError` on
-exhaustion. See [leases guide](./guides/leases.md).
+`validateLeaseOp` takes a single options object — `lease`, `capability`,
+`target`, optional `ctx` — and throws `PermissionDeniedError` on
+denial, `LeaseExpiredError` on expiration (when `ctx.constraints` is
+set and elapsed), or `BudgetExhaustedError` on exhaustion (when
+`ctx.budgetRemaining` has a non-positive entry). See
+[leases guide](./guides/leases.md).
 
 ## In-process client + runtime for tests
 
@@ -184,13 +202,13 @@ import { ARCPClient, ARCPServer, pairMemoryTransports } from "@agentruntimecontr
 
 async function makePair() {
   const server = new ARCPServer({
-    /* … */
+    /* ... */
   });
   const [c, s] = pairMemoryTransports();
-  await server.accept(s);
+  server.accept(s); // sync
 
   const client = new ARCPClient({
-    /* … */
+    /* ... */
   });
   await client.connect(c);
 
@@ -225,7 +243,7 @@ const transport = new StdioTransport({
 });
 
 const client = new ARCPClient({
-  /* … */
+  /* ... */
 });
 await client.connect(transport);
 ```
@@ -255,7 +273,7 @@ secondary observer (admin UI, audit log).
 let cursor: string | null = null;
 do {
   const { jobs, nextCursor } = await client.listJobs(
-    { state: "running" },
+    { status: ["running"] }, // filter.status is an array of job-state names
     { limit: 100, cursor: cursor ?? undefined },
   );
   for (const job of jobs) console.log(job.job_id, job.agent);

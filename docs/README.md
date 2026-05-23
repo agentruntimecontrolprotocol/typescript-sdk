@@ -15,6 +15,7 @@ go deeper into each subsystem.
 - [Architecture](./architecture.md) — how `@agentruntimecontrolprotocol/core`, `@agentruntimecontrolprotocol/client`, and `@agentruntimecontrolprotocol/runtime` fit together.
 - [Transports](./transports.md) — WebSocket, stdio, in-memory; when to pick each.
 - [CLI](./cli.md) — the `arcp` binary shipped by `@agentruntimecontrolprotocol/sdk`.
+- [Effect-native surface](./effect.md) — Layers, Services, and ManagedRuntime for Effect-shaped callers.
 
 ## Guides (one per spec section)
 
@@ -26,6 +27,7 @@ go deeper into each subsystem.
 | [Jobs](./guides/jobs.md)                           | §7   |
 | [Job events](./guides/job-events.md)               | §8   |
 | [Leases](./guides/leases.md)                       | §9   |
+| [Credentials](./guides/credentials.md)             | §9.7–§9.8 |
 | [Delegation](./guides/delegation.md)               | §10  |
 | [Observability](./guides/observability.md)         | §11  |
 | [Errors](./guides/errors.md)                       | §12  |

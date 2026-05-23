@@ -53,7 +53,7 @@ server.registerAgent("echo", async (input, ctx) => {
 });
 
 const [c, s] = pairMemoryTransports();
-await server.accept(s);
+server.accept(s); // sync: returns a SessionContext
 
 const client = new ARCPClient({
   client: { name: "demo-client", version: "1.0.0" },
@@ -61,17 +61,19 @@ const client = new ARCPClient({
   token: TOKEN,
 });
 
+// Register handlers BEFORE submit — `submit()` resolves on `job.accepted`,
+// after which events can arrive immediately.
+client.on("job.event", (env) => {
+  if (env.type === "job.event") {
+    console.log(`[${env.event_seq}] ${env.payload.kind}`, env.payload.body);
+  }
+});
+
 await client.connect(c);
 
 const handle = await client.submit({
   agent: "echo",
   input: { hi: 1 },
-});
-
-client.on("job.event", (env) => {
-  if (env.type === "job.event") {
-    console.log(`[${env.event_seq}] ${env.payload.kind}`, env.payload.body);
-  }
 });
 
 const result = await handle.done;
@@ -93,16 +95,18 @@ server and `WebSocketTransport.connect()`:
 ```ts
 import { startWebSocketServer, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
-// server side
+// server side — startWebSocketServer accepts every connection on the root
+// path; for path-routed mounts on an existing http.Server use attachArcpUpgrade
+// from @agentruntimecontrolprotocol/node.
 const wss = await startWebSocketServer({
   host: "127.0.0.1",
   port: 7777,
   onTransport: (t) => server.accept(t),
 });
-console.log(`listening on ${wss.url}`); // ws://127.0.0.1:7777/arcp
+console.log(`listening on ${wss.url}`); // ws://127.0.0.1:7777
 
-// client side
-const transport = await WebSocketTransport.connect("ws://127.0.0.1:7777/arcp");
+// client side — connect to wss.url directly.
+const transport = await WebSocketTransport.connect(wss.url);
 await client.connect(transport);
 ```
 

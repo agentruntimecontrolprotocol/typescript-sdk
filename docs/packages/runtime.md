@@ -24,7 +24,7 @@ server.registerAgent("echo", async (input, ctx) => {
   return { echoed: input };
 });
 
-await server.accept(transport);
+server.accept(transport); // sync: returns SessionContext
 ```
 
 ### `ARCPServerOptions`
@@ -32,18 +32,20 @@ await server.accept(transport);
 | Field                                                  | Default          | Notes                                      |
 | ------------------------------------------------------ | ---------------- | ------------------------------------------ |
 | `runtime: RuntimeIdentity`                             | —                | `{ name, version }` advertised on welcome. |
-| `capabilities: Capabilities`                           | —                | `{ encodings, agents, extensions? }`.      |
+| `capabilities: Capabilities`                           | —                | `{ encodings?, agents?, features? }`. Vendor keys round-trip. |
 | `bearer?: BearerVerifier`                              | optional         | See [auth guide](../guides/auth.md).       |
-| `eventLog?: EventLog`                                  | in-memory        | Drop-in for durable resume.                |
+| `eventLog?: EventLog`                                  | `new EventLog()` (in-memory SQLite) | Pass `{ path }` for durable resume. |
 | `logger?: Logger`                                      | `rootLogger`     | Pino-shaped.                               |
-| `heartbeatIntervalSeconds?: number`                    | 30               | v1.1 — interval for `session.heartbeat`.   |
+| `heartbeatIntervalSeconds?: number`                    | 30               | v1.1 — interval for `session.ping`.        |
 | `resumeWindowSeconds?: number`                         | 600              | §6.3 — buffered-event TTL.                 |
 | `cancelGraceMs?: number`                               | 30_000           | §7.4 — grace before forced terminate.      |
 | `idempotencyTtlMs?: number`                            | 86_400_000 (24h) | §7.2 — idempotency cache TTL.              |
 | `caps?: SessionCaps`                                   | see below        | §14 — per-session DoS caps.                |
 | `features?: readonly string[]`                         | `V1_1_FEATURES`  | Advertised feature set.                    |
 | `jobAuthorizationPolicy?: (job, principal) => boolean` | same-principal   | Authorization gate.                        |
-| `backPressureThreshold?: number`                       | 1000             | v1.1 — unacked events before stall.        |
+| `backPressureThreshold?: number`                       | 1000             | v1.1 — unacked-event count that emits `back_pressure` status. |
+| `credentialProvisioner?: CredentialProvisioner`        | —                | v1.1 §9.7. Requires `credentialStore`.     |
+| `credentialStore?: CredentialStore`                    | —                | v1.1 §9.7. Required when provisioner is set. |
 
 #### `SessionCaps` defaults
 
@@ -57,33 +59,43 @@ await server.accept(transport);
 
 ### Methods
 
-#### `accept(transport): Promise<SessionContext>`
+#### `accept(transport): SessionContext`
 
-Pair the runtime with a new transport. Returns the `SessionContext`
-representing that session. Most callers don't touch the returned
-object — it's driven internally — but it's useful for advanced cases
-(registering custom envelope handlers, observing state).
+Pair the runtime with a new transport. Synchronous — returns the
+`SessionContext` representing that session immediately; the handshake
+runs asynchronously on the transport's inbound queue. Most callers
+don't touch the returned object (the runtime drives everything), but
+it's useful for advanced cases (registering custom envelope handlers
+for vendor types, observing state).
 
-#### `registerAgent(name, handler)`
+#### `registerAgent(name, handler)` / `registerAgentVersion(name, version, handler)` / `setDefaultAgentVersion(name, version)`
 
 ```ts
+// Unversioned handler (bare `agent: "name"` submits resolve here).
 server.registerAgent("name", async (input, ctx) => {
   await ctx.status("running");
   return { ok: true };
 });
+
+// v1.1 §7.5 — versioned handlers. `registerAgent` does NOT parse
+// `name@version`; use `registerAgentVersion` for each version, then
+// optionally `setDefaultAgentVersion` to choose the bare-name target.
+server.registerAgentVersion("summarize", "v1", handlerV1);
+server.registerAgentVersion("summarize", "v2", handlerV2);
+server.setDefaultAgentVersion("summarize", "v2");
 ```
 
 The handler signature is `(input: unknown, ctx: JobContext) =>
 Promise<unknown>`. Throw an `ARCPError` to signal a typed failure;
 return a value to signal success.
 
-For versioned agents:
+#### `hasAgent(name)` / `resolveAgent(name, version)` / `getAgentInventory()`
 
-```ts
-server.registerAgent("summarize@v1", handlerV1);
-server.registerAgent("summarize@v2", handlerV2);
-// Defaults to the latest registered version when client omits @version.
-```
+`hasAgent` is a fast existence check. `resolveAgent` parses an
+incoming submit (mirroring §7.5 rules; throws
+`AgentNotAvailableError` / `AgentVersionNotAvailableError`).
+`getAgentInventory` returns the rich `AgentInventoryEntry[]` shape
+the runtime advertises on welcome.
 
 #### `subscribers` — v1.1
 
@@ -202,13 +214,18 @@ import {
   isValidCapabilityName,
   isReservedCapabilityName,
   initialBudgetFromLease,
+  // Effect-shaped twins:
+  validateLeaseOpEffect,
+  validateLeaseConstraintsEffect,
+  assertLeaseSubsetEffect,
+  assertLeaseConstraintsSubsetEffect,
 } from "@agentruntimecontrolprotocol/runtime";
 ```
 
-`validateLeaseOp(lease, capability, target, ctx?)` is the core
-enforcement check; throws `PermissionDeniedError`,
-`LeaseExpiredError`, or `BudgetExhaustedError`. See
-[leases guide](../guides/leases.md).
+`validateLeaseOp({ lease, capability, target, ctx? })` is the core
+enforcement check. It takes a single options object — not positional
+args — and throws `PermissionDeniedError`, `LeaseExpiredError`, or
+`BudgetExhaustedError`. See [leases guide](../guides/leases.md).
 
 ## `SessionContext`
 
@@ -234,7 +251,7 @@ Default: same-principal-only. Override to permit shared access:
 
 ```ts
 new ARCPServer({
-  // …
+  // ...
   jobAuthorizationPolicy: (job, principal) => {
     if (job.submitterPrincipal === principal) return true;
     if (
@@ -250,7 +267,74 @@ new ARCPServer({
 The policy runs on `job.cancel`, `subscribe`, and `list_jobs` access
 checks.
 
+## Credential provisioning — v1.1
+
+When `model.use` or other provisioned credentials are in play,
+configure both a provisioner and a store:
+
+```ts
+import {
+  ARCPServer,
+  InMemoryCredentialStore,
+  toBudgetExhausted,
+  type CredentialProvisioner,
+  type CredentialIssueContext,
+  type IssuedCredential,
+  type CredentialStore,
+} from "@agentruntimecontrolprotocol/runtime";
+```
+
+`ARCPServer` throws at construction if `credentialProvisioner` is set
+without a `credentialStore` (§14 — credential revocation reliability).
+`InMemoryCredentialStore` is fine for tests; production callers
+implement `CredentialStore` against durable storage. See
+[credentials guide](../guides/credentials.md).
+
+## Effect surface
+
+```ts
+import {
+  ARCPRuntimeLayer,
+  type ARCPRuntimeLayerOptions,
+  ARCPServerService,
+  makeARCPServerRuntime,
+  acceptSessionEffect,
+  resumeSweepDaemon,
+  JobService,
+  jobLayer,
+  JobManagerService,
+  jobManagerLayer,
+  makeJobEffect,
+  makeJobManagerEffect,
+  type JobEffect,
+  type JobManagerEffect,
+  watchdogEffect,
+  SessionContextService,
+  sessionContextLayer,
+  makeSessionContextEffect,
+  type SessionContextEffect,
+} from "@agentruntimecontrolprotocol/runtime";
+```
+
+`makeARCPServerRuntime(options)` returns a `ManagedRuntime` that
+provisions `ARCPServerService`. `acceptSessionEffect(transport)` is
+the Effect-shaped twin of `server.accept`; `resumeSweepDaemon`
+replaces the legacy `setInterval`-based sweep. `JobService`,
+`JobManagerService`, and `SessionContextService` are the per-job /
+per-session Effects driven internally by the runtime.
+
 ## Source
 
-[`packages/runtime/src/`](../../packages/runtime/src/) — five files:
-`server.ts`, `job.ts`, `lease.ts`, `types.ts`, `index.ts`.
+[`packages/runtime/src/`](../../packages/runtime/src/) — the runtime
+is split across multiple modules:
+
+- `server.ts` — `ARCPServer` (sessions, agent registry, handshake)
+- `session-context.ts` — per-session state machine
+- `job.ts` / `job-context.ts` / `job-runner.ts` — job lifecycle
+- `agent-registry.ts` — versioned agent resolution
+- `lease.ts` — `validateLeaseOp` and friends
+- `credential-provisioner.ts` / `credential-store.ts` — §9.7
+- `server-resume.ts` / `server-subscribe.ts` — §6.3 / §6.6 / §7.6
+- `server-effect.ts` / `job-effect.ts` / `lease-effect.ts` /
+  `session-effect.ts` — Effect-shaped twins
+- `types.ts`, `stores.ts`, `index.ts`

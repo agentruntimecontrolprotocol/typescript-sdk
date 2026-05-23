@@ -9,7 +9,7 @@ Section-by-section status lives in
 | Section                    | Status | Notes                                                              |
 | -------------------------- | ------ | ------------------------------------------------------------------ |
 | §4 Transport               | full   | WebSocket, stdio, in-memory.                                       |
-| §5 Wire format             | full   | Envelope, version `"1"`, ULID/UUIDv7 ids, `event_seq`, `trace_id`. |
+| §5 Wire format             | full   | Envelope, `arcp: "1.1"`, ULID/UUIDv7 ids, `event_seq`, `trace_id`. |
 | §6 Sessions                | full   | Hello, welcome, error, bye, resume.                                |
 | §6.1 Authentication        | full   | Bearer + `StaticBearerVerifier`. Custom verifier interface.        |
 | §6.2 Resume token rotation | full   | Single-use, rotated on every welcome.                              |
@@ -30,10 +30,12 @@ Section-by-section status lives in
 | §9 Leases                  | full   | Immutable per-job, glob matching.                                  |
 | §9.2 Glob syntax           | full   | `*` segment, `**` zero-or-more.                                    |
 | §9.5 Lease expiry          | full   | Negotiated via `lease_expires_at` feature flag.                    |
-| §9.6 Lease budgets         | full   | Negotiated via `lease_budgets` feature flag.                       |
+| §9.6 Lease budgets         | full   | Negotiated via `cost.budget` feature flag; counters in `lease["cost.budget"]`. |
+| §9.7 Model use             | full   | Negotiated via `model.use` feature flag.                           |
+| §9.7–§9.8 Provisioned credentials | full | Negotiated via `provisioned_credentials` feature flag.            |
 | §10 Delegation             | full   | Subset validation, trace inheritance.                              |
-| §11 Trace propagation      | full   | W3C via `@agentruntimecontrolprotocol/middleware-otel`.                                   |
-| §12 Error taxonomy         | full   | All 12 codes implemented.                                          |
+| §11 Trace propagation      | full   | W3C via `@agentruntimecontrolprotocol/middleware-otel`.            |
+| §12 Error taxonomy         | full   | All 15 v1.1 codes implemented (see `ERROR_CODES`).                 |
 | §14 Security               | full   | Resume sweep, per-session DoS caps, canonicalization.              |
 | §15 Vendor extensions      | full   | Validation + round-trip.                                           |
 
@@ -47,7 +49,7 @@ The SDK runs an integration suite in
 - `delegation.test.ts` — subset enforcement + trace inheritance.
 - `idempotency.test.ts` — duplicate submits collapse.
 - `transports.test.ts` — same behavior across WS / stdio / memory.
-- `v1-1-features.test.ts` — 30 tests across the v1.1 surface.
+- `v1-1-features.test.ts` — coverage across the v1.1 surface.
 
 All tests run on every commit via the package's own `pnpm test`
 target.

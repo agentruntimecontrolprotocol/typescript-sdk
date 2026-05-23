@@ -6,18 +6,26 @@ write your own by implementing the
 
 ```ts
 interface Transport {
-  send(frame: WireFrame): Promise<void>;
+  send(frame: SendableFrame): Promise<void>;
   onFrame(handler: FrameHandler): void;
-  onClose(handler: (reason?: string) => void): void;
+  onClose(handler: (err?: Error) => void): void;
   close(reason?: string): Promise<void>;
   readonly closed: boolean;
 }
 ```
 
-Frames are JSON-encoded envelopes (text) or binary. The transport
-preserves order per logical stream (session-scoped, or job-scoped for
-streaming results). Handlers are awaited before the next inbound frame
-is dispatched.
+Frames are JSON-encoded envelopes (text); v0.1 transports discard
+binary frames. The transport preserves order per logical stream
+(session-scoped, or job-scoped for streaming results). Handlers are
+awaited before the next inbound frame is dispatched.
+
+Each built-in transport also ships an Effect-shaped twin returning a
+`TransportEffect` whose `incoming` is a
+`Stream<WireFrame, TaggedTransportError>` —
+`memoryTransportEffect()`, `stdioTransportEffect(...)`, and
+`websocketTransportEffect(socket)`. Use these from
+`acceptSessionEffect` / `subscribeEnvelopes` when composing the
+Effect-native runtime.
 
 ## WebSocket
 
@@ -29,24 +37,26 @@ Production default. Bidirectional, framed, fits naturally over TLS.
 import { startWebSocketServer } from "@agentruntimecontrolprotocol/sdk";
 
 const wss = await startWebSocketServer({
-  host: "127.0.0.1",
-  port: 7777,
-  path: "/arcp", // optional, default "/arcp"
-  allowedHosts: ["api.example.com"], // optional DNS-rebind protection
+  host: "127.0.0.1", // optional, default "127.0.0.1"
+  port: 7777,         // optional, default 0 (ephemeral)
   onTransport: (t) => server.accept(t),
 });
-console.log(wss.url); // ws://127.0.0.1:7777/arcp
+console.log(wss.url); // ws://127.0.0.1:7777
 await wss.close();
 ```
 
-For an existing Node `http.Server`, use the
-[`@agentruntimecontrolprotocol/node` middleware](./packages/node.md):
+`startWebSocketServer` accepts every connection on the root path and
+does not implement path-routing or `Host`-header filtering. For those
+features — including DNS-rebind protection via `allowedHosts` and a
+custom `path` — use [`attachArcpUpgrade`](./packages/node.md) on an
+existing Node `http.Server`:
 
 ```ts
 import { attachArcpUpgrade } from "@agentruntimecontrolprotocol/node";
 
 const handle = attachArcpUpgrade(httpServer, {
-  path: "/arcp",
+  path: "/arcp", // default "/arcp"
+  allowedHosts: ["api.example.com"], // DNS-rebind protection
   onTransport: (t) => server.accept(t),
 });
 ```
@@ -58,17 +68,17 @@ import { WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
 const transport = await WebSocketTransport.connect(
   "wss://runtime.example.com/arcp",
-  {
-    headers: {
-      /* optional, browsers ignore */
-    },
-  },
 );
 await client.connect(transport);
 ```
 
-In browsers, `WebSocketTransport` uses the global `WebSocket`. In Node,
-the standard library's `WebSocket` (Node ≥22) is used; no `ws` dep.
+`WebSocketTransport.connect(url)` opens a single WebSocket and resolves
+once the socket is OPEN. In Node it uses the [`ws`][ws] package, which
+is a direct dependency of `@agentruntimecontrolprotocol/core` and
+`@agentruntimecontrolprotocol/node`. For browser bundles use the
+global `WebSocket` and pass it through `new WebSocketTransport(socket)`.
+
+[ws]: https://www.npmjs.com/package/ws
 
 ### When to use
 
@@ -80,9 +90,11 @@ the standard library's `WebSocket` (Node ≥22) is used; no `ws` dep.
 ### DNS-rebind protection
 
 When attaching to an existing HTTP server you can browse to from a
-DNS-pinned name, the WS upgrade handshake should validate `Host`. The
-`@agentruntimecontrolprotocol/express` helper does this for you; pass `allowedHosts` to the
-others.
+DNS-pinned name, the WS upgrade handshake should validate `Host`.
+Pass `allowedHosts: string[]` to `attachArcpUpgrade` (from
+`@agentruntimecontrolprotocol/node`), or to the framework adapters
+that wrap it (`@agentruntimecontrolprotocol/express`, `/fastify`,
+`/hono`). The check strips the port and matches the bare hostname.
 
 ## stdio
 
@@ -119,7 +131,7 @@ const transport = new StdioTransport({
 });
 
 const client = new ARCPClient({
-  /* … */
+  /* ... */
 });
 await client.connect(transport);
 ```

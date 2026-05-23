@@ -1,12 +1,16 @@
 # @agentruntimecontrolprotocol/fastify
 
 Fastify integration: attach the ARCP WebSocket upgrade to the
-underlying `app.server`.
+underlying `app.server`. Internally this is a one-line delegation to
+[`attachArcpUpgrade`](./node.md) — Fastify's request pipeline is not
+consulted for the upgrade. `@fastify/websocket` is declared as a peer
+dependency for compatibility, but is not currently used by the
+adapter.
 
 ## Install
 
 ```sh
-pnpm add @agentruntimecontrolprotocol/fastify @agentruntimecontrolprotocol/runtime
+pnpm add @agentruntimecontrolprotocol/fastify @agentruntimecontrolprotocol/runtime @fastify/websocket
 ```
 
 ## Use
@@ -18,7 +22,7 @@ import { attachArcpToFastify } from "@agentruntimecontrolprotocol/fastify";
 
 const app = Fastify({ logger: true });
 const arcp = new ARCPServer({
-  /* … */
+  /* ... */
 });
 
 app.get("/healthz", async () => "ok");
@@ -64,7 +68,7 @@ hot-reload:
 
 ```ts
 const handle = attachArcpToFastify(app, {
-  /* … */
+  /* ... */
 });
 app.addHook("onClose", async () => {
   await handle.close();

@@ -1,9 +1,11 @@
 # Errors (§12)
 
-ARCP defines twelve error codes. Each has a corresponding TypeScript
-class in `@agentruntimecontrolprotocol/core`. Errors carry a structured payload and serialize
-to the wire identically whether they surface as `session.error`,
-`job.error`, or as the `error` body inside a `tool_result`.
+ARCP defines fifteen error codes (twelve in v1.0 plus three v1.1
+additions). Each has a corresponding TypeScript class in
+`@agentruntimecontrolprotocol/core`. Errors carry a structured
+payload and serialize to the wire identically whether they surface as
+`session.error`, `job.error`, or as the `error` body inside a
+`tool_result`.
 
 ## Codes
 
@@ -20,13 +22,17 @@ to the wire identically whether they surface as `session.error`,
 | `INTERNAL_ERROR`              | `InternalError`                 | Unhandled runtime error.                          | Yes       |
 | `LEASE_SUBSET_VIOLATION`      | `LeaseSubsetViolationError`     | Child lease wider than parent (§10).              | No        |
 | `LEASE_EXPIRED`               | `LeaseExpiredError`             | `lease_constraints.expires_at` reached (v1.1).    | No        |
-| `BUDGET_EXHAUSTED`            | `BudgetExhaustedError`          | `lease_constraints.budgets` depleted (v1.1).      | No        |
+| `BUDGET_EXHAUSTED`            | `BudgetExhaustedError`          | `lease["cost.budget"]` counter depleted (v1.1).   | No        |
 | `RESUME_WINDOW_EXPIRED`       | `ResumeWindowExpiredError`      | Resume past `resume_window_sec`.                  | No        |
-| `HEARTBEAT_LOST`              | `HeartbeatLostError`            | Two consecutive missed pongs (v1.1).              | Yes       |
+| `HEARTBEAT_LOST`              | `HeartbeatLostError`            | Two consecutive missed pongs (v1.1).              | No        |
 | `DUPLICATE_KEY`               | `DuplicateKeyError`             | Idempotency key collision with conflicting input. | No        |
 
-`isRetryableByDefault(code)` reflects the column above. Per-error
-overrides ride on the payload's `retryable` field.
+`isRetryableByDefault(code)` returns `true` only for `INTERNAL_ERROR`
+and `TIMEOUT`; every other code defaults to non-retryable. Subclasses
+may pin a different default — `LeaseExpiredError`,
+`BudgetExhaustedError`, and `AgentVersionNotAvailableError` are
+hard-pinned non-retryable. Per-error overrides ride on the payload's
+`retryable` field.
 
 ## Wire shape
 
@@ -47,16 +53,19 @@ Every wire emission of an error — `session.error.payload`,
 ## Throwing from an agent
 
 ```ts
-import { ARCPError, PermissionDeniedError } from "@agentruntimecontrolprotocol/core";
+import { ARCPError, InvalidRequestError, PermissionDeniedError } from "@agentruntimecontrolprotocol/core";
 
 server.registerAgent("strict", async (input, ctx) => {
   if (!input.allowed) {
     throw new PermissionDeniedError("input.allowed is false");
   }
   if (!input.url) {
-    throw new ARCPError("INVALID_REQUEST", "url is required");
+    // Prefer the per-code subclass; ARCPError takes an options object.
+    throw new InvalidRequestError("url is required");
   }
-  // …
+  // Or use the base class with an options object:
+  // throw new ARCPError({ code: "INVALID_REQUEST", message: "url is required" });
+  // ...
 });
 ```
 
@@ -140,9 +149,9 @@ See [leases.md](./leases.md) and [delegation.md](./delegation.md).
 
 ## Retry guidance
 
-`INTERNAL_ERROR`, `TIMEOUT`, and `HEARTBEAT_LOST` are retryable by
-default. Combine retries with idempotency keys (§7.2) so a duplicate
-submit collapses to the same `job_id`:
+Only `INTERNAL_ERROR` and `TIMEOUT` are retryable by default. Combine
+retries with idempotency keys (§7.2) so a duplicate submit collapses
+to the same `job_id`:
 
 ```ts
 const key = `weekly-report-2026-W19`;
@@ -165,19 +174,25 @@ for (let attempt = 0; attempt < 3; attempt++) {
 
 ## Adding context to a client-side rethrow
 
+`ARCPError.details` is a frozen object — to add context, wrap the
+original error in a fresh one of the same code:
+
 ```ts
 try {
   return await handle.done;
 } catch (err) {
   if (err instanceof ARCPError) {
-    err.details = { ...err.details, jobId: handle.jobId };
+    throw new ARCPError({
+      code: err.code,
+      message: err.message,
+      retryable: err.retryable,
+      details: { ...err.details, jobId: handle.jobId },
+      cause: err,
+    });
   }
   throw err;
 }
 ```
-
-The class isn't sealed — extend the `details` field freely on the way
-out.
 
 ## Runnable example
 

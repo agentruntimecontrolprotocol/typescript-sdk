@@ -20,17 +20,21 @@ Most apps don't install this explicitly — it's a transitive of
 
 ```ts
 import {
-  Envelope, // discriminated union of every message type
-  EnvelopeSchema, // Zod schema covering Envelope
-  BaseEnvelope, // common envelope fields
+  type Envelope, // discriminated union of every message type
+  EnvelopeSchema, // Effect Schema covering Envelope
+  type BaseEnvelope, // common envelope fields
+  BaseEnvelopeSchema,
   buildEnvelope, // helper to construct + validate
   messageEnvelope, // build per-message-type envelope
   isPreSessionType, // checks if a type may flow before session.welcome
   isValidTraceId, // 32-hex check
+  RoundTripEnvelopeSchema, // permissive schema preserving unknown fields
+  pickDefined,
+  EnvelopeExtensionsSchema,
 } from "@agentruntimecontrolprotocol/core";
 ```
 
-Every message type has a corresponding Zod schema in
+Every message type has a corresponding Effect `Schema` in
 [`packages/core/src/messages/`](../../packages/core/src/messages/).
 The discriminator field is `type`.
 
@@ -75,11 +79,21 @@ import {
   TimeoutError,
   UnauthenticatedError,
   // taxonomy:
-  ERROR_CODES,
+  ERROR_CODES, // 15 canonical v1.1 codes
   isErrorCode,
-  isRetryableByDefault,
+  isRetryableByDefault, // true only for INTERNAL_ERROR + TIMEOUT
+  type SdkError, // discriminated union of every typed error
+  type ErrorPayload,
+  ErrorPayloadSchema,
 } from "@agentruntimecontrolprotocol/core";
 ```
+
+For Effect-tagged twins (used by typed-error pipelines), import
+`TaggedAgentNotAvailable`, `TaggedTimeout`, `TaggedTransportError`,
+etc., from the same package — see
+[`packages/core/src/errors-tagged.ts`](../../packages/core/src/errors-tagged.ts).
+`taggedFromARCP(err)` / `arcpFromTagged(tagged)` round-trip between
+the two surfaces.
 
 See [errors guide](../guides/errors.md) for shape, retryability, and
 patterns.
@@ -88,62 +102,80 @@ patterns.
 
 ```ts
 import {
-  Transport, // interface
-  WireFrame,
-  SendableFrame,
-  FrameHandler,
+  type Transport, // legacy callback interface
+  type TransportEffect, // Effect-shaped twin (Stream-based incoming)
+  type WireFrame,
+  type SendableFrame,
+  type FrameHandler,
   MemoryTransport,
   pairMemoryTransports,
+  memoryTransportEffect,
   StdioTransport,
+  stdioTransportEffect,
   WebSocketTransport,
+  websocketTransportEffect,
   startWebSocketServer,
-  WebSocketServerHandle,
+  type WebSocketServerHandle,
 } from "@agentruntimecontrolprotocol/core";
 ```
 
-`Transport` is a four-method interface. See [transports.md](../transports.md)
-for the contract and existing implementations.
+`Transport` is the legacy callback-style interface;
+`TransportEffect` exposes the same channel as a
+`Stream<WireFrame, TaggedTransportError>` plus Effect-typed `send` and
+`close`. See [transports.md](../transports.md) for the contract and
+existing implementations.
 
 ### Session state
 
 ```ts
 import {
-  SessionState, // phase machine
-  SessionPhase, // "pre-handshake" | "awaiting-welcome" | "accepted" | "closed"
-  SessionSnapshot, // read-only view
-  PendingRegistry, // pending-request correlation
-  PendingMeta,
+  SessionState, // phase machine (legacy class)
+  SessionStateService, // Effect-shaped twin
+  type SessionPhase, // "opening" | "accepted" | "closing" | "rejected"
+  type SessionSnapshot, // read-only view
+  PendingRegistry, // pending-request correlation (legacy)
+  PendingRegistryService, // Effect-shaped twin
+  type PendingMeta,
   negotiateCapabilities,
 } from "@agentruntimecontrolprotocol/core";
 ```
 
 `SessionState` is the source of truth for what a session can do at
-any moment. `PendingRegistry` tracks outstanding requests waiting on
-responses (e.g., a `client.submit()` waiting for `job.accepted`).
+any moment; transitions follow `opening → accepted → closing` (or
+`opening → rejected` on rejection). `PendingRegistry` tracks
+outstanding requests waiting on responses (e.g., a `client.submit()`
+waiting for `job.accepted`).
 
 ### Storage
 
 ```ts
 import {
-  EventLog,
-  EventLogFilter,
-  EventLogOptions,
-  ParsedRowEnvelope,
+  EventLog, // SQLite-backed class (legacy)
+  EventLogService, // Effect-shaped twin
+  eventLogLayer,
+  type EventLogFilter,
+  type EventLogOptions,
+  type ParsedRowEnvelope,
   EventRowEnvelopeSchema,
 } from "@agentruntimecontrolprotocol/core";
 ```
 
-`EventLog` is the interface for resume-buffer persistence. The
-default in-memory implementation is sufficient for most cases; for
-durable resume across runtime restarts, drop in a SQLite backend.
+`EventLog` wraps `better-sqlite3` and is the runtime's
+resume-buffer store. It defaults to `:memory:`; pass `{ path: "..."
+}` (or `{ db: existingDatabase }`) to persist across restarts. The
+class is the contract — subclass it to back the same surface with
+another store. `EventLogService` is the Effect-aware twin.
 
 ### Auth
 
 ```ts
 import {
-  BearerVerifier,
-  BearerIdentity,
+  type BearerVerifier, // Promise-shaped legacy interface
+  type BearerVerifierEffect, // Effect-shaped twin
+  type BearerIdentity,
   StaticBearerVerifier,
+  BearerVerifierService,
+  staticBearerVerifierLayer,
 } from "@agentruntimecontrolprotocol/core";
 ```
 
@@ -153,16 +185,23 @@ See [auth guide](../guides/auth.md) for custom verifier patterns.
 
 ```ts
 import {
-  Logger, // pino-shaped interface
+  type Logger, // pino-shaped type alias
   rootLogger,
-  sessionLogger,
+  sessionLogger, // (parent, sessionId) → child logger pre-bound to session_id
   silentLogger,
+  LoggerLayer, // Effect default-logger replacement
+  PinoLogger,
+  makePinoEffectLogger,
+  sessionLoggerEffect, // annotate session_id on every log inside the scope
 } from "@agentruntimecontrolprotocol/core";
 ```
 
-`sessionLogger(parent, bindings)` returns a child logger with the
-bindings attached to every log line. The runtime's `ctx.logger` is
-pre-bound to `session_id` and `job_id`.
+`sessionLogger(parent, sessionId)` returns a child logger with
+`session_id` attached to every log line. The runtime's `ctx.logger`
+adds further bindings (`client`, etc.) and the per-job logger nests a
+`job_id` binding inside that. For Effect-aware code, compose
+`LoggerLayer` at the program edge so every `Effect.log*` call goes
+through pino.
 
 ### Extension classification
 
@@ -205,10 +244,15 @@ client and runtime feature sets during handshake.
 import {
   combineSignals, // merge multiple AbortSignals
   Deferred, // a promise + resolve/reject in one object
-  validateAgainstSchema, // zod with friendlier errors
+  validateAgainstSchema, // Effect Schema with friendlier errors
   safeSetInterval, // unref'd + clearable interval
   safeSetTimeout,
   nowTimestamp,
+  newId, // raw ULID, optionally prefixed
+  newJobId,
+  newMessageId,
+  newSessionId,
+  IdGen, // Effect-shaped id generator service
 } from "@agentruntimecontrolprotocol/core";
 ```
 
@@ -218,16 +262,18 @@ import {
 packages/core/src/
   envelope.ts            # buildEnvelope, base shape
   errors.ts              # ARCPError + per-code classes
+  errors-tagged.ts       # Effect-tagged twins
+  transport-error.ts     # TaggedTransportError + helpers
   extensions.ts          # x-vendor.* classification
   brands.ts              # branded ID types
-  logger.ts              # logger + helpers
+  logger.ts              # legacy + Effect logger bridge
   types.ts               # cross-cutting types
   version.ts             # protocol version + feature negotiation
-  auth/                  # BearerVerifier + StaticBearerVerifier
+  auth/                  # BearerVerifier + StaticBearerVerifier + Effect twins
   messages/              # one schema per message type
-  state/                 # SessionState, PendingRegistry
-  store/                 # EventLog interface + default impl
-  transport/             # memory, stdio, ws
+  state/                 # SessionState, PendingRegistry, Effect twins
+  store/                 # EventLog (SQLite) + EventLogService
+  transport/             # memory, stdio, ws + *Effect twins
   util/                  # signals, deferred, ids, etc.
 ```
 

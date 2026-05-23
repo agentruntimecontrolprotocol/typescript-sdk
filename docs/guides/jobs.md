@@ -62,7 +62,7 @@ server.registerAgent("weekly-report", async (input, ctx) => {
   for (const url of input.urls) {
     // lease enforcement is automatic — toolCall checks the lease
     await ctx.toolCall({ tool: "fetch", args: { url }, call_id: url });
-    // …work…
+    // ...work...
     await ctx.toolResult({ call_id: url, result: { ok: true } });
   }
 
@@ -85,7 +85,7 @@ produces `job.error` with that code. Throwing anything else produces
 | `maxRuntimeSec?: number`              | Hard wall clock; trips `TIMEOUT`.                           |
 | `traceId?: TraceId`                   | 32-hex W3C trace id to propagate.                           |
 | `signal?: AbortSignal`                | Client-side cancellation; sends `job.cancel` on abort.      |
-| `leaseConstraints?: LeaseConstraints` | v1.1 (§9.5/§9.6) — expiration + budgets.                    |
+| `leaseConstraints?: LeaseConstraints` | v1.1 (§9.5) — `{ expires_at?: string }`. Budgets are encoded inside the lease via `cost.budget` patterns. |
 
 ## Idempotency (§7.2)
 
@@ -172,25 +172,33 @@ should compute remaining budget themselves and emit a final
 
 ## Cost budgets (v1.1, §9.6)
 
-When the `lease_constraints` feature is negotiated, the lease can
-carry per-currency budgets:
+Budgets ride on the lease's `cost.budget` capability, not on
+`leaseConstraints`. Each pattern is a `currency:decimal` amount; when
+multiple entries share a currency the values sum:
 
 ```ts
 const handle = await client.submit({
   agent: "research",
-  input: { query: "…" },
-  lease: { "net.fetch": ["https://**"] },
+  input: { query: "..." },
+  lease: {
+    "net.fetch": ["https://**"],
+    "cost.budget": ["USD:1.50", "tokens:50000"],
+  },
+  // lease_constraints carries expires_at — see §9.5 below
   leaseConstraints: {
-    budgets: { usd: 1.5, tokens: 50_000 },
+    expires_at: new Date(Date.now() + 600_000).toISOString(),
   },
 });
 ```
 
-Inside the agent, `ctx.metric({ name, value, unit })` decrements the
-matching budget when `unit` is a currency. The runtime tracks the
-remaining budget on the `Job` and emits a `budget_remaining` event
-when consumption crosses 5% deltas (debounced). Exceeding any budget
-trips `BudgetExhaustedError` and terminates the job.
+The `cost.budget` feature flag negotiates whether the runtime should
+enforce the counter; the `lease_expires_at` flag negotiates expiry
+enforcement. Inside the agent, `ctx.metric({ name, value, unit })`
+decrements the matching budget when `name` starts with `cost.` and
+`unit` is a budgeted currency. The runtime emits a
+`cost.budget.remaining` metric event when consumption crosses 5%
+deltas (debounced). Exceeding any budget trips `BudgetExhaustedError`
+and terminates the job.
 
 ## Agent versions (v1.1, §7.5)
 

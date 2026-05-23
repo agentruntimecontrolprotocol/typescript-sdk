@@ -12,7 +12,7 @@ namespace.
 | `thought`      | `{ text }`                                      | Model reasoning / internal monologue.      |
 | `tool_call`    | `{ tool, args, call_id }`                       | Agent invoked a tool.                      |
 | `tool_result`  | `{ call_id, result? \| error? }`                | Result for a `tool_call`.                  |
-| `status`       | `{ phase, message? }`                           | Lifecycle hint (`running`, `fetching`, …). |
+| `status`       | `{ phase, message? }`                           | Lifecycle hint (`running`, `fetching`, ...). |
 | `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                       |
 | `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact.                  |
 | `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Spawn a child job (§10).                   |
@@ -36,12 +36,12 @@ server.registerAgent("research", async (input, ctx) => {
     args: { q: input.query },
     call_id: "s1",
   });
-  // …
+  // ...
   await ctx.toolResult({
     call_id: "s1",
     result: {
       hits: [
-        /* … */
+        /* ... */
       ],
     },
   });
@@ -51,7 +51,7 @@ server.registerAgent("research", async (input, ctx) => {
     uri: "s3://reports/2026-W19.md",
     content_type: "text/markdown",
     byte_size: 11_482,
-    sha256: "abc…",
+    sha256: "abc...",
   });
 
   return { ok: true };
@@ -121,8 +121,8 @@ information about every job in the session — that's how
 
 ## Progress events (v1.1, §8.2.1)
 
-`ctx.progress(current, opts)` is a convenience wrapper around `status`
-that includes a structured numeric tracker:
+`ctx.progress(current, opts)` emits a dedicated `progress` event kind
+(not a `status` phase):
 
 ```ts
 for (let i = 0; i < urls.length; i++) {
@@ -134,8 +134,8 @@ for (let i = 0; i < urls.length; i++) {
 }
 ```
 
-The body shape is a `status` with `phase: "progress"` and a payload
-that conforms to the v1.1 progress schema.
+The body conforms to `ProgressBodySchema` (`{ current, total?,
+units?, message? }`). Match by `env.payload.kind === "progress"`.
 
 ## Result streaming (v1.1, §8.4)
 
@@ -163,9 +163,12 @@ const handle = await client.submit({ agent: "big-report", input: {} });
 const buf = await handle.collectChunks(); // assembles result_chunk events
 ```
 
-`result_chunk` events carry `{ result_id, seq, encoding, data, final? }`
-in a sub-stream within the larger job. Same overall `event_seq`
-ordering applies — chunks interleave normally with other events.
+`result_chunk` events carry `{ result_id, chunk_seq, data, encoding,
+more }` (per `ResultChunkBodySchema`) inside the same `event_seq`
+ordering as other events; the final chunk has `more: false` and is
+followed by a terminating `job.result` carrying `result_id`. Inline
+`job.result.payload.result` MUST NOT be mixed with `result_chunk` for
+a single job.
 
 ## Vendor extension events
 
@@ -183,9 +186,11 @@ rules and round-trip guarantees.
 
 `tool_call`, `delegate`, and any vendor event that interacts with the
 outside world is gated by the lease. The runtime calls
-`validateLeaseOp(lease, capability, target)` before forwarding:
+`validateLeaseOp({ lease, capability, target, ctx? })` before
+forwarding:
 
-- `tool_call` checks `tool.call:<tool-name>`.
+- `tool_call` checks the lease's `tool.call` patterns against the
+  `tool` name.
 - `delegate` validates the child's `lease_request` is a subset of the
   parent's effective lease (§10).
 - `artifact_ref` does not check the lease — references are purely
@@ -199,11 +204,11 @@ A violation surfaces as a `tool_result` event on the **parent** with
 
 When the `ack` feature is negotiated, the runtime tracks
 `event_seq - last_acked_event_seq`. Once it exceeds
-`backPressureThreshold` (default 1000), `ctx.*` emission methods stall
-on a per-session semaphore until the client acks more events.
-
-This means slow consumers throttle agent emission rather than dropping
-events or queueing unboundedly. Tune with `backPressureThreshold` on
+`backPressureThreshold` (default 1000), the runtime emits a
+`back_pressure` `status` event on the session. Agents are not
+auto-stalled — observe the status event and back off in your handler
+loop (or let the per-session `caps` close the session if the
+consumer never drains). Tune with `backPressureThreshold` on
 `ARCPServerOptions`.
 
 ## Runnable examples

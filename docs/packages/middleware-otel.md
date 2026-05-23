@@ -39,15 +39,16 @@ startWebSocketServer({
 
 ### `withTracing(inner, options): Transport`
 
-| Option                             | Notes                                              |
-| ---------------------------------- | -------------------------------------------------- |
-| `tracer: Tracer`                   | OpenTelemetry `Tracer` instance.                   |
-| `sendSpanName?: (frame) => string` | Custom span name on send. Default: `arcp.send`.    |
-| `recvSpanName?: (frame) => string` | Custom span name on receive. Default: `arcp.recv`. |
+| Option                             | Notes                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| `tracer: Tracer`                   | OpenTelemetry `Tracer` instance.                                         |
+| `sendSpanName?: (frame) => string` | Custom span name on send. Default: `` `arcp.send ${frame.type}` ``.      |
+| `recvSpanName?: (frame) => string` | Custom span name on receive. Default: `` `arcp.recv ${frame.type}` ``.   |
 
 Returns a new `Transport` that wraps `inner`. Calls
 `inner.send`/`inner.onFrame` underneath; transparent to the rest of
-the SDK.
+the SDK. An Effect-shaped twin is also exported as `OtelTracerLayer`
++ `OtelTracerLayerOptions` for `ManagedRuntime`-based callers.
 
 ## What it does
 
@@ -56,9 +57,11 @@ the SDK.
 1. Starts a `Span` named per `sendSpanName(frame)`.
 2. Injects the active span's W3C trace context into
    `frame.extensions["x-vendor.opentelemetry.tracecontext"]`.
-3. Sets attributes (`arcp.type`, `arcp.id`, `arcp.session_id`,
-   `arcp.job_id?`, `arcp.event_seq?`, plus type-specific attributes
-   like `arcp.agent`, `arcp.lease`, `arcp.budget`).
+3. Sets attributes (`arcp.direction`, `arcp.type`, `arcp.id`,
+   `arcp.session_id`, `arcp.job_id?`, `arcp.trace_id?`,
+   `arcp.event_seq?`, plus payload-derived attributes when present:
+   `arcp.agent`, `arcp.lease.capabilities` (comma-joined),
+   `arcp.lease.expires_at`, `arcp.budget.remaining` (JSON-encoded)).
 4. Calls `inner.send(frame)`.
 5. Ends the span.
 
@@ -76,17 +79,15 @@ This means handler code (inside agents, inside client `on(...)`
 callbacks) runs with the correct OTel context active — child spans
 nest correctly without manual threading.
 
-## Filtered frame types
+## Heartbeats are not filtered
 
-Heartbeat-class frames are noisy and low-value for tracing. The
-middleware suppresses spans for:
-
-- `session.heartbeat`
-- `session.pong`
-
-Override by passing custom `sendSpanName` / `recvSpanName` that
-return a non-empty name for those types (a returned empty string
-suppresses the span).
+`withTracing` produces a span for every frame, including
+`session.ping` and `session.pong`. The middleware does NOT skip
+heartbeats — if their volume is a problem, drop them in the OTel
+pipeline (sampler, view, or a tail-based processor) rather than at
+the middleware. Alternatively, route heartbeats through an inner
+transport that is NOT wrapped with `withTracing`; only the outer,
+job-bearing traffic then produces spans.
 
 ## Composing with other transport wrappers
 

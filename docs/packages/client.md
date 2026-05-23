@@ -35,7 +35,7 @@ const client = new ARCPClient({
 | Field                                       | Required    | Notes                                                 |
 | ------------------------------------------- | ----------- | ----------------------------------------------------- |
 | `client: ClientIdentity`                    | yes         | `{ name, version }` advertised in `session.hello`.    |
-| `authScheme: AuthScheme`                    | yes         | `"bearer"` for standard auth. Vendor schemes via `x-vendor.*`. |
+| `authScheme: AuthScheme`                    | yes         | Pinned to `"bearer"` by `AuthSchemeSchema` in v1.1. |
 | `token?: string`                            | bearer only | Bearer token.                                         |
 | `capabilities?: Capabilities`               | no          | Client-advertised caps.                               |
 | `features?: readonly string[]`              | no          | Defaults to `V1_1_FEATURES`.                          |
@@ -53,8 +53,11 @@ const welcome: SessionWelcomePayload = await client.connect(transport);
 
 Performs the handshake: sends `session.hello`, awaits
 `session.welcome`. Throws `ARCPError` on `session.error` or transport
-failure. The returned payload includes `session_id`, `runtime`,
-`capabilities`, `resume_token`, and `resume_window_sec`.
+failure. The returned payload includes `runtime`, `capabilities`,
+`resume_token`, `resume_window_sec`, and (when the `heartbeat`
+feature negotiated) `heartbeat_interval_sec`. The `session_id` lives
+on the envelope, not the payload — read it from `client.state.id`.
+Pass `{ signal }` to abort the handshake.
 
 ### `resume(transport, resumeInfo)`
 
@@ -77,11 +80,11 @@ const handle: JobHandle = await client.submit({
   agent: "x",
   input: {},
   lease: {
-    /* … */
+    /* ... */
   },
-  idempotencyKey: "…",
+  idempotencyKey: "...",
   maxRuntimeSec: 600,
-  traceId: "0123…",
+  traceId: "0123...",
   signal: ac.signal, // optional client-side cancel
   leaseConstraints: {
     /* v1.1 */
@@ -105,13 +108,14 @@ up before forcing the terminal state. See [jobs#cancellation](../guides/jobs.md#
 
 ```ts
 const { jobs, nextCursor } = await client.listJobs(
-  { agent: "x", state: "running" },
+  { agent: "x", status: ["running", "pending"] },
   { limit: 50, cursor: prevCursor },
 );
 ```
 
-Paginated, server-filtered enumeration. Requires the `list_jobs`
-feature.
+`SessionListJobsFilter` supports `status: readonly string[]`,
+`agent: string`, `created_after: string`, and `created_before: string`
+— all optional. Requires the `list_jobs` feature.
 
 ### `subscribe(jobId, opts?)` — v1.1
 
@@ -140,13 +144,13 @@ Manual back-pressure ack. Most callers use `autoAck: true` instead.
 
 ```ts
 client.on("job.event", (env) => {
-  /* … */
+  /* ... */
 });
 client.on("job.result", (env) => {
-  /* … */
+  /* ... */
 });
 client.on("x-vendor.acme.warmup", (env) => {
-  /* … */
+  /* ... */
 });
 ```
 
@@ -160,13 +164,14 @@ await client.send({
   arcp: "1.1",
   id: newMessageId(),
   type: "x-vendor.acme.warmup",
-  session_id: client.state.sessionId!,
+  session_id: client.state.id!,
   payload: { model: "gpt-4o" },
 });
 ```
 
-Direct envelope emission. Use for vendor extension messages — the SDK
-fills in `session_id` defaults but not vendor `payload` shapes.
+Direct envelope emission. `client.send()` forwards the envelope
+verbatim — it does NOT inject `session_id`, `id`, or `arcp` for you.
+Stamp those yourself when constructing the envelope.
 
 ### `close(reason?)`
 
@@ -192,16 +197,17 @@ Sends `session.bye` and closes the transport. Idempotent.
 
 Returned by `submit()`.
 
-| Field                                        | Notes                                             |
-| -------------------------------------------- | ------------------------------------------------- |
-| `jobId: JobId`                               | Server-assigned.                                  |
-| `lease: Lease`                               | The effective lease (possibly narrowed).          |
-| `agent?: string`                             | v1.1 — resolved agent ref including version.      |
-| `traceId?: TraceId`                          | Same id if you passed one in.                     |
-| `leaseConstraints?: LeaseConstraints`        | v1.1 lease constraints.                           |
-| `budget?: Record<string, number>`            | v1.1 initial budget per currency.                 |
-| `done: Promise<JobResultPayload>`            | Resolves on `job.result`, rejects on `job.error`. |
-| `collectChunks(): Promise<Buffer \| string>` | v1.1 — assemble `result_chunk` stream.            |
+| Field                                                      | Notes                                             |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| `jobId: JobId`                                             | Server-assigned.                                  |
+| `lease: Lease`                                             | The effective lease (possibly narrowed).          |
+| `agent?: string`                                           | v1.1 — resolved agent ref including version.      |
+| `traceId?: TraceId`                                        | Same id if you passed one in.                     |
+| `leaseConstraints?: LeaseConstraints`                      | v1.1 lease constraints (`{ expires_at? }`).       |
+| `budget?: ReadonlyMap<string, number>`                     | v1.1 initial per-currency budget.                 |
+| `credentials?: readonly IssuedCredential["wire"][]`        | v1.1 provisioned credentials.                     |
+| `done: Promise<JobResultPayload>`                          | Resolves on `job.result`, rejects on `job.error`. |
+| `collectChunks(): Promise<Buffer \| string>`               | v1.1 — assemble `result_chunk` stream.            |
 
 ## `JobSubscription` — v1.1
 
@@ -219,8 +225,30 @@ Returned by `subscribe()`.
 The package is ESM-only. No imports pull in `@agentruntimecontrolprotocol/runtime` — a
 client-only browser bundle is small (`@agentruntimecontrolprotocol/core` + `@agentruntimecontrolprotocol/client`).
 
+## Effect surface
+
+The package also exports an Effect-native runtime layer for callers
+who want to compose the client inside an `Effect`/`Layer` graph:
+
+```ts
+import {
+  ARCPClientLayer,
+  ARCPClientService,
+  type ARCPClientServiceShape,
+  makeARCPClientRuntime,
+  subscribeEnvelopes,
+} from "@agentruntimecontrolprotocol/client";
+```
+
+`makeARCPClientRuntime(options)` returns a `ManagedRuntime` that
+provisions `ARCPClientService`. `subscribeEnvelopes(transport)` is a
+`Stream`-based alternative to `client.on("...", handler)` for
+Effect-aware consumers.
+
 ## Source
 
-[`packages/client/src/`](../../packages/client/src/) — three files:
-`client.ts` (the class), `types.ts` (options + handle types),
-`index.ts` (exports).
+[`packages/client/src/`](../../packages/client/src/) —
+`client.ts` (the class), `client-dispatch.ts`,
+`client-envelopes.ts`, `client-handle.ts`,
+`client-effect.ts` (Effect layer + service), `types.ts`,
+`index.ts`.

@@ -3,7 +3,8 @@
 Thanks for your interest in improving the TypeScript SDK for ARCP. This
 document covers how to report issues, propose changes, and get a change merged.
 
-By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+Be respectful — assume good intent, keep critique focused on the work, and
+flag conduct issues to the maintainers.
 
 ## Where changes belong
 

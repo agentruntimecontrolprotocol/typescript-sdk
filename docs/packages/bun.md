@@ -16,7 +16,7 @@ import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
 import { serveArcp } from "@agentruntimecontrolprotocol/bun";
 
 const arcp = new ARCPServer({
-  /* … */
+  /* ... */
 });
 
 const handle = serveArcp({
@@ -70,7 +70,7 @@ import { BunWebSocketTransport } from "@agentruntimecontrolprotocol/bun";
       arcp.accept(transport);
     },
     message(ws, msg) { /* dispatched by transport */ },
-    close(ws) { /* … */ },
+    close(ws) { /* ... */ },
   },
 }
 ```

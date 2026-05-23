@@ -24,7 +24,7 @@ const httpServer = createServer((req, res) => {
 });
 
 const arcp = new ARCPServer({
-  /* … */
+  /* ... */
 });
 
 const handle = attachArcpUpgrade(httpServer, {
@@ -70,11 +70,13 @@ with `close()` to detach.
 ## DNS-rebind protection
 
 Without `allowedHosts`, the upgrade accepts any `Host` header. For
-public-facing servers, set it to the hosts you actually serve from:
+public-facing servers, set it to the bare hostnames you serve from
+(the matcher strips the port from the request's `Host` before
+comparing, so don't include `:port` in the list):
 
 ```ts
 attachArcpUpgrade(httpServer, {
-  allowedHosts: ["arcp.example.com", "arcp.example.com:443"],
+  allowedHosts: ["arcp.example.com", "127.0.0.1"],
   onTransport: (t) => arcp.accept(t),
 });
 ```
@@ -84,12 +86,16 @@ A mismatch returns `403 Forbidden` to the upgrading client.
 ## Multiple paths
 
 To host multiple ARCP namespaces on one server, attach more than
-once:
+once — `path` is a literal exact match (no prefix or glob routing),
+and unmatched paths fall through to other listeners:
 
 ```ts
 attachArcpUpgrade(httpServer, { path: "/arcp/v1", onTransport: forV1 });
 attachArcpUpgrade(httpServer, { path: "/arcp/v2", onTransport: forV2 });
 ```
+
+For tenant routing inside a single path, parse `req.url` inside
+`onTransport` and dispatch to the right `ARCPServer` instance.
 
 ## Source
 

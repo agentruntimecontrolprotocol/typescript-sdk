@@ -23,7 +23,12 @@ import {
 } from "@agentruntimecontrolprotocol/sdk";
 ```
 
-Anything in core/client/runtime is reachable through this entry point.
+Anything in core/client/runtime is reachable through this entry
+point. The package also exposes subpath entries for selective imports
+(declared in its `package.json` exports): `@agentruntimecontrolprotocol/sdk/client`,
+`@agentruntimecontrolprotocol/sdk/runtime`, `@agentruntimecontrolprotocol/sdk/transport`,
+`@agentruntimecontrolprotocol/sdk/messages`, and `@agentruntimecontrolprotocol/sdk/errors`.
+
 For tree-shakable browser bundles, prefer importing directly from
 `@agentruntimecontrolprotocol/client` (avoids pulling in the runtime).
 

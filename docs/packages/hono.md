@@ -26,7 +26,7 @@ app.get("/healthz", (c) => c.text("ok"));
 const httpServer = serve({ fetch: app.fetch, port: 3000 });
 
 const arcp = new ARCPServer({
-  /* … */
+  /* ... */
 });
 
 attachArcpToHono(httpServer, {

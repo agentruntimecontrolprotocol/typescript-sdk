@@ -53,8 +53,11 @@ console.log("resume_token:", welcome.resume_token);
 ```
 
 The promise from `client.connect()` resolves to `SessionWelcomePayload`.
-After this point, every outgoing envelope must include `session_id`
-(the SDK fills it in for you).
+The assigned `session_id` lives on the envelope (and on the client as
+`client.state.id`); the SDK fills it in for outbound traffic produced
+by helpers like `submit`, `ack`, `listJobs`, and `subscribe`. When
+calling `client.send(env)` directly you must stamp `session_id`
+yourself.
 
 ## Runtime side
 
@@ -88,21 +91,22 @@ all per-session logic internally.
 
 ## Session state machine
 
-The client tracks five phases (`packages/core/src/state/`):
+Both the client and runtime track the same four `SessionPhase` values
+(`packages/core/src/state/types.ts`):
 
 ```
-pre-handshake
+opening
   ↓ send session.hello
-awaiting-welcome
   ↓ receive session.welcome
 accepted     ←→  any normal message
   ↓ send/receive session.bye  OR  transport closes
-closed
+closing
 ```
 
-If the runtime sends `session.error` instead of `session.welcome`, the
-client transitions straight to `closed`. The transport is closed by
-the runtime as part of that emission (§6 mandates this).
+`session.error` from the runtime (or any pre-welcome rejection) puts
+the session into `rejected` instead of `closing`. `accepted` is the
+only phase from which traffic flows. The transport is closed by the
+runtime as part of `session.error` emission (§6 mandates this).
 
 ## Closing cleanly
 
@@ -151,29 +155,32 @@ The runtime applies caps to protect against runaway sessions
 | `maxBufferedBytes`  | 16 MiB  | Resume buffer byte ceiling.                |
 | `maxConcurrentJobs` | 100     | Live `pending`/`running` jobs per session. |
 
-Exceeding any cap surfaces as a `session.error` with code
-`RESOURCE_EXHAUSTED`.
+Exceeding any cap closes the session with `INTERNAL_ERROR`
+(non-retryable).
 
 ## Heartbeat (v1.1, §6.4)
 
-When the `heartbeat` feature negotiates, the runtime emits
-`session.heartbeat` every `heartbeatIntervalSeconds`. The client must
-respond with `session.pong { sent_at }`. Missing two consecutive pongs
-trips `HeartbeatLostError` and closes the session.
+When the `heartbeat` feature negotiates, the runtime emits a
+`session.ping { nonce, sent_at }` every `heartbeatIntervalSeconds` and
+the peer answers with `session.pong { ping_nonce, received_at }`. The
+welcome carries the negotiated interval in
+`welcome.heartbeat_interval_sec`. Missing two consecutive pongs trips
+`HeartbeatLostError` and closes the session.
 
-The SDK handles both sides automatically when the feature is enabled —
-you don't write any code for it.
+The SDK handles both sides automatically when the feature is
+enabled — you don't write any code for it. Pings and pongs are NOT
+counted in `event_seq`.
 
 ## Back-pressure ack (v1.1, §6.5)
 
 When `ack` is negotiated, the client periodically sends `session.ack {
-last_event_seq }`. The runtime gates streaming based on unacked events
-(configurable via `backPressureThreshold`, default 1000). Pass
-`autoAck: true` to the client to enable automatic acking:
+last_processed_seq }`. The runtime emits a `back_pressure` `status`
+event when unacked events cross `backPressureThreshold` (default
+1000). Pass `autoAck: true` to the client to enable automatic acking:
 
 ```ts
 const client = new ARCPClient({
-  // …
+  // ...
   autoAck: { intervalMs: 250, minSeqDelta: 32 },
 });
 ```

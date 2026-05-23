@@ -32,7 +32,7 @@ const bearer = new StaticBearerVerifier(
   ]),
 );
 
-const server = new ARCPServer({ /* … */, bearer });
+const server = new ARCPServer({ /* ... */, bearer });
 ```
 
 Each `BearerIdentity` carries:
@@ -73,7 +73,7 @@ class JwtVerifier implements BearerVerifier {
 }
 
 const server = new ARCPServer({
-  // …
+  // ...
   bearer: new JwtVerifier(jwks),
 });
 ```
@@ -92,7 +92,11 @@ job submitted within it. Inside an agent handler:
 server.registerAgent("introspect", async (input, ctx) => {
   // ctx.sessionId — for diagnostics
   // ctx.lease — capability grant for this job
-  // The principal is on the parent Job: ctx.job.submitterPrincipal
+  // The principal is not exposed on JobContext directly; it lives on
+  // the runtime-side Job (`job.submitterPrincipal`). When you need it
+  // inside an agent, capture it on submit and pass it through `input`,
+  // or use a custom registration wrapper that closes over the
+  // accepted identity.
   return { ok: true };
 });
 ```
@@ -102,7 +106,7 @@ principal — same-principal-only is the default:
 
 ```ts
 new ARCPServer({
-  // …
+  // ...
   jobAuthorizationPolicy: (job, principal) =>
     job.submitterPrincipal === principal,
 });
@@ -134,22 +138,15 @@ attachArcpUpgrade(httpServer, {
 
 ## Vendor auth extensions
 
-ARCP v1.1 reserves `authScheme: "bearer"` as the only standard value.
-Custom schemes go through the `x-vendor.*` namespace:
-
-```ts
-// hypothetical mTLS extension
-const client = new ARCPClient({
-  // …
-  authScheme: "x-vendor.acme.mtls" as any,
-  extensions: {
-    "x-vendor.acme.mtls": { cert: pem },
-  },
-});
-```
-
-The runtime side must register a verifier that recognizes the scheme.
-See [vendor-extensions.md](./vendor-extensions.md).
+The `auth.scheme` field on `session.hello` is pinned to the literal
+`"bearer"` by `AuthSchemeSchema`, so vendor schemes cannot be smuggled
+in there. Out-of-band credentials (mTLS, signed proxy headers, etc.)
+travel on the transport layer — terminate them upstream of the WS
+upgrade and inject the resulting bearer token (or a synthesized one)
+on the `session.hello` envelope before the runtime sees it. Vendor
+metadata about the auth method may be sent in `envelope.extensions`
+under the `x-vendor.*` namespace; see
+[vendor-extensions.md](./vendor-extensions.md).
 
 ## Runnable example
 

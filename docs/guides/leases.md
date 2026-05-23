@@ -9,13 +9,14 @@ narrow but never widen what the client requests.
 
 ```ts
 type Lease = {
-  [capability: string]: readonly string[]; // glob patterns
+  [capability: string]: string[]; // glob patterns (or budget amounts for cost.budget)
 };
 ```
 
-A capability name is `<namespace>:<resource>`. Reserved namespaces:
+A lease is keyed by capability name; each value is an array of
+patterns. Reserved capability names:
 
-| Namespace        | What it gates                                          |
+| Capability       | What it gates                                          |
 | ---------------- | ------------------------------------------------------ |
 | `fs.read`        | Filesystem reads. Pattern is a path glob.              |
 | `fs.write`       | Filesystem writes.                                     |
@@ -23,9 +24,10 @@ A capability name is `<namespace>:<resource>`. Reserved namespaces:
 | `tool.call`      | Tool invocation. Pattern matches against `tool` name.  |
 | `agent.delegate` | Spawning child jobs. Pattern matches child agent name. |
 | `model.use`      | LLM model invocation. Pattern matches model id/name.   |
-| `cost.budget`    | Spend cap, encoded as `CURRENCY:amount` patterns.      |
+| `cost.budget`    | Spend cap; entries are `currency:amount` strings (see §9.6 below). |
 
-Custom namespaces MUST use `x-vendor.<vendor>.<cap>`:
+Custom capability names MUST use `x-vendor.<vendor>.<cap>` (at least
+three dot-separated segments after the `x-vendor.` prefix):
 
 ```ts
 const lease = {
@@ -56,27 +58,28 @@ const handle = await client.submit({
 
 Examples:
 
-| Pattern                      | Matches                               | Does not match                        |
+| Pattern (under capability)   | Matches                               | Does not match                        |
 | ---------------------------- | ------------------------------------- | ------------------------------------- |
 | `https://api.example.com/*`  | `https://api.example.com/v1`          | `https://api.example.com/v1/users`    |
 | `https://api.example.com/**` | `https://api.example.com/v1/users/42` | `https://other.example.com/`          |
 | `s3://reports/**.csv`        | `s3://reports/2026/W19.csv`           | `s3://reports/2026/W19.json`          |
-| `tool.call:web.*`            | `web.search`                          | `web.search.advanced` (extra segment) |
+| `web.*` (under `tool.call`)  | `web.search`                          | `web.search.advanced` (extra segment) |
 
 ## Canonicalization (§14)
 
 Before pattern matching, the runtime canonicalizes the target to
-prevent obvious bypasses:
+prevent obvious bypasses (`canonicalizeTarget` in
+[`packages/runtime/src/lease.ts`](../../packages/runtime/src/lease.ts)):
 
-- `..` and `.` path segments collapse.
-- URL scheme is lower-cased; default ports are dropped.
-- Repeated slashes collapse to one.
-- Trailing slashes are normalized.
-- Percent-encoded ASCII control chars are decoded.
+- URL scheme is lower-cased; the rest of the URL is left as-is.
+- For path-form targets, `.` and `..` segments are resolved, repeated
+  slashes collapse, and trailing/leading slashes are normalized.
 
-This means `https://API.example.com:443/path/../other` is checked as
-`https://api.example.com/other`. Patterns should be written against
-the canonical form.
+This means `https://API.example.com/path` is checked as
+`https://api.example.com/path`, and `/a/./b/../c` is checked as
+`/a/c`. Patterns should be written against the canonical form. The
+SDK does not normalize default ports, percent-encoding, or
+case-folded paths — make those assumptions explicit in your patterns.
 
 ## Immutability at submit
 
@@ -163,25 +166,29 @@ whether to abort.
 
 ## Budgets (v1.1, §9.6)
 
-`leaseConstraints.budgets` is `{ currency: amount }`:
+Budgets live inside the lease under the `cost.budget` capability.
+Each entry is a `currency:decimal` string; when multiple entries
+share a currency, amounts sum:
 
 ```ts
 await client.submit({
   agent: "research",
   input: {},
-  lease: { "net.fetch": ["https://**"] },
-  leaseConstraints: {
-    budgets: { usd: 2.0, tokens: 100_000 },
+  lease: {
+    "net.fetch": ["https://**"],
+    "cost.budget": ["USD:2.00", "tokens:100000"],
   },
 });
 ```
 
-Agents drive consumption via `ctx.metric()` — when `unit` matches a
-budget currency, the runtime decrements. Exhaustion throws
+Agents drive consumption via `ctx.metric({ name, value, unit })` —
+when `name` starts with `cost.` and `unit` matches a budgeted
+currency, the runtime decrements the counter. Exhaustion throws
 `BudgetExhaustedError` from the next lease-gated operation.
 
-The runtime also emits a `metric` event with name `budget_remaining`
-when consumption crosses 5% deltas (debounced).
+The runtime also emits a `metric` event with name
+`cost.budget.remaining` when consumption crosses 5% deltas
+(debounced).
 
 ## Model Use (v1.1, §9.7)
 

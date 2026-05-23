@@ -25,12 +25,14 @@ matches what the client sends.
 **Causes:**
 
 - Reconnected after `resume_window_sec` elapsed.
-- The runtime restarted (default `EventLog` is in-memory).
+- The runtime restarted (default `EventLog` is `new
+  Database(":memory:")` — backed by SQLite, but not persisted).
 
 **Fix:**
 
-- Persist the event log if you need cross-restart resume — implement
-  the `EventLog` interface against SQLite/Postgres/Redis.
+- Persist the event log if you need cross-restart resume — pass an
+  `EventLog` with a file path (`new EventLog({ path: "arcp.db" })`)
+  or subclass it to back the same surface with another store.
 - Increase `resumeWindowSeconds` if the workload is bursty and clients
   may take long to reconnect.
 
@@ -132,25 +134,27 @@ isn't acking events fast enough.
 
 **Causes:**
 
-- Resume buffer is unbounded — by default it accepts up to
-  `maxBufferedEvents = 10_000` / `maxBufferedBytes = 16 MiB` per
-  session. Long-running sessions with many subscribers can hit this.
+- Resume buffer caps are tracked per session — defaults are
+  `maxBufferedEvents = 10_000`, `maxBufferedBytes = 16 MiB`, and
+  `maxConcurrentJobs = 100` (see `SessionCaps`). Hitting any of these
+  closes the session with `INTERNAL_ERROR` (non-retryable).
 - Idempotency cache TTL is 24h by default; high-throughput tenants
   with many distinct keys accumulate entries.
 
 **Fix:**
 
-- Lower `caps.maxBufferedBytes` / `caps.maxBufferedEvents`.
+- Lower `caps.maxBufferedBytes` / `caps.maxBufferedEvents` /
+  `caps.maxConcurrentJobs` on `ARCPServerOptions`.
 - Lower `idempotencyTtlMs` if your retry window is shorter.
-- Use a persistent `EventLog` so the buffer doesn't grow in process
-  memory.
+- Point `EventLog` at a file path so the on-disk SQLite store backs
+  the buffer instead of the in-memory database.
 
 ## `HEARTBEAT_LOST`
 
 **Symptom:** session closes after a network hiccup, even though the
 transport itself stayed open.
 
-**Cause:** two consecutive `session.heartbeat` pings went un-ponged.
+**Cause:** two consecutive `session.ping` frames went un-ponged.
 
 **Fix:**
 
@@ -180,6 +184,10 @@ exact input parity.
 **Fix:**
 
 - Inspect `welcome.capabilities.agents` for the available versions.
+  When the rich shape is in use, each entry is
+  `{ name, versions: string[], default?: string }`; pass the result
+  through `normalizeAgentInventory(...)` if you receive the legacy
+  flat `string[]` shape.
 - Submit without a `@version` to get the runtime's default.
 
 ## Events arrive but `handle.done` never resolves

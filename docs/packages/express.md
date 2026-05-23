@@ -24,7 +24,7 @@ app.get("/healthz", (_req, res) => res.send("ok"));
 
 const httpServer = createServer(app);
 const arcp = new ARCPServer({
-  /* … */
+  /* ... */
 });
 
 attachArcpToExpress(httpServer, {

@@ -31,7 +31,10 @@ import { WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 // Original connect
 const welcome = await client.connect(transport);
 const stash = {
-  session_id: welcome.session_id,
+  // The session_id lives on the envelope, not the welcome payload —
+  // pull it from the client (or capture it off `env.session_id` in a
+  // handler). `client.state.id` is set when the welcome resolves.
+  session_id: client.state.id!,
   resume_token: welcome.resume_token,
   last_event_seq: 0,
 };
@@ -40,9 +43,9 @@ client.on("job.event", (env) => {
   stash.last_event_seq = env.event_seq!; // monotonic, gap-free
 });
 
-// …transport drops…
+// ...transport drops...
 
-const fresh = await WebSocketTransport.connect("wss://…/arcp");
+const fresh = await WebSocketTransport.connect("wss://.../arcp");
 const resumed = await client.resume(fresh, stash);
 // new resume_token returned on the welcome — replace stash.resume_token
 stash.resume_token = resumed.resume_token;
@@ -80,9 +83,9 @@ completes, live events resume from `latestSeq + 1`. The client cannot
 observe duplicates or holes during resume:
 
 ```
-buffer:     5 6 7 8 9 10        live: 11 12 13 …
+buffer:     5 6 7 8 9 10        live: 11 12 13 ...
 last seen:        ^7
-replay:       8 9 10  →  11 12 13 …
+replay:       8 9 10  →  11 12 13 ...
 ```
 
 If `last_event_seq` is **higher** than what the runtime has buffered,
@@ -97,7 +100,7 @@ runtime:
 
 ```ts
 new ARCPServer({
-  // …
+  // ...
   resumeWindowSeconds: 1800, // 30 min
 });
 ```

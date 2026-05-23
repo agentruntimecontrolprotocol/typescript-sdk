@@ -27,7 +27,7 @@ server.registerAgent("orchestrator", async (input, ctx) => {
     },
   });
 
-  // …more work…
+  // ...more work...
   return { ok: true };
 });
 ```
@@ -93,11 +93,15 @@ Children appear as ordinary jobs on the same session:
 ```ts
 const handle = await client.submit({ agent: "orchestrator", input: {} });
 
+// The parent's job.accepted is consumed by client.submit(); child
+// jobs reach you via job.event (the runtime fans out the delegate
+// event on the parent's stream) and via job.accepted envelopes for
+// the child that carry `parent_job_id` / `delegate_id`.
 client.on("job.accepted", (env) => {
   if (env.type !== "job.accepted") return;
   const { job_id, parent_job_id, delegate_id } = env.payload;
-  if (parent_job_id) {
-    console.log(`child ${job_id} (delegate_id=${delegate_id})`);
+  if (parent_job_id !== undefined && parent_job_id !== null) {
+    console.log(`child ${job_id} (delegate_id=${delegate_id ?? ""})`);
   }
 });
 
@@ -138,9 +142,9 @@ server.registerAgent("orchestrator", async (input, ctx) => {
   const children = new Set<JobId>();
   try {
     await ctx.delegate({
-      /* … */
+      /* ... */
     });
-    // …
+    // ...
   } finally {
     if (ctx.signal.aborted) {
       // emit cancel intents for children — they're separate jobs
@@ -160,22 +164,15 @@ it's an application convention.
 
 ## Idempotency
 
-Children may carry their own `idempotency_key` in the delegate body,
-treated identically to top-level submission keys:
-
-```ts
-await ctx.delegate({
-  delegate_id: "summary",
-  agent: "summarize",
-  input: { source: doc },
-  lease_request: { "tool.call": ["summarize"] },
-  idempotency_key: `summary-${docHash}`,
-});
-```
-
-The runtime's `(principal, idempotency_key)` cache spans top-level
-submits and delegations — a duplicate key from any path collapses to
-the same job.
+The `delegate` event body (`DelegateBodySchema`) carries
+`{ delegate_id, agent, input, lease_request?, lease_constraints? }`.
+There is no `idempotency_key` field on the delegate body in v1.1 —
+the parent's `delegate_id` is the local correlation handle, and the
+runtime assigns a fresh `job_id` to each child. If you need
+content-addressed idempotency for delegated work, route it through a
+top-level `client.submit({ idempotencyKey })` with a parent job that
+proxies the result, or compute and cache the result yourself in the
+parent agent.
 
 ## Runnable example
 

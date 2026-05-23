@@ -14,7 +14,11 @@ understood, never silently dropped.
 | Event `kind` (inside `job.event.payload`) | `x-vendor.<vendor>.<kind>`   |
 | Lease capability namespace                | `x-vendor.<vendor>.<cap>`    |
 | Envelope `extensions` object keys         | `x-vendor.<vendor>.<key>`    |
-| Auth scheme                               | `x-vendor.<vendor>.<scheme>` |
+
+The `auth.scheme` field is pinned to the literal `"bearer"` in v1.1.
+Out-of-band auth schemes (mTLS, signed proxy headers) terminate
+upstream of the WS upgrade — see
+[auth.md](./auth.md#vendor-auth-extensions).
 
 ## Naming rules
 
@@ -72,18 +76,21 @@ type AcmeWarmup = {
   payload: { model: string };
 };
 
-// Client sends
+// Client sends — `client.send()` does NOT auto-fill session_id, so
+// stamp it explicitly from the accepted state.
 await client.send({
   arcp: "1.1",
   id: newMessageId(),
   type: "x-vendor.acme.warmup",
-  session_id: client.state.sessionId!,
+  session_id: client.state.id!,
   payload: { model: "gpt-4o-mini" },
 });
 
 // Runtime handler (registered on a SessionContext)
 sessionCtx.registerHandler("x-vendor.acme.warmup", async (env) => {
-  await warmup(env.payload.model);
+  // `env.type` is the vendor type; cast `env.payload` to your local shape.
+  const body = env.payload as { model: string };
+  await warmup(body.model);
 });
 ```
 
@@ -112,12 +119,12 @@ Every envelope carries an optional `extensions` object:
 ```ts
 {
   arcp: "1.1",
-  id: "01J…",
+  id: "01J...",
   type: "job.submit",
-  payload: { /* … */ },
+  payload: { /* ... */ },
   extensions: {
     "x-vendor.opentelemetry.tracecontext": {
-      traceparent: "00-…",
+      traceparent: "00-...",
       tracestate: "vendor=value",
     },
   },
@@ -148,21 +155,28 @@ A few rules of thumb when adding extensions:
 
 ## Discovery via `capabilities`
 
-If you want clients to opt in to your extension, advertise it on
-`session.welcome.capabilities`:
+`CapabilitiesSchema` defines three reserved keys (`encodings`,
+`agents`, `features`); any other top-level key is round-tripped as a
+vendor advertisement. Use an `x-vendor.<you>.<name>` key on
+`capabilities` to broadcast extension availability:
 
 ```ts
 new ARCPServer({
   capabilities: {
     encodings: ["json"],
     agents: ["echo"],
-    extensions: ["x-vendor.acme.warmup", "x-vendor.acme.confidence"],
+    "x-vendor.acme.extensions": [
+      "x-vendor.acme.warmup",
+      "x-vendor.acme.confidence",
+    ],
   },
 });
 ```
 
-The client can introspect `welcome.capabilities.extensions` to decide
-whether to send the corresponding envelopes.
+The client can introspect `welcome.capabilities["x-vendor.acme.extensions"]`
+to decide whether to send the corresponding envelopes. Standard v1.1
+feature negotiation goes through `capabilities.features` and
+`hasFeature(name)` — use that for non-vendor flags.
 
 ## Runnable example
 
