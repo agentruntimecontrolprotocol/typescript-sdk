@@ -1,4 +1,4 @@
-<h1 align="center">ARCP TypeScript SDK</h1>
+<h3 align="center">ARCP TypeScript SDK</h1>
 
 <p align="center"><strong>TypeScript SDK for the Agent Runtime Control Protocol (ARCP) — submit, observe, and control long-running agent jobs from TypeScript.</strong></p>
 
