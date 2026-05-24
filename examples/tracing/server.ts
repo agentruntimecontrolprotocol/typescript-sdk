@@ -2,9 +2,10 @@
  * Tracing example — server.
  *
  * Wires `@agentruntimecontrolprotocol/middleware-otel` into the runtime side so every inbound
- * frame extracts the W3C trace context from `extensions["x.otel"]` and
- * every outbound frame injects one. Spans are exported to the console
- * via `ConsoleSpanExporter` — no collector required.
+ * frame extracts the W3C trace context from
+ * `extensions["x-vendor.opentelemetry.tracecontext"]` and every outbound
+ * frame injects one. Spans are exported to the console via
+ * `ConsoleSpanExporter` — no collector required.
  */
 
 import {

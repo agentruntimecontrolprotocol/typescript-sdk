@@ -6,11 +6,13 @@
  *
  *   - Outbound `send` calls produce a `arcp.send` span with the envelope
  *     type/id/session_id as attributes, and the active trace context is
- *     injected into the envelope's `extensions["x.otel"]` field (W3C
- *     traceparent + tracestate) so the peer can continue the trace.
+ *     injected into the envelope's
+ *     `extensions["x-vendor.opentelemetry.tracecontext"]` field (W3C
+ *     `traceparent` + `tracestate`) so the peer can continue the trace.
  *   - Inbound frames produce a `arcp.recv` span, extracting any
- *     `extensions["x.otel"]` trace context so the inbound frame appears
- *     as a child of the originating span on the remote end.
+ *     `extensions["x-vendor.opentelemetry.tracecontext"]` trace context so
+ *     the inbound frame appears as a child of the originating span on the
+ *     remote end.
  *
  * Wire it on either side:
  * ```ts
@@ -50,7 +52,8 @@ const OTEL_EXTENSION_NAME = "x-vendor.opentelemetry.tracecontext" as const;
 
 /**
  * Wrap a {@link Transport} so each frame produces a span and W3C trace
- * context is propagated through `envelope.extensions["x.otel"]`.
+ * context is propagated through
+ * `envelope.extensions["x-vendor.opentelemetry.tracecontext"]`.
  *
  * The returned transport satisfies the same interface, so it is a drop-in
  * for `ARCPServer.accept(...)` / `ARCPClient.connect(...)`.
