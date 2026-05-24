@@ -1,6 +1,6 @@
 {
   "name": "@agentruntimecontrolprotocol/node",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Node.js HTTP server integration for the ARCP WebSocket transport. Wires the WS upgrade handshake onto an existing `http.Server` with Host-header DNS-rebinding protection.",
   "license": "Apache-2.0",
   "repository": {

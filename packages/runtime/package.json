@@ -1,6 +1,6 @@
 {
   "name": "@agentruntimecontrolprotocol/runtime",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Server/runtime implementation of the Agent Runtime Control Protocol (ARCP): session state machine, job manager, lease manager, subscription manager, artifact store, and the event log.",
   "license": "Apache-2.0",
   "repository": {
