@@ -23,7 +23,7 @@ Section-by-section status lives in
 | §7.4 Cancellation          | full   | 30s grace by default.                                              |
 | §7.5 Agent versions        | full   | Negotiated via `agent_versions` feature flag.                      |
 | §7.6 Subscribe             | full   | Per-job cross-session subscription.                                |
-| §8 Job events              | full   | All eight reserved kinds + `x-vendor.*`.                           |
+| §8 Job events              | full   | All ten reserved kinds + `x-vendor.*`.                           |
 | §8.2.1 Progress            | full   | Negotiated via `progress` feature flag.                            |
 | §8.3 Sequence numbers      | full   | Session-scoped, strictly monotonic.                                |
 | §8.4 Result chunks         | full   | Negotiated via `result_chunk` feature flag.                        |

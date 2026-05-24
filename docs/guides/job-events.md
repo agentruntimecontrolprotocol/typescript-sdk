@@ -1,10 +1,10 @@
 # Job events (§8)
 
 Every signal an agent emits during a job is one `job.event` envelope.
-There are eight reserved kinds plus the `x-vendor.*` extension
-namespace.
+There are ten reserved kinds, including the v1.1 `progress` and
+`result_chunk` additions, plus the `x-vendor.*` extension namespace.
 
-## The eight kinds
+## The ten kinds
 
 | Kind           | Body                                            | Purpose                                    |
 | -------------- | ----------------------------------------------- | ------------------------------------------ |
