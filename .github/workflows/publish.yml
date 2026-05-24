@@ -4,11 +4,19 @@
 # root (package.json `"private": true`) is never published.
 #
 # Required repo configuration:
-#   - Secret: NPM_TOKEN (npm automation token with publish rights to the
-#     @agentruntimecontrolprotocol scope — create at npmjs.com → Access Tokens → Automation)
+#   - npm Trusted Publisher must be configured on every
+#     @agentruntimecontrolprotocol/* package (npmjs.com → package → Settings →
+#     Trusted Publishers) pointing at:
+#       repository:      agentruntimecontrolprotocol/typescript-sdk
+#       workflow:        publish.yml
+#       environment:     (none)
+#     With trusted publishers in place the workflow authenticates to npm via
+#     the OIDC token GitHub Actions mints from `id-token: write`; no NPM_TOKEN
+#     secret is needed.
 #   - The built-in GITHUB_TOKEN is used for GitHub Packages; the job grants
 #     `packages: write` below.
-#   - `id-token: write` is required for npm provenance (sigstore OIDC).
+#   - `id-token: write` is required for both npm publish (trusted publisher
+#     handshake) and npm provenance (sigstore attestation).
 
 name: publish
 
@@ -52,13 +60,15 @@ jobs:
           version: 9.15.0
           run_install: false
 
-      - name: Setup Node.js (npm registry)
+      - name: Setup Node.js
+        # No registry-url/scope: that would cause setup-node to write an
+        # `_authToken=${NODE_AUTH_TOKEN}` line into ~/.npmrc, which then
+        # short-circuits the trusted-publisher OIDC handshake when no token is
+        # present. The npm publish step passes --registry explicitly instead.
         uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "pnpm"
-          registry-url: "https://registry.npmjs.org"
-          scope: "@agentruntimecontrolprotocol"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -86,8 +96,8 @@ jobs:
           cat .publish-dirs.txt
 
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # No NODE_AUTH_TOKEN: npm CLI uses the OIDC token from `id-token: write`
+        # against the npmjs.com trusted-publisher configured for each package.
         run: |
           set -euo pipefail
 
