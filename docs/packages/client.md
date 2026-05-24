@@ -204,7 +204,7 @@ Returned by `submit()`.
 | `agent?: string`                                           | v1.1 — resolved agent ref including version.      |
 | `traceId?: TraceId`                                        | Same id if you passed one in.                     |
 | `leaseConstraints?: LeaseConstraints`                      | v1.1 lease constraints (`{ expires_at? }`).       |
-| `budget?: ReadonlyMap<string, number>`                     | v1.1 initial per-currency budget.                 |
+| `budget?: Readonly<Record<string, number>>`                | v1.1 initial per-currency budget; access with `budget?.USD` or `budget?.["USD"]`. |
 | `credentials?: readonly IssuedCredential["wire"][]`        | v1.1 provisioned credentials.                     |
 | `done: Promise<JobResultPayload>`                          | Resolves on `job.result`, rejects on `job.error`. |
 | `collectChunks(): Promise<Buffer \| string>`               | v1.1 — assemble `result_chunk` stream.            |
