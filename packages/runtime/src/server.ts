@@ -92,6 +92,13 @@ export class ARCPServer {
   public readonly subscribers = new Map<string, Set<SessionContext>>();
   private resumeSweep: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Create a runtime with the supplied options.
+   *
+   * @param options - Runtime configuration, including transport policy
+   *   and optional credential provisioning.
+   * @throws {TypeError} When a provisioner is configured without a store.
+   */
   public constructor(public readonly options: ARCPServerOptions) {
     // §14 — credential revocation reliability: a provisioner without a store
     // means credentials issued to crash-recovered jobs cannot be revoked.
@@ -118,6 +125,8 @@ export class ARCPServer {
    * v1.1 feature flags this runtime advertises. Defaults to every v1.1
    * feature, but filters out `provisioned_credentials` and `model.use` when
    * no `credentialProvisioner` is configured (§9.7 — feature flag gating).
+   *
+   * @returns The runtime's advertised feature list.
    */
   public get advertisedFeatures(): readonly string[] {
     const base = this.options.features ?? V1_1_FEATURES;
@@ -134,6 +143,9 @@ export class ARCPServer {
    * name match this. If a versioned handler is also registered, bare-name
    * submissions resolve to the default version (or the unversioned handler
    * if no default is set).
+   *
+   * @param name - Agent name to register.
+   * @param handler - Handler invoked for matching submissions.
    */
   public registerAgent<Input = unknown, Result = unknown>(
     name: string,
@@ -146,6 +158,10 @@ export class ARCPServer {
    * v1.1 §7.5 — register a versioned agent handler. The same `name` MAY have
    * multiple versions; use {@link setDefaultAgentVersion} to choose which one
    * resolves for bare-name submissions.
+   *
+   * @param name - Agent name to version.
+   * @param version - Version string to associate with the handler.
+   * @param handler - Handler invoked for the versioned agent.
    */
   public registerAgentVersion<Input = unknown, Result = unknown>(
     name: string,
@@ -155,7 +171,11 @@ export class ARCPServer {
     this.agentRegistry.registerVersion(name, version, handler);
   }
 
-  /** v1.1 §7.5 — set the default version for bare-name submissions. */
+  /** v1.1 §7.5 — set the default version for bare-name submissions.
+   *
+   * @param name - Agent name to default.
+   * @param version - Version string to use for bare-name submissions.
+   */
   public setDefaultAgentVersion(name: string, version: string): void {
     this.agentRegistry.setDefaultVersion(name, version);
   }
@@ -168,6 +188,10 @@ export class ARCPServer {
    * Resolve a parsed agent reference to a concrete handler. Returns the
    * resolved version (may be empty string for unversioned). Throws
    * `AgentNotAvailableError` / `AgentVersionNotAvailableError` per §7.5.
+   *
+   * @param name - Agent name to resolve.
+   * @param version - Optional pinned version.
+   * @returns The resolved handler and version.
    */
   public resolveAgent(
     name: string,
@@ -176,7 +200,10 @@ export class ARCPServer {
     return this.agentRegistry.resolve(name, version);
   }
 
-  /** Build the rich agent inventory shape (§6.2 / §7.5) for advertisement. */
+  /** Build the rich agent inventory shape (§6.2 / §7.5) for advertisement.
+   *
+   * @returns The current agent inventory.
+   */
   public getAgentInventory(): AgentInventoryEntry[] {
     return this.agentRegistry.inventory();
   }
@@ -184,6 +211,9 @@ export class ARCPServer {
   /**
    * Adopt a {@link Transport} as a new session. Returns the
    * {@link SessionContext}; the handshake completes asynchronously.
+   *
+   * @param transport - Transport to accept.
+   * @returns A session context wired to the transport.
    */
   public accept(transport: Transport): SessionContext {
     const ctx = new SessionContextCtor(transport, this, this.logger);
@@ -201,7 +231,10 @@ export class ARCPServer {
     return ctx;
   }
 
-  /** Close the runtime and the underlying event log. */
+  /** Close the runtime and the underlying event log.
+   *
+   * @returns A promise that resolves when shutdown is complete.
+   */
   public async close(): Promise<void> {
     if (this.resumeSweep !== null) {
       clearInterval(this.resumeSweep);

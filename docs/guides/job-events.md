@@ -16,6 +16,8 @@ There are ten reserved kinds, including the v1.1 `progress` and
 | `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                       |
 | `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact.                  |
 | `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Spawn a child job (§10).                   |
+| `progress`     | `{ current, total?, units?, message? }`         | Structured progress update.                |
+| `result_chunk` | `{ result_id, chunk_seq, data, encoding, more }`| Fragment of a streamed result.             |
 
 `tool_result` carries either `result` or `error` (mutually exclusive).
 `artifact_ref` is a reference; storage is out of scope for ARCP. The
@@ -172,7 +174,7 @@ a single job.
 
 ## Vendor extension events
 
-Kinds outside the reserved eight must use the `x-vendor.<vendor>.<kind>`
+Kinds outside the reserved ten must use the `x-vendor.<vendor>.<kind>`
 namespace:
 
 ```ts

@@ -58,10 +58,9 @@ import type {
  * Client-side driver for an ARCP v1.1 session (§6).
  *
  * One client instance owns one transport and one session. After
- * {@link ARCPClient.connect} resolves, the session is in the `accepted`
- * phase and {@link ARCPClient.submit} may be called to launch jobs.
- * Use {@link ARCPClient.resume} to recover a prior session within the
- * runtime's resume window.
+ * {@link ARCPClient.connect} resolves, the session is ready for job
+ * submission and observation. Use {@link ARCPClient.resume} to recover a
+ * prior session within the runtime's resume window.
  */
 export class ARCPClient {
   public readonly state = new SessionState();
@@ -135,8 +134,10 @@ export class ARCPClient {
   /**
    * Connect over `transport` and complete the handshake.
    *
-   * Resolves with the negotiated `session.welcome` payload; rejects with
-   * an {@link ARCPError} on rejection, malformed envelopes, or timeout.
+   * @param transport - Transport to bind to this client.
+   * @param opts - Optional abort signal for the handshake.
+   * @returns The negotiated `session.welcome` payload.
+   * @throws {@link ARCPError} on rejection, malformed envelopes, or timeout.
    */
   public async connect(
     transport: Transport,
@@ -149,6 +150,12 @@ export class ARCPClient {
   /**
    * Resume a prior session under the same principal. Sends a hello with the
    * resume block and replays missed events upon welcome.
+   *
+   * @param transport - Fresh transport for the resumed session.
+   * @param resume - Resume tuple identifying the prior session.
+   * @param opts - Optional abort signal for the handshake.
+   * @returns The negotiated `session.welcome` payload.
+   * @throws {@link ARCPError} when the runtime rejects the resume request.
    */
   public async resume(
     transport: Transport,
@@ -260,12 +267,22 @@ export class ARCPClient {
     );
   }
 
-  /** Register a handler for a specific message type. */
+  /** Register a handler for a specific message type.
+   *
+   * @param type - Envelope type name to observe.
+   * @param handler - Async callback invoked for matching envelopes.
+   */
   public on(type: string, handler: ClientHandler): void {
     this.handlers.set(type, handler);
   }
 
-  /** Send an envelope to the runtime. Requires an accepted session. */
+  /** Send an envelope to the runtime. Requires an accepted session.
+   *
+   * @param env - Envelope to transmit.
+   * @param opts - Optional abort signal.
+   * @throws {@link InvalidRequestError} if the client is disconnected.
+   * @throws {@link UnauthenticatedError} if the session is not accepted.
+   */
   public async send(
     env: BaseEnvelope,
     opts: { signal?: AbortSignal } = {},
@@ -279,7 +296,10 @@ export class ARCPClient {
     await this.transport.send(env);
   }
 
-  /** Close the underlying transport, optionally sending session.bye. */
+  /** Close the underlying transport, optionally sending session.bye.
+   *
+   * @param reason - Optional close reason forwarded to the transport.
+   */
   public async close(reason?: string): Promise<void> {
     this.rejectAllPending(new CancelledError("Client closing"));
     this.clearAutoAckTimer();
@@ -324,6 +344,11 @@ export class ARCPClient {
   /**
    * Submit a job. Returns once `job.accepted` arrives, with a handle that
    * exposes `done` for the terminal `job.result` / `job.error`.
+   *
+   * @param opts - Submission payload and optional control flags.
+   * @returns A handle for the accepted job.
+   * @throws {@link InvalidRequestError} if the client is disconnected.
+   * @throws {@link UnauthenticatedError} if the session is not accepted.
    */
   public async submit(opts: SubmitOptions): Promise<JobHandle> {
     if (this.transport === null) {
@@ -398,7 +423,11 @@ export class ARCPClient {
     return null;
   }
 
-  /** Send a `job.cancel` envelope. */
+  /** Send a `job.cancel` envelope.
+   *
+   * @param jobId - Job to cancel.
+   * @param options - Optional cancellation reason and abort signal.
+   */
   public async cancelJob(
     jobId: JobId,
     options: { reason?: string; signal?: AbortSignal } = {},
@@ -423,6 +452,10 @@ export class ARCPClient {
    * been processed. The runtime MAY free buffered events earlier than the
    * resume window. This is purely advisory and does not affect resume
    * semantics.
+   *
+   * @param seq - Highest processed event sequence.
+   * @param opts - Optional abort signal.
+   * @throws {@link InvalidRequestError} if the `ack` feature was not negotiated.
    */
   public async ack(
     seq: number,
@@ -453,6 +486,11 @@ export class ARCPClient {
    * v1.1 §6.6 — request a read-only inventory of jobs accessible in this
    * session. Returns a single page; pass `cursor: result.nextCursor` to
    * fetch additional pages.
+   *
+   * @param filter - Optional server-side filter.
+   * @param opts - Paging options and abort signal.
+   * @returns A single page of jobs and the next cursor, if any.
+   * @throws {@link InvalidRequestError} if `list_jobs` was not negotiated.
    */
   public async listJobs(
     filter?: SessionListJobsFilter,
@@ -492,6 +530,11 @@ export class ARCPClient {
    * history. The returned {@link JobSubscription} exposes `unsubscribe()`;
    * events for the subscribed job arrive via the usual handlers
    * (`client.on("job.event", ...)`) as they would for any in-session job.
+   *
+   * @param jobId - Job to observe.
+   * @param opts - History and sequence options.
+   * @returns A job subscription handle.
+   * @throws {@link InvalidRequestError} if `subscribe` was not negotiated.
    */
   public async subscribe(
     jobId: JobId,
