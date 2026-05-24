@@ -1,14 +1,14 @@
-# Publishes all @agentruntimecontrolprotocol/* workspace packages to npm after the `test` workflow
-# succeeds on main, skipping any package whose local version is already on the
-# registry. The workspace root (package.json `"private": true`) is never
-# published.
+# Publishes all @agentruntimecontrolprotocol/* workspace packages to npm and
+# GitHub Packages after the `test` workflow succeeds on main, skipping any
+# package whose local version is already on the target registry. The workspace
+# root (package.json `"private": true`) is never published.
 #
 # Required repo configuration:
 #   - Secret: NPM_TOKEN (npm automation token with publish rights to the
 #     @agentruntimecontrolprotocol scope — create at npmjs.com → Access Tokens → Automation)
-#   - Settings > Actions > General > Workflow permissions: "Read and write"
-#     is NOT required; this workflow only needs id-token:write (set below)
-#     for npm provenance.
+#   - The built-in GITHUB_TOKEN is used for GitHub Packages; the job grants
+#     `packages: write` below.
+#   - `id-token: write` is required for npm provenance (sigstore OIDC).
 
 name: publish
 
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   publish:
-    name: publish to npm
+    name: publish to npm + GitHub Packages
     runs-on: ubuntu-latest
     # Only run if the test workflow succeeded (or this was manually dispatched).
     if: >
@@ -35,6 +35,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # required for npm provenance
+      packages: write # required for GitHub Packages publish
 
     steps:
       - name: Checkout
@@ -51,12 +52,13 @@ jobs:
           version: 9.15.0
           run_install: false
 
-      - name: Setup Node.js
+      - name: Setup Node.js (npm registry)
         uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
+          scope: "@agentruntimecontrolprotocol"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -64,45 +66,91 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Publish workspace packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Collect publishable packages
+        id: collect
         run: |
           set -euo pipefail
-
-          # Collect every publishable (non-private) package directory by
-          # scanning packages/ and packages/middleware/*.
-          mapfile -t PACKAGE_DIRS < <(
-            find packages -maxdepth 2 -name "package.json" \
+          # Walk packages/ to depth 3 so packages/middleware/<name>/package.json
+          # is included alongside packages/<name>/package.json.
+          {
+            find packages -maxdepth 3 -name "package.json" \
               -not -path "*/node_modules/*" \
+              -not -path "*/dist/*" \
               | while IFS= read -r manifest; do
                   dir=$(dirname "$manifest")
                   private=$(node -p "require('./$manifest').private || false")
                   [ "$private" = "false" ] && echo "$dir"
                 done
-          )
+          } > .publish-dirs.txt
+          echo "Packages to consider:"
+          cat .publish-dirs.txt
 
-          published_count=0
-          skipped_count=0
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
 
-          for dir in "${PACKAGE_DIRS[@]}"; do
+          published=0
+          skipped=0
+
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
             name=$(node -p "require('./$dir/package.json').name")
             local_ver=$(node -p "require('./$dir/package.json').version")
             # npm view exits non-zero if the package was never published.
-            npm_ver=$(npm view "$name" version 2>/dev/null || echo "")
+            npm_ver=$(npm view "$name" version --registry=https://registry.npmjs.org 2>/dev/null || echo "")
 
             if [ "$local_ver" = "$npm_ver" ]; then
               echo "  [skip] $name@$local_ver — already on npm"
-              skipped_count=$((skipped_count + 1))
+              skipped=$((skipped + 1))
             else
               echo "[publish] $name@$local_ver (npm has '${npm_ver:-nothing}')"
               # publishConfig in each package.json carries access=public and
               # provenance=true; --provenance here is the CLI counterpart that
               # activates the OIDC token flow in GitHub Actions.
-              (cd "$dir" && npm publish --provenance)
-              published_count=$((published_count + 1))
+              (cd "$dir" && npm publish --provenance --registry=https://registry.npmjs.org)
+              published=$((published + 1))
             fi
-          done
+          done < .publish-dirs.txt
 
           echo ""
-          echo "Done — published: $published_count  skipped: $skipped_count"
+          echo "npm — published: $published  skipped: $skipped"
+
+      - name: Setup Node.js (GitHub Packages registry)
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@agentruntimecontrolprotocol"
+
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GitHub Packages doesn't participate in the sigstore provenance
+          # flow; override the publishConfig.provenance=true set per-package.
+          NPM_CONFIG_PROVENANCE: "false"
+        run: |
+          set -euo pipefail
+
+          published=0
+          skipped=0
+
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            name=$(node -p "require('./$dir/package.json').name")
+            local_ver=$(node -p "require('./$dir/package.json').version")
+            gh_ver=$(npm view "$name" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "")
+
+            if [ "$local_ver" = "$gh_ver" ]; then
+              echo "  [skip] $name@$local_ver — already on GitHub Packages"
+              skipped=$((skipped + 1))
+            else
+              echo "[publish] $name@$local_ver (GitHub Packages has '${gh_ver:-nothing}')"
+              (cd "$dir" && npm publish --registry=https://npm.pkg.github.com)
+              published=$((published + 1))
+            fi
+          done < .publish-dirs.txt
+
+          echo ""
+          echo "GitHub Packages — published: $published  skipped: $skipped"

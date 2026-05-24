@@ -1,6 +1,6 @@
 {
   "name": "@agentruntimecontrolprotocol/hono",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hono helpers for the Agent Runtime Control Protocol (ARCP). Creates a Hono app with safe defaults and attaches the ARCP WebSocket upgrade handler when served via @hono/node-server.",
   "license": "Apache-2.0",
   "repository": {
