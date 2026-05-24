@@ -27,13 +27,19 @@ patterns. Reserved capability names:
 | `cost.budget`    | Spend cap; entries are `currency:amount` strings (see §9.6 below). |
 
 Custom capability names MUST use `x-vendor.<vendor>.<cap>` (at least
-three dot-separated segments after the `x-vendor.` prefix):
+two dot-separated segments after the `x-vendor.` prefix). See the
+[vendor extensions guide](./vendor-extensions.md) for the canonical
+namespace rules:
 
 ```ts
 const lease = {
   "x-vendor.acme.kafka.publish": ["topic-events-*"],
 };
 ```
+
+For the same namespace shape in another ARCP surface, the tracing
+middleware uses `x-vendor.opentelemetry.tracecontext` as its envelope
+extension key.
 
 ## Example
 
