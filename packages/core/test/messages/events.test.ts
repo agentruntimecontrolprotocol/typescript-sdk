@@ -154,7 +154,11 @@ describe("ToolResultBodySchema (Effect Schema)", () => {
   it("accepts an error-only body", async () => {
     const input = {
       call_id: "s1",
-      error: { code: "PERMISSION_DENIED" as const, message: "no" },
+      error: {
+        code: "PERMISSION_DENIED" as const,
+        message: "no",
+        retryable: false,
+      },
     };
     await expect(decode(ToolResultBodySchema)(input)).resolves.toEqual(input);
   });
@@ -170,7 +174,7 @@ describe("ToolResultBodySchema (Effect Schema)", () => {
       decode(ToolResultBodySchema)({
         call_id: "s1",
         result: 1,
-        error: { code: "INTERNAL_ERROR", message: "x" },
+        error: { code: "INTERNAL_ERROR", message: "x", retryable: true },
       }),
     ).rejects.toThrow();
   });
