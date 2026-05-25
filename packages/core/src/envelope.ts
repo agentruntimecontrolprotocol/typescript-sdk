@@ -13,7 +13,7 @@ import { PROTOCOL_VERSION } from "./version.js";
 // ARCP v1.1 §5.1 envelope: `arcp`, `id`, `type`, `session_id`, `trace_id`,
 // `job_id`, `event_seq`, `payload`, plus `extensions`.
 //
-//   - `arcp`        MUST be the literal `"1"`.
+//   - `arcp`        MUST be the current `PROTOCOL_VERSION` literal.
 //   - `session_id`  REQUIRED on every envelope EXCEPT `session.hello` and
 //                   `session.welcome`. Enforced in `RoundTripEnvelopeSchema`
 //                   via a filter, and per-type by the discriminated union.

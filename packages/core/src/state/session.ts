@@ -303,10 +303,8 @@ function applyFeatures(
     out.features = runtimeFeatures.filter((f) => clientFeatures.includes(f));
     return;
   }
-  if (runtimeFeatures !== undefined) {
-    out.features = runtimeFeatures;
-  } else if (clientFeatures !== undefined) {
-    out.features = clientFeatures;
+  if (clientFeatures !== undefined || runtimeFeatures !== undefined) {
+    out.features = [];
   }
 }
 

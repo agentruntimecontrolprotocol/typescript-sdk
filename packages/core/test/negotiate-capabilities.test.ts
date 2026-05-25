@@ -16,14 +16,14 @@ describe("negotiateCapabilities — feature intersection (issue #74)", () => {
     expect(out.features).toEqual(["progress", "ack"]);
   });
 
-  it("returns runtime list when only runtime advertised", () => {
+  it("returns an empty feature list when only runtime advertised", () => {
     const out = negotiateCapabilities(empty, { features: ["progress", "ack"] });
-    expect(out.features).toEqual(["progress", "ack"]);
+    expect(out.features).toEqual([]);
   });
 
-  it("returns client list when only client advertised", () => {
+  it("returns an empty feature list when only client advertised", () => {
     const out = negotiateCapabilities({ features: ["progress"] }, empty);
-    expect(out.features).toEqual(["progress"]);
+    expect(out.features).toEqual([]);
   });
 
   it("yields an empty array when client and runtime do not overlap", () => {

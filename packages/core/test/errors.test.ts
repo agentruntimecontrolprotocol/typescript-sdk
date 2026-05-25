@@ -64,6 +64,7 @@ type TaggedClass =
 interface ErrorRow {
   readonly code: ErrorCode;
   readonly tag: string;
+  readonly forcedRetryable?: boolean;
   readonly Legacy: new (
     message: string,
     opts?: {
@@ -145,24 +146,28 @@ const ROWS: readonly ErrorRow[] = [
   {
     code: "INTERNAL_ERROR",
     tag: "Internal",
+    forcedRetryable: true,
     Legacy: InternalError,
     Tagged: TaggedInternal,
   },
   {
     code: "LEASE_EXPIRED",
     tag: "LeaseExpired",
+    forcedRetryable: false,
     Legacy: LeaseExpiredError,
     Tagged: TaggedLeaseExpired,
   },
   {
     code: "BUDGET_EXHAUSTED",
     tag: "BudgetExhausted",
+    forcedRetryable: false,
     Legacy: BudgetExhaustedError,
     Tagged: TaggedBudgetExhausted,
   },
   {
     code: "AGENT_VERSION_NOT_AVAILABLE",
     tag: "AgentVersionNotAvailable",
+    forcedRetryable: false,
     Legacy: AgentVersionNotAvailableError,
     Tagged: TaggedAgentVersionNotAvailable,
   },
@@ -255,18 +260,8 @@ describe("Tagged* errors encode → decode round-trip", () => {
   }
 });
 
-// v1.1 §12 — these error codes are documented as always non-retryable.
-// Their constructors MUST enforce `retryable: false` regardless of what the
-// caller passes, so the ARCP→Tagged tests can't assume a user-supplied
-// `retryable: true` survives the construction step.
-const ALWAYS_NON_RETRYABLE = new Set<string>([
-  "LEASE_EXPIRED",
-  "BUDGET_EXHAUSTED",
-  "AGENT_VERSION_NOT_AVAILABLE",
-]);
-
 describe("bridge converters: taggedFromARCP / arcpFromTagged", () => {
-  for (const { code, tag, Legacy, Tagged } of ROWS) {
+  for (const { code, tag, forcedRetryable, Legacy, Tagged } of ROWS) {
     it(`${code}: ARCP → Tagged preserves shape`, () => {
       const legacy = new Legacy("hello", {
         retryable: true,
@@ -277,7 +272,7 @@ describe("bridge converters: taggedFromARCP / arcpFromTagged", () => {
       expect(tagged._tag).toBe(tag);
       expect(tagged.code).toBe(code);
       expect(tagged.message).toBe("hello");
-      expect(tagged.retryable).toBe(!ALWAYS_NON_RETRYABLE.has(code));
+      expect(tagged.retryable).toBe(forcedRetryable ?? true);
       expect(tagged.details).toEqual({ k: "v" });
     });
 
@@ -293,7 +288,7 @@ describe("bridge converters: taggedFromARCP / arcpFromTagged", () => {
       expect(legacy).toBeInstanceOf(Error);
       expect(legacy.code).toBe(code);
       expect(legacy.message).toBe("hello");
-      expect(legacy.retryable).toBe(false);
+      expect(legacy.retryable).toBe(forcedRetryable ?? false);
       expect(legacy.details).toEqual({ k: "v" });
     });
 
@@ -306,10 +301,8 @@ describe("bridge converters: taggedFromARCP / arcpFromTagged", () => {
       expect(after).toBeInstanceOf(Legacy);
       expect(after.code).toBe(before.code);
       expect(after.message).toBe(before.message);
-      // Always-non-retryable subclasses enforce `false` at construction.
-      expect(after.retryable).toBe(
-        ALWAYS_NON_RETRYABLE.has(code) ? false : before.retryable,
-      );
+      // Pinned retryability subclasses enforce their spec value.
+      expect(after.retryable).toBe(forcedRetryable ?? before.retryable);
       expect(after.details).toEqual(before.details);
     });
   }

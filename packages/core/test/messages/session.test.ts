@@ -208,6 +208,7 @@ describe("SessionErrorPayloadSchema (Effect Schema)", () => {
     const input = {
       code: "INVALID_REQUEST" as const,
       message: "bad request",
+      retryable: false,
     };
     await expect(decode(SessionErrorPayloadSchema)(input)).resolves.toEqual(
       input,

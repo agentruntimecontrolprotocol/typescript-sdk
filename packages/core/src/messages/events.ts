@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { ERROR_CODES } from "../errors.js";
+import { ERROR_CODES, retryabilityViolation } from "../errors.js";
 
 import { ArtifactRefSchema } from "./artifacts.js";
 import { LeaseConstraintsSchema } from "./lease-schema.js";
@@ -42,11 +42,11 @@ export function isVendorEventKind(value: string): boolean {
 const ErrorPayloadEffectSchema = Schema.Struct({
   code: Schema.Literal(...ERROR_CODES),
   message: Schema.String.pipe(Schema.nonEmptyString()),
-  retryable: Schema.optional(Schema.Boolean),
+  retryable: Schema.Boolean,
   details: Schema.optional(
     Schema.Record({ key: Schema.String, value: Schema.Unknown }),
   ),
-});
+}).pipe(Schema.filter((p) => retryabilityViolation(p.code, p.retryable)));
 
 /** §8.2 `thought` event-kind body. */
 export const ThoughtBodySchema = Schema.Struct({

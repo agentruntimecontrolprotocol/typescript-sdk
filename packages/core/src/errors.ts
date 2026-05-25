@@ -53,6 +53,29 @@ export function isRetryableByDefault(code: ErrorCode): boolean {
 }
 
 /**
+ * Validate v1.1 retryability invariants for wire error payloads.
+ *
+ * Most codes can choose retryability by context, but the spec pins these:
+ * `LEASE_EXPIRED` and `BUDGET_EXHAUSTED` are never retryable, while
+ * `INTERNAL_ERROR` is always retryable.
+ */
+export function retryabilityViolation(
+  code: ErrorCode,
+  retryable: boolean,
+): string | undefined {
+  if (
+    (code === "LEASE_EXPIRED" || code === "BUDGET_EXHAUSTED") &&
+    retryable
+  ) {
+    return `${code} MUST be returned with retryable: false`;
+  }
+  if (code === "INTERNAL_ERROR" && !retryable) {
+    return "INTERNAL_ERROR MUST be returned with retryable: true";
+  }
+  return undefined;
+}
+
+/**
  * Wire schema for an ARCP error payload (§12).
  *
  * Shape: `{ code, message, retryable, details? }`. Anything implementation-specific
@@ -61,11 +84,11 @@ export function isRetryableByDefault(code: ErrorCode): boolean {
 export const ErrorPayloadSchema = Schema.Struct({
   code: Schema.Literal(...ERROR_CODES),
   message: Schema.String.pipe(Schema.nonEmptyString()),
-  retryable: Schema.optional(Schema.Boolean),
+  retryable: Schema.Boolean,
   details: Schema.optional(
     Schema.Record({ key: Schema.String, value: Schema.Unknown }),
   ),
-});
+}).pipe(Schema.filter((p) => retryabilityViolation(p.code, p.retryable)));
 
 export type ErrorPayload = Schema.Schema.Type<typeof ErrorPayloadSchema>;
 
@@ -255,7 +278,7 @@ export class InternalError extends ARCPError {
     message: string,
     opts: Omit<ARCPErrorOptions, "message" | "code"> = {},
   ) {
-    super({ ...opts, code: "INTERNAL_ERROR", message });
+    super({ ...opts, retryable: true, code: "INTERNAL_ERROR", message });
     this.name = "InternalError";
   }
 }

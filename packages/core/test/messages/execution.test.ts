@@ -147,6 +147,7 @@ describe("JobErrorPayloadSchema (Effect Schema)", () => {
       final_status: "error" as const,
       code: "INTERNAL_ERROR" as const,
       message: "boom",
+      retryable: true,
     };
     await expect(decode(JobErrorPayloadSchema)(input)).resolves.toEqual(input);
   });
@@ -157,6 +158,7 @@ describe("JobErrorPayloadSchema (Effect Schema)", () => {
         final_status,
         code: "CANCELLED" as const,
         message: "x",
+        retryable: false,
       };
       await expect(decode(JobErrorPayloadSchema)(input)).resolves.toEqual(
         input,

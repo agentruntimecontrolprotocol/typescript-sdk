@@ -5,6 +5,7 @@ import {
   ERROR_CODES,
   type ErrorPayload,
   InvalidRequestError,
+  retryabilityViolation,
 } from "../errors.js";
 
 import { CredentialSchema } from "./credentials.js";
@@ -263,11 +264,11 @@ export const JobErrorPayloadSchema = Schema.Struct({
   final_status: JobErrorFinalStatusSchema,
   code: Schema.Literal(...ERROR_CODES),
   message: Schema.String.pipe(Schema.nonEmptyString()),
-  retryable: Schema.optional(Schema.Boolean),
+  retryable: Schema.Boolean,
   details: Schema.optional(
     Schema.Record({ key: Schema.String, value: Schema.Unknown }),
   ),
-});
+}).pipe(Schema.filter((p) => retryabilityViolation(p.code, p.retryable)));
 export type JobErrorPayload = Schema.Schema.Type<typeof JobErrorPayloadSchema>;
 
 /** Convenience: extract the error portion of a {@link JobErrorPayload}. */
@@ -275,7 +276,7 @@ export function jobErrorToErrorPayload(p: JobErrorPayload): ErrorPayload {
   return {
     code: p.code,
     message: p.message,
-    ...(p.retryable === undefined ? {} : { retryable: p.retryable }),
+    retryable: p.retryable,
     ...(p.details === undefined ? {} : { details: p.details }),
   };
 }
