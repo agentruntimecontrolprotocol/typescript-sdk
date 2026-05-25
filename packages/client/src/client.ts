@@ -2,13 +2,19 @@
 import { randomBytes } from "node:crypto";
 
 import type { JobId, SessionId } from "@agentruntimecontrolprotocol/core";
-import { type BaseEnvelope, buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import {
+  type BaseEnvelope,
+  buildEnvelope,
+} from "@agentruntimecontrolprotocol/core/envelope";
 import {
   CancelledError,
   InvalidRequestError,
   UnauthenticatedError,
 } from "@agentruntimecontrolprotocol/core/errors";
-import { type Logger, rootLogger } from "@agentruntimecontrolprotocol/core/logger";
+import {
+  type Logger,
+  rootLogger,
+} from "@agentruntimecontrolprotocol/core/logger";
 import type {
   Capabilities,
   Envelope,
@@ -21,10 +27,19 @@ import type {
   SessionResume,
   SessionWelcomePayload,
 } from "@agentruntimecontrolprotocol/core/messages";
-import { PendingRegistry, SessionState } from "@agentruntimecontrolprotocol/core/state";
-import type { Transport, WireFrame } from "@agentruntimecontrolprotocol/core/transport";
+import {
+  PendingRegistry,
+  SessionState,
+} from "@agentruntimecontrolprotocol/core/state";
+import type {
+  Transport,
+  WireFrame,
+} from "@agentruntimecontrolprotocol/core/transport";
 import { Deferred, newMessageId } from "@agentruntimecontrolprotocol/core/util";
-import { intersectFeatures, V1_1_FEATURES } from "@agentruntimecontrolprotocol/core/version";
+import {
+  intersectFeatures,
+  V1_1_FEATURES,
+} from "@agentruntimecontrolprotocol/core/version";
 
 import { dispatchEnvelope } from "./client-dispatch.js";
 import {
@@ -150,9 +165,14 @@ export class ARCPClient {
    *
    * @example
    * ```ts
-   * const client = new ARCPClient({ identity: { name: "demo", version: "1.0.0" } })
+   * const client = new ARCPClient({
+   *   client: { name: "demo", version: "1.0.0" },
+   *   authScheme: "bearer",
+   *   token,
+   * })
    * const welcome = await client.connect(transport)
-   * console.log("session id:", welcome.session_id)
+   * console.log("session id:", client.state.id)
+   * console.log("resume token:", welcome.resume_token)
    * ```
    */
   public async connect(
@@ -182,9 +202,11 @@ export class ARCPClient {
    * @example
    * ```ts
    * const welcome = await client.resume(transport, {
-   *   sessionId: previous.sessionId,
-   *   lastEventSeq: previous.eventSeq,
+   *   session_id: previous.sessionId,
+   *   resume_token: previous.resumeToken,
+   *   last_event_seq: previous.lastEventSeq,
    * })
+   * console.log("fresh resume token:", welcome.resume_token)
    * ```
    */
   public async resume(
