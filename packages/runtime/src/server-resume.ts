@@ -1,11 +1,13 @@
 import type { SessionId } from "@agentruntimecontrolprotocol/core";
 import type { BearerIdentity } from "@agentruntimecontrolprotocol/core/auth";
+import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   InvalidRequestError,
   ResumeWindowExpiredError,
 } from "@agentruntimecontrolprotocol/core/errors";
 import type { SessionHelloPayload } from "@agentruntimecontrolprotocol/core/messages";
+import type { EventSeqBounds } from "@agentruntimecontrolprotocol/core/store";
 import { newMessageId } from "@agentruntimecontrolprotocol/core/util";
 
 import type { ARCPServer } from "./server.js";
@@ -32,6 +34,8 @@ export async function handleResume(args: HandleResumeArgs): Promise<void> {
   }
   if (ctx.state.id === undefined) ctx.state.assignId(resume.session_id);
   if (!(await validateResumeRecord(server, ctx, resume))) return;
+  const replayed = await readResumeEvents(server, ctx, resume);
+  if (replayed === null) return;
   rebindResumedSession({ server, ctx, identity, payload });
   const freshToken = rotateResumeToken(server, resume.session_id);
   await sendResumeWelcome({
@@ -40,7 +44,7 @@ export async function handleResume(args: HandleResumeArgs): Promise<void> {
     freshToken,
     sessionId: resume.session_id,
   });
-  await replayResumeEvents(server, ctx, resume);
+  await replayResumeEvents(ctx, resume, replayed);
   ctx.logger.info(
     { session_id: resume.session_id, replayed_from: resume.last_event_seq },
     "session resumed",
@@ -133,25 +137,76 @@ async function sendResumeWelcome(args: SendResumeWelcomeArgs): Promise<void> {
 }
 
 async function replayResumeEvents(
+  ctx: SessionContext,
+  resume: NonNullable<SessionHelloPayload["resume"]>,
+  replayed: readonly BaseEnvelope[],
+): Promise<void> {
+  let highest = resume.last_event_seq;
+  for (const env of replayed) {
+    if (env.event_seq !== undefined && env.event_seq > highest) {
+      highest = env.event_seq;
+    }
+    await ctx.transport.send(env);
+  }
+  ctx.setEventSeq(highest);
+}
+
+async function readResumeEvents(
   server: ARCPServer,
   ctx: SessionContext,
   resume: NonNullable<SessionHelloPayload["resume"]>,
-): Promise<void> {
+): Promise<readonly BaseEnvelope[] | null> {
   try {
+    const bounds = await server.eventLog.getSeqBounds(resume.session_id);
     const replayed = await server.eventLog.readSinceSeq(
       resume.session_id,
       resume.last_event_seq,
       10_000,
     );
-    let highest = resume.last_event_seq;
-    for (const env of replayed) {
-      if (env.event_seq !== undefined && env.event_seq > highest) {
-        highest = env.event_seq;
-      }
-      await ctx.transport.send(env);
-    }
-    ctx.setEventSeq(highest);
+    validateResumeCoverage(bounds, replayed, resume.last_event_seq);
+    return replayed;
   } catch (error) {
-    ctx.logger.warn({ err: error }, "resume replay failed");
+    ctx.logger.warn({ err: error }, "resume replay unavailable");
+    await ctx.emitSessionError(
+      error instanceof ResumeWindowExpiredError
+        ? error
+        : new ResumeWindowExpiredError("Resume buffer no longer covers cursor"),
+    );
+    return null;
+  }
+}
+
+function validateResumeCoverage(
+  bounds: EventSeqBounds,
+  replayed: readonly BaseEnvelope[],
+  lastEventSeq: number,
+): void {
+  if (bounds.max === null) {
+    if (lastEventSeq > 0) {
+      throw new ResumeWindowExpiredError(
+        "Resume buffer no longer covers last_event_seq",
+      );
+    }
+    return;
+  }
+  if (lastEventSeq > bounds.max) {
+    throw new ResumeWindowExpiredError(
+      "last_event_seq is beyond the buffered event window",
+    );
+  }
+  if (bounds.min !== null && lastEventSeq < bounds.min - 1) {
+    throw new ResumeWindowExpiredError(
+      "Resume buffer no longer covers last_event_seq",
+    );
+  }
+  let expected = lastEventSeq + 1;
+  for (const env of replayed) {
+    if (env.event_seq === undefined) continue;
+    if (env.event_seq !== expected) {
+      throw new ResumeWindowExpiredError(
+        "Resume buffer contains an event_seq gap",
+      );
+    }
+    expected += 1;
   }
 }

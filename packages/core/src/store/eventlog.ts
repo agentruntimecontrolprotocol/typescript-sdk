@@ -18,6 +18,10 @@ import { SCHEMA_SQL } from "./schema.js";
 import type { EventLogFilter, EventLogOptions } from "./types.js";
 
 type DatabaseInstance = InstanceType<typeof Database>;
+export interface EventSeqBounds {
+  min: number | null;
+  max: number | null;
+}
 
 // ARCP v1.1 event-log indexed columns: session_id, id, type, trace_id,
 // job_id, event_seq. Replay is by (session_id, event_seq).
@@ -40,6 +44,7 @@ export class EventLog {
   private readonly readSinceSeqStmt: ReturnType<DatabaseInstance["prepare"]>;
   private readonly countStmt: ReturnType<DatabaseInstance["prepare"]>;
   private readonly getByIdStmt: ReturnType<DatabaseInstance["prepare"]>;
+  private readonly seqBoundsStmt: ReturnType<DatabaseInstance["prepare"]>;
   private closed = false;
 
   public constructor(opts: EventLogOptions = {}) {
@@ -78,6 +83,11 @@ export class EventLog {
     );
     this.getByIdStmt = this.db.prepare(
       `SELECT * FROM events WHERE session_id = @session_id AND id = @id`,
+    );
+    this.seqBoundsStmt = this.db.prepare(
+      `SELECT MIN(event_seq) AS min, MAX(event_seq) AS max
+       FROM events
+       WHERE session_id = @session_id AND event_seq IS NOT NULL`,
     );
   }
 
@@ -182,6 +192,15 @@ export class EventLog {
       | EventRow
       | undefined;
     return row === undefined ? null : rowToEnvelope(row);
+  }
+
+  /** Return the buffered event_seq range for a session, or null bounds if empty. */
+  public async getSeqBounds(sessionId: string): Promise<EventSeqBounds> {
+    if (this.closed) throw new InvalidRequestError("EventLog is closed");
+    const row = this.seqBoundsStmt.get({ session_id: sessionId }) as
+      | EventSeqBounds
+      | undefined;
+    return row ?? { min: null, max: null };
   }
 
   /**

@@ -104,6 +104,12 @@ describe("EventLogService", () => {
     const rows = await log.readSinceSeq(SESSION, 0);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.event_seq).toBe(1);
+    await log.append(envFor(2));
+    expect(await log.getSeqBounds(SESSION)).toEqual({ min: 1, max: 2 });
+    expect(await log.getSeqBounds("sess_empty")).toEqual({
+      min: null,
+      max: null,
+    });
     await log.close();
   });
 

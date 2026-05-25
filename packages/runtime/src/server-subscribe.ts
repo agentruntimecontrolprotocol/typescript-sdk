@@ -210,7 +210,7 @@ async function replaySubscribeHistory(
     );
     for (const e of events) {
       if (!isReplayableForJob(e, job.jobId)) continue;
-      await forwardEventToSubscriber(ctx, e);
+      await forwardEventToSubscriber(ctx, e, { fanOut: false });
     }
     return events.some((e) => e.job_id === job.jobId);
   } catch (error) {

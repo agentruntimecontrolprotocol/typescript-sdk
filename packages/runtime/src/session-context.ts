@@ -10,15 +10,24 @@ import {
   InternalError,
   InvalidRequestError,
 } from "@agentruntimecontrolprotocol/core/errors";
-import { classifyUnknownType, CORE_MESSAGE_TYPES } from "@agentruntimecontrolprotocol/core/extensions";
+import {
+  classifyUnknownType,
+  CORE_MESSAGE_TYPES,
+} from "@agentruntimecontrolprotocol/core/extensions";
 import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import {
   type Envelope,
   EnvelopeSchema,
   type JobErrorPayload,
 } from "@agentruntimecontrolprotocol/core/messages";
-import { PendingRegistry, SessionState } from "@agentruntimecontrolprotocol/core/state";
-import type { Transport, WireFrame } from "@agentruntimecontrolprotocol/core/transport";
+import {
+  PendingRegistry,
+  SessionState,
+} from "@agentruntimecontrolprotocol/core/state";
+import type {
+  Transport,
+  WireFrame,
+} from "@agentruntimecontrolprotocol/core/transport";
 import { newMessageId } from "@agentruntimecontrolprotocol/core/util";
 import { Either, Schema } from "effect";
 
@@ -453,7 +462,7 @@ export class SessionContext implements EventSeqSource {
       await this.emitSessionError(
         new HeartbeatLostError("No inbound activity within 2× heartbeat"),
       );
-      await this.terminate("heartbeat lost");
+      await this.closeSession("heartbeat lost", { cancelJobs: false });
       return;
     }
     if (this.state.id === undefined) return;
@@ -481,13 +490,22 @@ export class SessionContext implements EventSeqSource {
   }
 
   public async terminate(reason: string | undefined): Promise<void> {
+    await this.closeSession(reason, { cancelJobs: true });
+  }
+
+  private async closeSession(
+    reason: string | undefined,
+    opts: { cancelJobs: boolean },
+  ): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     if (this.heartbeatTimer !== null) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
-    this.jobs.cancelAll(reason ?? "session terminated");
+    if (opts.cancelJobs) {
+      this.jobs.cancelAll(reason ?? "session terminated");
+    }
     this.pending.rejectAll(new InvalidRequestError("session terminated"));
     // Drop subscriptions to other jobs.
     for (const stop of this.subscriptions.values()) {

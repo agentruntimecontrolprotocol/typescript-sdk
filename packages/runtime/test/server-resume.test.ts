@@ -38,6 +38,7 @@ function makeCtx() {
 function makeServer() {
   const resumeStore = new ResumeStore();
   const eventLog = {
+    getSeqBounds: vi.fn(async (_sessionId: string) => ({ min: 2, max: 3 })),
     readSinceSeq: vi.fn(async (_sessionId: string, _after: number) => [
       {
         id: "msg_1",
@@ -137,7 +138,7 @@ describe("handleResume", () => {
     expect(ctx.setEventSeq).toHaveBeenCalledWith(3);
   });
 
-  it("logs and continues when resume replay fails", async () => {
+  it("rejects when resume replay fails before welcome", async () => {
     const server = makeServer();
     const ctx = makeCtx();
     const sessionId = newSessionId();
@@ -168,5 +169,8 @@ describe("handleResume", () => {
     });
 
     expect(ctx.logger.warn).toHaveBeenCalled();
+    expect(ctx.emitSessionError).toHaveBeenCalled();
+    expect(ctx.send).not.toHaveBeenCalled();
+    expect(server.registerPostHandshakeHandlers).not.toHaveBeenCalled();
   });
 });
