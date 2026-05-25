@@ -67,8 +67,12 @@ jobs:
         # present. The npm publish step passes --registry explicitly instead.
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "pnpm"
+
+      - name: Use npm 11 for trusted publishing
+        # npm trusted publishing requires npm CLI 11.5.1 or newer.
+        run: npm install --global npm@11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -130,7 +134,7 @@ jobs:
       - name: Setup Node.js (GitHub Packages registry)
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://npm.pkg.github.com"
           scope: "@agentruntimecontrolprotocol"
 
