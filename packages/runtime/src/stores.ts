@@ -5,12 +5,15 @@ import {
   type ResumeToken,
   TaggedResumeWindowExpired,
 } from "@agentruntimecontrolprotocol/core";
+import type { JobAcceptedPayload } from "@agentruntimecontrolprotocol/core/messages";
 import { Effect, SynchronizedRef } from "effect";
 
 export interface IdempotencyEntry {
   jobId: JobId;
   agent: string;
   inputDigest: string;
+  submitDigest: string;
+  acceptedPayload: JobAcceptedPayload;
   expiresAt: number;
 }
 
@@ -21,7 +24,21 @@ export interface ResumeRecord {
 }
 
 export function digest(input: unknown): string {
-  return JSON.stringify(input);
+  return stableStringify(input);
+}
+
+function stableStringify(input: unknown): string {
+  if (input === null || typeof input !== "object") {
+    return JSON.stringify(input);
+  }
+  if (Array.isArray(input)) {
+    return `[${input.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  const record = input as Record<string, unknown>;
+  const entries = Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`);
+  return `{${entries.join(",")}}`;
 }
 
 export function newResumeToken(): ResumeToken {

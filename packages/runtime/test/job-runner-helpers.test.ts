@@ -36,6 +36,7 @@ function makeJob(overrides: Partial<Job> = {}) {
     chunkedResultStarted: false,
     activeResultId: undefined,
     activeResultNextChunkSeq: 0,
+    resultChunkFinalized: false,
     abortController: new AbortController(),
     emitEventKind: vi.fn(async (kind: string, payload: unknown) => {
       emitted.push({ kind, payload });
@@ -76,11 +77,7 @@ describe("job-runner-helpers", () => {
       emitSessionError: vi.fn(async () => undefined),
     };
     await emitParseError(ctx, new Error("bad parse"));
-    await emitAgentResolveError(
-      ctx,
-      new Error("missing"),
-      "agent-a@v1",
-    );
+    await emitAgentResolveError(ctx, new Error("missing"), "agent-a@v1");
     await emitAgentResolveError(
       ctx,
       new AgentVersionNotAvailableError("expired"),
@@ -120,7 +117,9 @@ describe("job-runner-helpers", () => {
     const { job } = makeJob();
     await emitHandlerFailure(job, new Error("oops"));
     await emitHandlerFailure(job, new CancelledError("bye"));
-    expect(vi.mocked(job.emitErrorEnvelope).mock.calls.length).toBeGreaterThan(0);
+    expect(vi.mocked(job.emitErrorEnvelope).mock.calls.length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("validates delegate leases and forwards subscriber events", async () => {
@@ -130,18 +129,16 @@ describe("job-runner-helpers", () => {
       leaseConstraints: undefined,
     } as unknown as Job;
     expect(
-      validateDelegateLease(
-        { "tool.call": ["calc"] },
-        parent,
-        { delegate_id: "d_1", agent: "helper" } as DelegateBody,
-      ),
+      validateDelegateLease({ "tool.call": ["calc"] }, parent, {
+        delegate_id: "d_1",
+        agent: "helper",
+      } as DelegateBody),
     ).toBeNull();
     expect(
-      validateDelegateLease(
-        { "tool.call": ["nope"] },
-        parent,
-        { delegate_id: "d_1", agent: "helper" } as DelegateBody,
-      ),
+      validateDelegateLease({ "tool.call": ["nope"] }, parent, {
+        delegate_id: "d_1",
+        agent: "helper",
+      } as DelegateBody),
     ).toBeInstanceOf(LeaseSubsetViolationError);
 
     const sub: any = {
@@ -163,6 +160,19 @@ describe("job-runner-helpers", () => {
     });
     await forwardEventToSubscriber(sub, src);
     expect(sub.send).toHaveBeenCalled();
+
+    const directSub: any = {
+      state: new SessionState(),
+      send: vi.fn(async () => undefined),
+      transport: { send: vi.fn(async () => undefined) },
+      server: { eventLog: { append: vi.fn(async () => undefined) } },
+      nextEventSeq: vi.fn(() => 43),
+    };
+    directSub.state.assignId("sess_2" as never);
+    await forwardEventToSubscriber(directSub, src, { fanOut: false });
+    expect(directSub.send).not.toHaveBeenCalled();
+    expect(directSub.server.eventLog.append).toHaveBeenCalled();
+    expect(directSub.transport.send).toHaveBeenCalled();
   });
 
   it("schedules runtime timeout and aborts non-terminal jobs", async () => {

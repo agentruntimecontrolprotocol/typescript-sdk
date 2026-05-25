@@ -12,11 +12,15 @@ function makeJob(
       sessionId: "sess_1" as never,
       agent: "echo",
       lease: { "tool.call": ["calc"], "agent.delegate": ["helper"] },
+      negotiatedFeatures: ["progress", "result_chunk"],
       heartbeatIntervalSeconds: 60,
       ...overrides,
     } as never,
     send: vi.fn(async (env: unknown) => {
-      emitted.push({ kind: (env as { type?: string }).type ?? "unknown", payload: env });
+      emitted.push({
+        kind: (env as { type?: string }).type ?? "unknown",
+        payload: env,
+      });
     }),
     seq: {
       nextEventSeq: vi.fn(() => emitted.length + 1),
@@ -60,7 +64,9 @@ describe("makeJobContext", () => {
     await ctx.toolCall({ tool: "calc", call_id: "call_1", input: {} } as never);
     await ctx.delegate({ delegate_id: "d_1", agent: "helper" } as never);
 
-    expect(emitted.some((e) => e.kind === "job.event" || e.kind === "job.result")).toBe(true);
+    expect(
+      emitted.some((e) => e.kind === "job.event" || e.kind === "job.result"),
+    ).toBe(true);
   });
 
   it("rejects writes after finalize and emits an empty terminal chunk when needed", async () => {

@@ -1,13 +1,17 @@
-import type { JobId, SessionId, TraceId } from "@agentruntimecontrolprotocol/core";
+import type {
+  JobId,
+  SessionId,
+  TraceId,
+} from "@agentruntimecontrolprotocol/core";
 import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   CancelledError,
-  HeartbeatLostError,
   InternalError,
   InvalidRequestError,
 } from "@agentruntimecontrolprotocol/core/errors";
 import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import type {
+  JobAcceptedPayload,
   JobErrorPayload,
   JobResultPayload,
   JobStateName,
@@ -15,10 +19,21 @@ import type {
   LeaseConstraints,
   ResultChunkBody,
 } from "@agentruntimecontrolprotocol/core/messages";
-import { newJobId, newMessageId, nowTimestamp } from "@agentruntimecontrolprotocol/core/util";
+import { parseJobEventBody } from "@agentruntimecontrolprotocol/core/messages";
+import {
+  newJobId,
+  newMessageId,
+  nowTimestamp,
+} from "@agentruntimecontrolprotocol/core/util";
 
-import type { CredentialProvisioner, IssuedCredential } from "./credential-provisioner.js";
-import type { CredentialStore, CredentialStoreEntry } from "./credential-store.js";
+import type {
+  CredentialProvisioner,
+  IssuedCredential,
+} from "./credential-provisioner.js";
+import type {
+  CredentialStore,
+  CredentialStoreEntry,
+} from "./credential-store.js";
 import type { EventSeqSource, JobOptions, JobSend } from "./types.js";
 
 /** Constructor dependency bag for {@link Job}. */
@@ -71,10 +86,9 @@ const TERMINAL = new Set<JobStateName>([
 /**
  * Per-job state machine (§7.3 / §8).
  *
- * Owns the job's lifecycle, the abort signal exposed to the agent, the
- * heartbeat watchdog, and the emission of `job.accepted` /
- * `job.event` / `job.result` / `job.error` envelopes. The session
- * provides the monotonic `event_seq` source.
+ * Owns the job's lifecycle, the abort signal exposed to the agent, and the
+ * emission of `job.accepted` / `job.event` / `job.result` / `job.error`
+ * envelopes. The session provides the monotonic `event_seq` source.
  */
 export class Job {
   public readonly jobId: JobId;
@@ -91,6 +105,8 @@ export class Job {
   public readonly parentJobId: JobId | undefined;
   public readonly delegateId: string | undefined;
   public readonly traceId: TraceId | undefined;
+  /** v1.1 §6.2 — effective feature set negotiated for this job's session. */
+  public readonly negotiatedFeatures: readonly string[];
   /** Timestamp at which the job was constructed (for §6.6 listing). */
   public readonly createdAt: string = nowTimestamp();
   /**
@@ -121,6 +137,8 @@ export class Job {
   public activeResultId: string | undefined;
   /** Next `chunk_seq` to allocate on the active result stream. */
   public activeResultNextChunkSeq = 0;
+  /** True once the active result stream has emitted `more: false`. */
+  public resultChunkFinalized = false;
   /**
    * v1.1 §9.7–§9.8 — short-lived credentials issued by the provisioner at
    * job acceptance. Wire shapes are included in `job.accepted`; provisioner
@@ -136,14 +154,10 @@ export class Job {
    */
   public lastEventSeq = 0;
 
-  private missedHeartbeats = 0;
-  private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly missesAllowed: number;
-  private readonly heartbeatIntervalMs: number;
-
   private readonly send: JobSend;
   private readonly seq: EventSeqSource;
   public readonly logger: Logger;
+  private readonly negotiatedFeatureSet: ReadonlySet<string>;
 
   public constructor(deps: JobDependencies) {
     const { options, send, seq, logger } = deps;
@@ -161,8 +175,10 @@ export class Job {
     this.parentJobId = options.parentJobId;
     this.delegateId = options.delegateId;
     this.traceId = options.traceId;
-    this.heartbeatIntervalMs = options.heartbeatIntervalSeconds * 1000;
-    this.missesAllowed = options.missedHeartbeatsAllowed ?? 2;
+    void options.heartbeatIntervalSeconds;
+    void options.missedHeartbeatsAllowed;
+    this.negotiatedFeatures = options.negotiatedFeatures ?? [];
+    this.negotiatedFeatureSet = new Set(this.negotiatedFeatures);
     this.credentials = options.credentials ?? [];
   }
 
@@ -177,7 +193,7 @@ export class Job {
    * v1.1 §9.6: decrement the matching budget counter from a `metric` event
    * whose name begins with `cost.` and whose unit matches a budgeted
    * currency. Returns the new remaining value, or `null` if no counter is
-   * affected. Negative values are ignored.
+   * affected. Negative cost values are rejected before any decrement.
    */
   public applyCostMetric(
     name: string,
@@ -187,7 +203,12 @@ export class Job {
     if (!name.startsWith("cost.")) return null;
     if (name === "cost.budget.remaining") return null;
     if (unit === undefined) return null;
-    if (!Number.isFinite(value) || value < 0) return null;
+    if (!Number.isFinite(value)) {
+      throw new InvalidRequestError("cost metric value must be finite");
+    }
+    if (value < 0) {
+      throw new InvalidRequestError("cost metric value must be non-negative");
+    }
     const current = this.budget.get(unit);
     if (current === undefined) return null;
     const next = current - value;
@@ -248,12 +269,11 @@ export class Job {
   }
 
   public startWatchdog(): void {
-    this.armWatchdog();
+    // v1.1 §6.4 heartbeat loss is session-scoped and MUST NOT terminate jobs.
   }
 
   public markHeartbeat(): void {
-    this.missedHeartbeats = 0;
-    this.armWatchdog();
+    // Event emission no longer arms a per-job heartbeat watchdog.
   }
 
   /** Cooperatively cancel the job; armed timer will follow per §7.4. */
@@ -267,7 +287,6 @@ export class Job {
     if (this.isTerminal) return;
     const err = new InternalError(reason);
     this.abortController.abort(err);
-    this.disarmWatchdog();
     this.transition("error");
     void this.emitErrorEnvelope({
       final_status: "error",
@@ -279,37 +298,44 @@ export class Job {
 
   // -------- Outbound envelopes ---------------------------------------
 
-  /** Emit `job.accepted`. Does NOT carry `event_seq`. */
-  public async emitAccepted(): Promise<void> {
+  /** Build the `job.accepted` payload. Does NOT carry `event_seq`. */
+  public acceptedPayload(): JobAcceptedPayload {
     const budgetObj: Record<string, number> = {};
     let hasBudget = false;
     for (const [k, v] of this.initialBudget.entries()) {
       budgetObj[k] = v;
       hasBudget = true;
     }
+    return {
+      job_id: this.jobId,
+      agent: this.agentRef,
+      lease: this.lease,
+      ...(this.leaseConstraints === undefined
+        ? {}
+        : { lease_constraints: this.leaseConstraints }),
+      ...(hasBudget ? { budget: budgetObj } : {}),
+      ...(this.credentials.length > 0
+        ? { credentials: this.credentials.map((c) => c.wire) }
+        : {}),
+      accepted_at: this.createdAt,
+      ...(this.parentJobId === undefined
+        ? {}
+        : { parent_job_id: this.parentJobId }),
+      ...(this.delegateId === undefined
+        ? {}
+        : { delegate_id: this.delegateId }),
+      ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
+    };
+  }
+
+  /** Emit `job.accepted`. Does NOT carry `event_seq`. */
+  public async emitAccepted(
+    payload: JobAcceptedPayload = this.acceptedPayload(),
+  ): Promise<void> {
     const env = buildEnvelope({
       id: newMessageId(),
       type: "job.accepted" as const,
-      payload: {
-        job_id: this.jobId,
-        agent: this.agentRef,
-        lease: this.lease,
-        ...(this.leaseConstraints === undefined
-          ? {}
-          : { lease_constraints: this.leaseConstraints }),
-        ...(hasBudget ? { budget: budgetObj } : {}),
-        ...(this.credentials.length > 0
-          ? { credentials: this.credentials.map((c) => c.wire) }
-          : {}),
-        accepted_at: this.createdAt,
-        ...(this.parentJobId === undefined
-          ? {}
-          : { parent_job_id: this.parentJobId }),
-        ...(this.delegateId === undefined
-          ? {}
-          : { delegate_id: this.delegateId }),
-        ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
-      },
+      payload,
       optional: {
         session_id: this.sessionId,
         job_id: this.jobId,
@@ -336,21 +362,9 @@ export class Job {
   public async emitEventKind(kind: string, body: unknown): Promise<void> {
     if (this.isTerminal) return;
     this.markHeartbeat();
+    this.validateReservedEvent(kind, body);
     if (kind === "result_chunk") {
-      this.chunkedResultStarted = true;
-      const chunkBody = body as Partial<ResultChunkBody>;
-      if (
-        typeof chunkBody.result_id === "string" &&
-        this.activeResultId === undefined
-      ) {
-        this.activeResultId = chunkBody.result_id;
-      }
-      if (typeof chunkBody.chunk_seq === "number") {
-        this.activeResultNextChunkSeq = Math.max(
-          this.activeResultNextChunkSeq,
-          chunkBody.chunk_seq + 1,
-        );
-      }
+      this.recordResultChunk(body);
     }
     const env = buildEnvelope({
       id: newMessageId(),
@@ -386,9 +400,16 @@ export class Job {
           "job.result MUST NOT carry inline `result` when result_chunk events were emitted",
         );
       }
+      if (
+        this.activeResultId !== undefined &&
+        result.result_id !== this.activeResultId
+      ) {
+        throw new InvalidRequestError(
+          "job.result.result_id MUST match the emitted result_chunk result_id",
+        );
+      }
     }
     this.transition("success");
-    this.disarmWatchdog();
     const env = buildEnvelope({
       id: newMessageId(),
       type: "job.result" as const,
@@ -406,7 +427,6 @@ export class Job {
   /** Emit `job.error` (error / cancelled / timed_out terminal). */
   public async emitErrorEnvelope(payload: JobErrorPayload): Promise<void> {
     if (this.isTerminal) return;
-    this.disarmWatchdog();
     const target: JobStateName = payload.final_status;
     this.transition(target);
     const env = buildEnvelope({
@@ -440,16 +460,76 @@ export class Job {
     return seq;
   }
 
+  private validateReservedEvent(kind: string, body: unknown): void {
+    if (kind === "progress") {
+      if (!this.negotiatedFeatureSet.has("progress")) {
+        throw new InvalidRequestError(
+          "Cannot emit progress event without negotiated 'progress' feature",
+        );
+      }
+      this.parseProgressBody(body);
+      return;
+    }
+    if (kind === "result_chunk") {
+      if (!this.negotiatedFeatureSet.has("result_chunk")) {
+        throw new InvalidRequestError(
+          "Cannot emit result_chunk event without negotiated 'result_chunk' feature",
+        );
+      }
+      this.parseResultChunkBody(body);
+    }
+  }
+
+  private recordResultChunk(body: unknown): void {
+    const chunkBody = this.parseResultChunkBody(body);
+    if (this.resultChunkFinalized) {
+      throw new InvalidRequestError(
+        "Cannot emit result_chunk after a final chunk",
+      );
+    }
+    if (
+      this.activeResultId !== undefined &&
+      chunkBody.result_id !== this.activeResultId
+    ) {
+      throw new InvalidRequestError(
+        "result_chunk.result_id MUST remain stable for a job",
+      );
+    }
+    if (chunkBody.chunk_seq !== this.activeResultNextChunkSeq) {
+      throw new InvalidRequestError(
+        `result_chunk.chunk_seq MUST be ${this.activeResultNextChunkSeq}`,
+      );
+    }
+    this.chunkedResultStarted = true;
+    this.activeResultId = chunkBody.result_id;
+    this.activeResultNextChunkSeq = chunkBody.chunk_seq + 1;
+    if (chunkBody.more === false) this.resultChunkFinalized = true;
+  }
+
+  private parseProgressBody(body: unknown): void {
+    try {
+      parseJobEventBody("progress", body);
+    } catch (error) {
+      throw new InvalidRequestError(formatEventBodyError(error));
+    }
+  }
+
+  private parseResultChunkBody(body: unknown): ResultChunkBody {
+    try {
+      return parseJobEventBody("result_chunk", body);
+    } catch (error) {
+      throw new InvalidRequestError(formatEventBodyError(error));
+    }
+  }
+
   // -------- Credential revocation (§9.7–§9.8) -------------------
 
   /**
    * Revoke all credentials issued for this job.
    *
-   * Calls `store.removeByJob()` to atomically dequeue all outstanding
-   * entries, then calls `provisioner.revoke()` for each. Per §9.7,
-   * revocation failures MUST NOT propagate — each call is wrapped in a
-   * try/catch that logs a warning and continues. `wire.value` is NEVER
-   * referenced here.
+   * Reads outstanding entries first and removes them only after every revoke
+   * succeeds. Per §9.8 / §14, a failed revoke leaves retry state intact for
+   * recovery sweeps. `wire.value` is NEVER referenced here.
    */
   public async revokeAll(
     provisioner: CredentialProvisioner,
@@ -457,14 +537,17 @@ export class Job {
   ): Promise<void> {
     let entries: readonly CredentialStoreEntry[];
     try {
-      entries = await store.removeByJob(this.jobId);
+      entries = (await store.listOutstanding()).filter(
+        (entry) => entry.jobId === this.jobId,
+      );
     } catch (error) {
       this.logger.warn(
         { err: error, jobId: this.jobId },
-        "credential store removeByJob failed; credentials may not be revoked",
+        "credential store listOutstanding failed; credentials may not be revoked",
       );
       return;
     }
+    let allRevoked = true;
     for (const entry of entries) {
       try {
         await provisioner.revoke(entry.provisionerId);
@@ -473,50 +556,27 @@ export class Job {
           "revoked provisioned credential",
         );
       } catch (error) {
+        allRevoked = false;
         this.logger.warn(
           { err: error, jobId: this.jobId, credentialId: entry.credentialId },
           "credential revocation failed (non-fatal)",
         );
       }
     }
-  }
-
-  // -------- Watchdog ----------------------------------------------
-
-  private armWatchdog(): void {
-    this.disarmWatchdog();
-    if (this.isTerminal) return;
-    this.heartbeatTimer = setTimeout(() => {
-      this.onWatchdogFire();
-    }, this.heartbeatIntervalMs);
-    this.heartbeatTimer.unref();
-  }
-
-  private disarmWatchdog(): void {
-    if (this.heartbeatTimer !== null) {
-      clearTimeout(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
-  }
-
-  private onWatchdogFire(): void {
-    if (this.isTerminal) return;
-    this.missedHeartbeats += 1;
-    if (this.missedHeartbeats >= this.missesAllowed) {
-      const err = new HeartbeatLostError(
-        `Job ${this.jobId} failed: ${this.missedHeartbeats} consecutive missed heartbeats`,
+    if (!allRevoked) return;
+    try {
+      await store.removeByJob(this.jobId);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, jobId: this.jobId },
+        "credential store removeByJob failed after revoke",
       );
-      this.abortController.abort(err);
-      void this.emitErrorEnvelope({
-        final_status: "error",
-        code: "HEARTBEAT_LOST",
-        message: err.message,
-        retryable: false,
-      });
-      return;
     }
-    this.armWatchdog();
   }
+}
+
+function formatEventBodyError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**

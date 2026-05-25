@@ -1,11 +1,15 @@
 import { randomBytes } from "node:crypto";
 
 import type { SessionId, TraceId } from "@agentruntimecontrolprotocol/core";
-import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import {
+  type BaseEnvelope,
+  buildEnvelope,
+} from "@agentruntimecontrolprotocol/core/envelope";
 /* eslint-disable max-lines, max-depth */
 import {
   AgentNotAvailableError,
   ARCPError,
+  BudgetExhaustedError,
   InternalError,
   InvalidRequestError,
   LeaseExpiredError,
@@ -18,7 +22,7 @@ import {
   type MetricBody,
   parseAgentRef,
 } from "@agentruntimecontrolprotocol/core/messages";
-import { newJobId } from "@agentruntimecontrolprotocol/core/util";
+import { newJobId, newMessageId } from "@agentruntimecontrolprotocol/core/util";
 
 import {
   type DelegateOutcome,
@@ -65,7 +69,6 @@ interface AcceptDispatchArgs {
   resolved: ResolvedSubmitAgent;
   leaseFields: LeaseFields;
   principal: string;
-  idempotency: IdempotencyEntry | null;
 }
 
 interface ConstructJobInput {
@@ -76,7 +79,6 @@ interface ConstructJobInput {
   parsedAgentName: string;
   resolvedVersion: string;
   leaseFields: LeaseFields;
-  idempotencyHit: IdempotencyEntry | null;
   principal: string;
 }
 
@@ -93,7 +95,6 @@ interface RecordIdempotencyArgs {
   job: Job;
   principal: string;
   payload: SubmitPayload;
-  idempotencyHit: IdempotencyEntry | "conflict" | null;
 }
 
 interface ConstructDelegateChildInput {
@@ -123,13 +124,6 @@ export class JobRunner {
     const sessionId = ctx.state.id;
     if (sessionId === undefined) return;
     if (await this.rejectIfOverConcurrencyCap(ctx)) return;
-    const resolved = await this.resolveSubmitAgent(ctx, env.payload);
-    if (resolved === null) return;
-    const leaseFields = await this.validateLeaseAndConstraints(
-      ctx,
-      env.payload,
-    );
-    if (leaseFields === null) return;
     const principal = ctx.state.identity?.principal ?? "<anonymous>";
     const idempotency = await this.checkIdempotency(
       ctx,
@@ -137,6 +131,17 @@ export class JobRunner {
       env.payload,
     );
     if (idempotency === "conflict") return;
+    if (idempotency !== null) {
+      await this.emitIdempotencyAccepted(ctx, sessionId, idempotency);
+      return;
+    }
+    const resolved = await this.resolveSubmitAgent(ctx, env.payload);
+    if (resolved === null) return;
+    const leaseFields = await this.validateLeaseAndConstraints(
+      ctx,
+      env.payload,
+    );
+    if (leaseFields === null) return;
     await this.acceptAndDispatchSubmit({
       ctx,
       env,
@@ -144,14 +149,13 @@ export class JobRunner {
       resolved,
       leaseFields,
       principal,
-      idempotency,
     });
   }
 
   private async acceptAndDispatchSubmit(
     args: AcceptDispatchArgs,
   ): Promise<void> {
-    const { ctx, env, resolved, principal, idempotency } = args;
+    const { ctx, env, resolved, principal } = args;
     if (env.type !== "job.submit") return;
     const job = this.constructJob({
       ctx,
@@ -161,16 +165,10 @@ export class JobRunner {
       parsedAgentName: resolved.parsedAgent.name,
       resolvedVersion: resolved.resolvedVersion,
       leaseFields: args.leaseFields,
-      idempotencyHit: idempotency,
       principal,
-    });
-    this.recordIdempotency({
-      job,
-      principal,
-      payload: env.payload,
-      idempotencyHit: idempotency,
     });
     if (!(await this.issueCredentials(ctx, job))) return;
+    this.recordIdempotency({ job, principal, payload: env.payload });
     await job.emitAccepted();
     await job.emitRunning();
     void this.runHandler({
@@ -258,9 +256,8 @@ export class JobRunner {
       ctx.addLocalIdempotencyKey(key);
       return null;
     }
-    const sameAgent = existing.agent === payload.agent;
-    const sameInput = existing.inputDigest === digest(payload.input);
-    if (sameAgent && sameInput) return existing;
+    const sameSubmit = existing.submitDigest === digest(payload);
+    if (sameSubmit) return existing;
     await ctx.emitJobError(existing.jobId, {
       final_status: "error",
       code: "DUPLICATE_KEY",
@@ -274,11 +271,10 @@ export class JobRunner {
   private constructJob(input: ConstructJobInput): Job {
     const traceId: TraceId =
       input.env.trace_id ?? randomBytes(16).toString("hex");
-    const idempotencyHit = input.idempotencyHit;
     // Generate the job id up-front so the logger can be bound with the
     // final value at construction time, preserving Job.logger's readonly
     // contract instead of mutating it via Object.assign post-construction.
-    const jobId = idempotencyHit === null ? newJobId() : idempotencyHit.jobId;
+    const jobId = newJobId();
     const job = new Job({
       options: {
         jobId,
@@ -289,6 +285,7 @@ export class JobRunner {
         lease: input.leaseFields.requestedLease,
         leaseConstraints: input.leaseFields.leaseConstraints,
         initialBudget: input.leaseFields.initialBudget,
+        negotiatedFeatures: input.ctx.negotiatedFeatures,
         heartbeatIntervalSeconds:
           this.server.options.heartbeatIntervalSeconds ??
           DEFAULT_HEARTBEAT_SECONDS,
@@ -308,9 +305,8 @@ export class JobRunner {
   }
 
   private recordIdempotency(args: RecordIdempotencyArgs): void {
-    const { job, principal, payload, idempotencyHit } = args;
+    const { job, principal, payload } = args;
     if (payload.idempotency_key === undefined) return;
-    if (idempotencyHit !== null) return;
     const key = `${principal}::${payload.idempotency_key}`;
     const ttl =
       this.server.options.idempotencyTtlMs ?? DEFAULT_IDEMPOTENCY_TTL_MS;
@@ -318,8 +314,31 @@ export class JobRunner {
       jobId: job.jobId,
       agent: payload.agent,
       inputDigest: digest(payload.input),
+      submitDigest: digest(payload),
+      acceptedPayload: job.acceptedPayload(),
       expiresAt: Date.now() + ttl,
     });
+  }
+
+  private async emitIdempotencyAccepted(
+    ctx: SessionContext,
+    sessionId: SessionId,
+    entry: IdempotencyEntry,
+  ): Promise<void> {
+    await ctx.send(
+      buildEnvelope({
+        id: newMessageId(),
+        type: "job.accepted" as const,
+        payload: entry.acceptedPayload,
+        optional: {
+          session_id: sessionId,
+          job_id: entry.jobId,
+          ...(entry.acceptedPayload.trace_id === undefined
+            ? {}
+            : { trace_id: entry.acceptedPayload.trace_id }),
+        },
+      }),
+    );
   }
 
   /**
@@ -345,6 +364,7 @@ export class JobRunner {
   ): Promise<boolean> {
     const provisioner = this.server.options.credentialProvisioner;
     if (provisioner === undefined) return true;
+    if (!ctx.hasFeature("provisioned_credentials")) return true;
     // `credentialStore` is always present when `credentialProvisioner` is set
     // (validated in ARCPServer constructor).
     const store = this.server.options.credentialStore;
@@ -527,7 +547,10 @@ export class JobRunner {
       resolvedVersion: agent.resolvedVersion,
     });
     if (!(await this.issueCredentials(ctx, child))) {
-      return { ok: false, error: new InternalError("Credential provisioning failed") };
+      return {
+        ok: false,
+        error: new InternalError("Credential provisioning failed"),
+      };
     }
     await child.emitAccepted();
     await child.emitRunning();
@@ -597,6 +620,7 @@ export class JobRunner {
         lease: requested,
         leaseConstraints: effectiveConstraints,
         initialBudget: initialBudgetFromLease(requested),
+        negotiatedFeatures: ctx.negotiatedFeatures,
         parentJobId: parent.jobId,
         delegateId: body.delegate_id,
         heartbeatIntervalSeconds:
@@ -642,6 +666,11 @@ export class JobRunner {
             })
             .catch(() => undefined);
         });
+      }
+      if (remaining !== null && remaining <= 0) {
+        throw new BudgetExhaustedError(
+          `Budget exhausted for ${body.unit ?? "unknown currency"}`,
+        );
       }
     };
   }

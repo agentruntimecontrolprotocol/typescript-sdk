@@ -95,7 +95,10 @@ function helloFrame(token: string): Record<string, unknown> {
  * session ID in the `session.welcome` envelope; callers must extract it from
  * that frame (at the envelope level: `frame["session_id"]`) and pass it here.
  */
-function submitFrame(agent: string, sessionId: string): Record<string, unknown> {
+function submitFrame(
+  agent: string,
+  sessionId: string,
+): Record<string, unknown> {
   return {
     arcp: PROTOCOL_VERSION,
     id: "msg-submit",
@@ -193,9 +196,24 @@ describe("InMemoryCredentialStore", () => {
   it("listOutstanding returns all un-removed entries across multiple jobs", async () => {
     const store = new InMemoryCredentialStore();
     const now = new Date().toISOString();
-    await store.add({ jobId: "job-a", credentialId: "c-1", provisionerId: "p-1", issuedAt: now });
-    await store.add({ jobId: "job-a", credentialId: "c-2", provisionerId: "p-2", issuedAt: now });
-    await store.add({ jobId: "job-b", credentialId: "c-3", provisionerId: "p-3", issuedAt: now });
+    await store.add({
+      jobId: "job-a",
+      credentialId: "c-1",
+      provisionerId: "p-1",
+      issuedAt: now,
+    });
+    await store.add({
+      jobId: "job-a",
+      credentialId: "c-2",
+      provisionerId: "p-2",
+      issuedAt: now,
+    });
+    await store.add({
+      jobId: "job-b",
+      credentialId: "c-3",
+      provisionerId: "p-3",
+      issuedAt: now,
+    });
 
     const all = await store.listOutstanding();
     expect(all).toHaveLength(3);
@@ -316,7 +334,12 @@ describe("ARCPServer.advertisedFeatures", () => {
     const server = new ARCPServer({
       runtime: TEST_RUNTIME,
       capabilities: TEST_CAPABILITIES,
-      features: ["streaming", "back_pressure", "model.use", "provisioned_credentials"],
+      features: [
+        "streaming",
+        "back_pressure",
+        "model.use",
+        "provisioned_credentials",
+      ],
     });
     const flags = server.advertisedFeatures;
     // Non-credential flags are preserved.
@@ -413,7 +436,9 @@ describe("provisioned credentials E2E lifecycle", () => {
   });
 
   it("stores the credential in the store before emitting job.accepted", async () => {
-    const provisioner = makeProvisioner([makeIssuedCredential("cred-store-order")]);
+    const provisioner = makeProvisioner([
+      makeIssuedCredential("cred-store-order"),
+    ]);
     const store = new InMemoryCredentialStore();
 
     // Spy on store.add to verify it's called before job.accepted is received.
@@ -427,7 +452,9 @@ describe("provisioned credentials E2E lifecycle", () => {
     const server = new ARCPServer({
       runtime: TEST_RUNTIME,
       capabilities: TEST_CAPABILITIES,
-      bearer: new StaticBearerVerifier(new Map([["tok", { principal: "bob" }]])),
+      bearer: new StaticBearerVerifier(
+        new Map([["tok", { principal: "bob" }]]),
+      ),
       credentialProvisioner: provisioner,
       credentialStore: store,
       logger: silentLogger,
@@ -462,6 +489,46 @@ describe("provisioned credentials E2E lifecycle", () => {
     // By the time we receive job.accepted, store.add must have already been called
     // (issueCredentials → store.add is awaited before job.emitAccepted).
     expect(storeAddCalledCount).toBe(1);
+
+    await client.close();
+    await server.close();
+  });
+
+  it("keeps store entries when revocation fails so recovery can retry", async () => {
+    const provisioner = makeProvisioner([makeIssuedCredential("cred-retry")]);
+    vi.mocked(provisioner.revoke).mockRejectedValueOnce(new Error("offline"));
+    const store = new InMemoryCredentialStore();
+
+    const server = new ARCPServer({
+      runtime: TEST_RUNTIME,
+      capabilities: TEST_CAPABILITIES,
+      bearer: new StaticBearerVerifier(
+        new Map([["tok", { principal: "alice" }]]),
+      ),
+      credentialProvisioner: provisioner,
+      credentialStore: store,
+      logger: silentLogger,
+    });
+    server.registerAgent("noop", async () => null);
+
+    const [client, serverSide] = pairMemoryTransports();
+    server.accept(serverSide);
+    const collector = new FrameCollector(client);
+
+    await client.send(helloFrame("tok"));
+    const welcomeFrames = await collector.waitFor(
+      (f) => f["type"] === "session.welcome",
+    );
+    const welcome = welcomeFrames.find((f) => f["type"] === "session.welcome");
+    const sessionId = welcome!["session_id"] as string;
+
+    await client.send(submitFrame("noop", sessionId));
+    await collector.waitFor((f) => f["type"] === "job.result");
+    await new Promise((r) => setTimeout(r, 50));
+
+    const outstanding = await store.listOutstanding();
+    expect(outstanding).toHaveLength(1);
+    expect(outstanding[0]?.credentialId).toBe("cred-retry");
 
     await client.close();
     await server.close();
@@ -585,7 +652,10 @@ describe("credential confidentiality in job.subscribed (§14)", () => {
     >;
     // Alice (original submitter) SHOULD receive credentials.
     expect(Array.isArray(aliceSubPayload["credentials"])).toBe(true);
-    const aliceCreds = aliceSubPayload["credentials"] as Record<string, unknown>[];
+    const aliceCreds = aliceSubPayload["credentials"] as Record<
+      string,
+      unknown
+    >[];
     expect(aliceCreds[0]?.["id"]).toBe("cred-conf");
 
     await aliceClient.close();

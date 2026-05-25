@@ -23,6 +23,13 @@ function entry(
     jobId: jobId,
     agent: "echo",
     inputDigest: "{}",
+    submitDigest: "{}",
+    acceptedPayload: {
+      job_id: jobId,
+      agent: "echo",
+      lease: {},
+      accepted_at: new Date(0).toISOString(),
+    },
     expiresAt: FUTURE,
     ...overrides,
   };

@@ -1,4 +1,9 @@
-import type { EventSeq, JobId, SessionId, TraceId } from "@agentruntimecontrolprotocol/core";
+import type {
+  EventSeq,
+  JobId,
+  SessionId,
+  TraceId,
+} from "@agentruntimecontrolprotocol/core";
 import type { BearerVerifier } from "@agentruntimecontrolprotocol/core/auth";
 import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
@@ -69,6 +74,8 @@ export interface JobOptions {
   delegateId?: string;
   /** W3C trace id propagated for OTel correlation (§11). */
   traceId?: TraceId;
+  /** v1.1 §6.2 — effective feature set negotiated for the owning session. */
+  negotiatedFeatures?: readonly string[];
   /** Heartbeat watchdog interval. */
   heartbeatIntervalSeconds: number;
   /** Heartbeats missed before HEARTBEAT_LOST. Default 2. */
@@ -286,4 +293,7 @@ export type {
   CredentialIssueContext,
   IssuedCredential,
 } from "./credential-provisioner.js";
-export type { CredentialStore, CredentialStoreEntry } from "./credential-store.js";
+export type {
+  CredentialStore,
+  CredentialStoreEntry,
+} from "./credential-store.js";

@@ -70,6 +70,44 @@ describe("v1.1 §6.2 feature negotiation", () => {
     await h.close();
   });
 
+  it("does not issue credentials when the client does not negotiate the feature", async () => {
+    let issued = 0;
+    const provisioner: CredentialProvisioner = {
+      issue: async () => {
+        issued += 1;
+        return [
+          {
+            wire: {
+              id: "cred-1",
+              scheme: "bearer",
+              value: "secret",
+              endpoint: "https://example.test",
+            },
+            provisionerId: "prov-1",
+          },
+        ];
+      },
+      revoke: async () => undefined,
+    };
+    const h = makePairedHarness(
+      {
+        credentialProvisioner: provisioner,
+        credentialStore: new InMemoryCredentialStore(),
+      },
+      {
+        features: V1_1_FEATURES.filter((f) => f !== "provisioned_credentials"),
+      },
+    );
+    h.server.registerAgent("echo", async (input) => input);
+    await h.connect();
+    expect(h.client.hasFeature("provisioned_credentials")).toBe(false);
+    const handle = await h.client.submit({ agent: "echo", input: {} });
+    await handle.done;
+    expect(handle.credentials).toBeUndefined();
+    expect(issued).toBe(0);
+    await h.close();
+  });
+
   it("degrades when the runtime advertises a subset", async () => {
     const h = makePairedHarness({ features: ["heartbeat", "progress"] });
     h.server.registerAgent("echo", async (input) => input);
@@ -308,6 +346,36 @@ describe("v1.1 §8.2 progress events", () => {
     expect((p?.body as { current: number }).current).toBe(5);
     await h.close();
   });
+
+  it("rejects progress when the feature is not negotiated", async () => {
+    const h = makePairedHarness({
+      features: V1_1_FEATURES.filter((f) => f !== "progress"),
+    });
+    h.server.registerAgent("p", async (_input, ctx) => {
+      await ctx.progress(1);
+      return {};
+    });
+    await h.connect();
+    const handle = await h.client.submit({ agent: "p", input: {} });
+    await expect(handle.done).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+    });
+    await h.close();
+  });
+
+  it("rejects progress where current exceeds total", async () => {
+    const h = makePairedHarness();
+    h.server.registerAgent("p", async (_input, ctx) => {
+      await ctx.progress(2, { total: 1 });
+      return {};
+    });
+    await h.connect();
+    const handle = await h.client.submit({ agent: "p", input: {} });
+    await expect(handle.done).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+    });
+    await h.close();
+  });
 });
 
 describe("v1.1 §8.4 result_chunk + streaming", () => {
@@ -344,6 +412,26 @@ describe("v1.1 §8.4 result_chunk + streaming", () => {
     // Inline result must NOT be present.
     expect(result.result).toBeUndefined();
     expect(result.result_id).toBeDefined();
+    await h.close();
+  });
+
+  it("rejects out-of-order result chunks", async () => {
+    const h = makePairedHarness();
+    h.server.registerAgent("bad-chunk", async (_input, ctx) => {
+      await ctx.resultChunk({
+        result_id: "res_1",
+        chunk_seq: 1,
+        data: "late",
+        encoding: "utf8",
+        more: true,
+      });
+      return {};
+    });
+    await h.connect();
+    const handle = await h.client.submit({ agent: "bad-chunk", input: {} });
+    await expect(handle.done).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+    });
     await h.close();
   });
 });
@@ -441,6 +529,24 @@ describe("v1.1 §9.6 cost.budget", () => {
     });
     const result = await handle.done;
     expect((result.result as { remaining: number }).remaining).toBeCloseTo(0.5);
+    await h.close();
+  });
+
+  it("rejects negative cost metrics without decrementing budget", async () => {
+    const h = makePairedHarness();
+    h.server.registerAgent("spender", async (_i, ctx) => {
+      await ctx.metric({ name: "cost.inference", value: -0.1, unit: "USD" });
+      return { remaining: ctx.budget.get("USD") };
+    });
+    await h.connect();
+    const handle = await h.client.submit({
+      agent: "spender",
+      input: {},
+      lease: { "cost.budget": ["USD:1.00"] },
+    });
+    await expect(handle.done).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+    });
     await h.close();
   });
 

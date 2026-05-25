@@ -1,4 +1,7 @@
-import { type BaseEnvelope, buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import {
+  type BaseEnvelope,
+  buildEnvelope,
+} from "@agentruntimecontrolprotocol/core/envelope";
 import {
   AgentNotAvailableError,
   AgentVersionNotAvailableError,
@@ -64,8 +67,8 @@ export function wrapJobCtx(args: WrapJobCtxArgs): JobContext {
       await delegateInterceptor(body);
     },
     async metric(body) {
-      await base.metric(body);
       await metricInterceptor(body);
+      await base.metric(body);
     },
   };
 }
@@ -170,13 +173,15 @@ export async function runAndEmitResult({
       });
       return;
     }
-    await job.emitEventKind("result_chunk", {
-      result_id: resultId,
-      chunk_seq: job.activeResultNextChunkSeq,
-      data: "",
-      encoding: "utf8",
-      more: false,
-    });
+    if (!job.resultChunkFinalized) {
+      await job.emitEventKind("result_chunk", {
+        result_id: resultId,
+        chunk_seq: job.activeResultNextChunkSeq,
+        data: "",
+        encoding: "utf8",
+        more: false,
+      });
+    }
     await job.emitResult({
       final_status: "success",
       result_id: resultId,
@@ -220,6 +225,7 @@ function wrapHandlerError(error: unknown): ARCPError {
 export async function forwardEventToSubscriber(
   sub: SessionContext,
   src: BaseEnvelope,
+  opts: { fanOut?: boolean } = {},
 ): Promise<void> {
   if (sub.state.id === undefined) return;
   // Build a fresh envelope: same payload/type/job_id but new id and a new
@@ -235,7 +241,12 @@ export async function forwardEventToSubscriber(
       ...(src.event_seq === undefined ? {} : { event_seq: sub.nextEventSeq() }),
     },
   });
-  await sub.send(env);
+  if (opts.fanOut ?? true) {
+    await sub.send(env);
+    return;
+  }
+  await sub.server.eventLog.append(env);
+  await sub.transport.send(env);
 }
 
 export function validateDelegateLease(
