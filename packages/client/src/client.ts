@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { randomBytes } from "node:crypto";
 
 import type { JobId, SessionId } from "@agentruntimecontrolprotocol/core";
@@ -132,12 +133,27 @@ export class ARCPClient {
   }
 
   /**
-   * Connect over `transport` and complete the handshake.
+   * Connect over `transport` and complete the v1.1 handshake.
    *
-   * @param transport - Transport to bind to this client.
-   * @param opts - Optional abort signal for the handshake.
+   * Sends `session.hello`, awaits `session.welcome`, and records the
+   * negotiated capabilities (encodings, features, agent inventory). Use
+   * {@link ARCPClient.resume} instead to recover an existing session.
+   *
+   * @param transport - Transport to bind to this client. The client takes
+   *   ownership of `onFrame`/`onClose` registrations for its lifetime.
+   * @param opts.signal - Optional abort signal for the handshake. If
+   *   already aborted, this throws `signal.reason` before sending hello.
    * @returns The negotiated `session.welcome` payload.
-   * @throws {@link ARCPError} on rejection, malformed envelopes, or timeout.
+   * @throws {@link InvalidRequestError} if the client is already connected
+   *   or the transport closes before the handshake completes.
+   * @throws {@link ARCPError} on runtime rejection or malformed envelopes.
+   *
+   * @example
+   * ```ts
+   * const client = new ARCPClient({ identity: { name: "demo", version: "1.0.0" } })
+   * const welcome = await client.connect(transport)
+   * console.log("session id:", welcome.session_id)
+   * ```
    */
   public async connect(
     transport: Transport,
@@ -151,11 +167,25 @@ export class ARCPClient {
    * Resume a prior session under the same principal. Sends a hello with the
    * resume block and replays missed events upon welcome.
    *
+   * The runtime replays any events with `event_seq > resume.lastEventSeq`
+   * before the welcome resolves. Use {@link ARCPClient.connect} for fresh
+   * sessions.
+   *
    * @param transport - Fresh transport for the resumed session.
    * @param resume - Resume tuple identifying the prior session.
-   * @param opts - Optional abort signal for the handshake.
+   * @param opts.signal - Optional abort signal for the handshake.
    * @returns The negotiated `session.welcome` payload.
+   * @throws {@link ResumeWindowExpiredError} when the prior session is
+   *   beyond the runtime's resume window.
    * @throws {@link ARCPError} when the runtime rejects the resume request.
+   *
+   * @example
+   * ```ts
+   * const welcome = await client.resume(transport, {
+   *   sessionId: previous.sessionId,
+   *   lastEventSeq: previous.eventSeq,
+   * })
+   * ```
    */
   public async resume(
     transport: Transport,
@@ -342,13 +372,26 @@ export class ARCPClient {
   }
 
   /**
-   * Submit a job. Returns once `job.accepted` arrives, with a handle that
-   * exposes `done` for the terminal `job.result` / `job.error`.
+   * Submit a job. Returns once `job.accepted` arrives, with a handle whose
+   * `done` resolves on the terminal `job.result` and rejects on `job.error`.
    *
-   * @param opts - Submission payload and optional control flags.
+   * Pre-aborted `opts.signal` rejects with {@link CancelledError} before the
+   * submit envelope is sent. Aborting after submit but before acceptance
+   * removes the pending invocation and rejects `handle.done`; aborting after
+   * acceptance issues a `job.cancel` for the assigned `jobId`.
+   *
+   * @param opts - Submission payload (agent, input, lease, etc.) and
+   *   optional control flags (`signal`, `traceId`).
    * @returns A handle for the accepted job.
    * @throws {@link InvalidRequestError} if the client is disconnected.
    * @throws {@link UnauthenticatedError} if the session is not accepted.
+   * @throws {@link CancelledError} if `opts.signal` is already aborted.
+   *
+   * @example
+   * ```ts
+   * const handle = await client.submit({ agent: "research", input: { q } })
+   * const result = await handle.done
+   * ```
    */
   public async submit(opts: SubmitOptions): Promise<JobHandle> {
     if (this.transport === null) {
@@ -361,18 +404,34 @@ export class ARCPClient {
     if (sessionId === undefined) {
       throw new InvalidRequestError("session has no id");
     }
+    // Pre-aborted signal: never register the invocation or send anything.
+    // Returning a dead handle would leave callers awaiting `handle.done`
+    // forever; the explicit throw matches `cancelJob`'s contract.
+    if (opts.signal?.aborted === true) {
+      throw new CancelledError(
+        typeof opts.signal.reason === "string"
+          ? opts.signal.reason
+          : "aborted before submit",
+      );
+    }
     const id = newMessageId();
     const env = buildSubmitEnvelope({ id, sessionId, opts });
     const invocation = this.registerSubmitInvocation(id, opts);
-    const abortHandled = this.wireSubmitAbort(invocation, opts.signal);
-    if (abortHandled === "aborted-before-submit") {
-      return makeHandleFromInvocation(invocation);
+    const detachAbort = this.wireSubmitAbort(invocation, id, opts.signal);
+    try {
+      await this.transport.send(env);
+      // The routeJobEvent path resolves `acceptance` *and* registers the
+      // invocation in `invocationsByJobId` before this await returns, so any
+      // subsequent events arriving in the same tick will still route.
+      await invocation.acceptance.promise;
+    } catch (error) {
+      this.invocationsByOriginId.delete(id);
+      removeFromArray(this.pendingAccepts, invocation);
+      invocation.completion.reject(error);
+      detachAbort();
+      throw error;
     }
-    await this.transport.send(env);
-    // The routeJobEvent path resolves `acceptance` *and* registers the
-    // invocation in `invocationsByJobId` before this await returns, so any
-    // subsequent events arriving in the same tick will still route.
-    await invocation.acceptance.promise;
+    detachAbort();
     return makeHandleFromInvocation(invocation);
   }
 
@@ -405,22 +464,34 @@ export class ARCPClient {
 
   private wireSubmitAbort(
     invocation: InvocationState,
+    originId: string,
     signal: AbortSignal | undefined,
-  ): "aborted-before-submit" | null {
-    if (signal === undefined) return null;
-    if (signal.aborted) {
-      invocation.acceptance.reject(new CancelledError("aborted before submit"));
-      return "aborted-before-submit";
-    }
+  ): () => void {
+    if (signal === undefined) return () => undefined;
     const onAbort = (): void => {
       if (invocation.jobId !== null) {
         void this.cancelJob(invocation.jobId, {
           reason: String(signal.reason ?? "abort"),
         });
+        return;
       }
+      // Abort raced in before `job.accepted` — drop the pending invocation so
+      // it does not pile up in `invocationsByOriginId` or `pendingAccepts`,
+      // and surface the failure on both deferreds.
+      this.invocationsByOriginId.delete(originId);
+      removeFromArray(this.pendingAccepts, invocation);
+      const reason = new CancelledError(
+        typeof signal.reason === "string"
+          ? signal.reason
+          : "aborted before acceptance",
+      );
+      invocation.acceptance.reject(reason);
+      invocation.completion.reject(reason);
     };
     signal.addEventListener("abort", onAbort, { once: true });
-    return null;
+    return () => {
+      signal.removeEventListener("abort", onAbort);
+    };
   }
 
   /** Send a `job.cancel` envelope.
@@ -648,6 +719,11 @@ export function asEnvelopeOfType<T extends Envelope["type"]>(
   type: T,
 ): Extract<Envelope, { type: T }> | null {
   return env.type === type ? (env as Extract<Envelope, { type: T }>) : null;
+}
+
+function removeFromArray<T>(arr: T[], value: T): void {
+  const idx = arr.indexOf(value);
+  if (idx !== -1) arr.splice(idx, 1);
 }
 
 // Silence unused — re-exported for future timers.

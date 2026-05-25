@@ -145,7 +145,17 @@ export class ARCPServer {
    * if no default is set).
    *
    * @param name - Agent name to register.
-   * @param handler - Handler invoked for matching submissions.
+   * @param handler - Handler invoked for matching submissions. Receives the
+   *   submitted `input` and a {@link JobContext}; throwing rejects the job
+   *   with the wrapped {@link ARCPError}.
+   *
+   * @example
+   * ```ts
+   * server.registerAgent("echo", async (input, ctx) => {
+   *   await ctx.status("running")
+   *   return { echoed: input }
+   * })
+   * ```
    */
   public registerAgent<Input = unknown, Result = unknown>(
     name: string,
@@ -209,11 +219,27 @@ export class ARCPServer {
   }
 
   /**
-   * Adopt a {@link Transport} as a new session. Returns the
-   * {@link SessionContext}; the handshake completes asynchronously.
+   * Adopt a {@link Transport} as a new session and start the v1.1 handshake.
    *
-   * @param transport - Transport to accept.
+   * The returned {@link SessionContext} is fully wired (frame dispatch, close
+   * handler, heartbeat scheduler) but the handshake completes asynchronously
+   * — observers must use {@link SessionContext.onAccept} or its event log to
+   * react to acceptance.
+   *
+   * @param transport - Transport to accept. The runtime takes ownership of
+   *   `onFrame`/`onClose` registrations until the session terminates.
    * @returns A session context wired to the transport.
+   * @throws {@link InvalidRequestError} if `maxSessions` is configured and
+   *   already saturated.
+   *
+   * @example
+   * ```ts
+   * httpServer.on("upgrade", (req, sock, head) => {
+   *   wss.handleUpgrade(req, sock, head, (ws) => {
+   *     server.accept(new WebSocketTransport(ws))
+   *   })
+   * })
+   * ```
    */
   public accept(transport: Transport): SessionContext {
     const ctx = new SessionContextCtor(transport, this, this.logger);
@@ -607,13 +633,26 @@ export class ARCPServer {
     const windowMs =
       (this.options.resumeWindowSeconds ?? DEFAULT_RESUME_WINDOW_SECONDS) *
       1000;
+    const idle: SessionContext[] = [];
     for (const ctx of this.sessions.values()) {
       if (now - ctx.lastActivityAt > windowMs) {
-        void ctx.emitSessionError(
-          new ResumeWindowExpiredError("session idle past resume_window_sec"),
-        );
+        idle.push(ctx);
       }
     }
+    if (idle.length === 0) return;
+    void Promise.allSettled(
+      idle.map(async (ctx) => {
+        try {
+          await ctx.emitSessionError(
+            new ResumeWindowExpiredError(
+              "session idle past resume_window_sec",
+            ),
+          );
+        } finally {
+          await ctx.terminate("resume window expired");
+        }
+      }),
+    );
   }
 
   // §10 delegation child-job creation lives on `JobRunner` in ./job-runner.ts.

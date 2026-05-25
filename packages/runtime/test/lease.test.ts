@@ -134,6 +134,43 @@ describe("isLeaseSubset (§9.4)", () => {
       isLeaseSubset({ "model.use": ["**"] }, { "model.use": ["gpt-4*"] }),
     ).toBe(false);
   });
+
+  // Issue #73: patternSubsumes used to test the parent regex against the
+  // child *pattern string*, which let `[^/]*` swallow the literal `**` in a
+  // broader child and reported it as a subset (privilege escalation in
+  // delegation). Subsumption must be checked syntactically.
+  describe("patternSubsumes (issue #73 — segment-wise subset)", () => {
+    it("rejects /a/** as a subset of /a/* (** is broader than *)", () => {
+      expect(
+        isLeaseSubset({ "fs.read": ["/a/**"] }, { "fs.read": ["/a/*"] }),
+      ).toBe(false);
+    });
+    it("accepts /a/* as a subset of /a/**", () => {
+      expect(
+        isLeaseSubset({ "fs.read": ["/a/*"] }, { "fs.read": ["/a/**"] }),
+      ).toBe(true);
+    });
+    it("rejects multi-segment /a/b/c as a subset of /a/*", () => {
+      expect(
+        isLeaseSubset({ "fs.read": ["/a/b/c"] }, { "fs.read": ["/a/*"] }),
+      ).toBe(false);
+    });
+    it("accepts /a as a subset of /**", () => {
+      expect(
+        isLeaseSubset({ "fs.read": ["/a"] }, { "fs.read": ["/**"] }),
+      ).toBe(true);
+    });
+    it("accepts identical literal patterns", () => {
+      expect(
+        isLeaseSubset({ "fs.read": ["/a"] }, { "fs.read": ["/a"] }),
+      ).toBe(true);
+    });
+    it("accepts a literal as a subset of a single-segment *", () => {
+      expect(isLeaseSubset({ "fs.read": ["x"] }, { "fs.read": ["*"] })).toBe(
+        true,
+      );
+    });
+  });
 });
 
 describe("validateLeaseShape", () => {

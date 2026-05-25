@@ -76,6 +76,30 @@ describe("PendingRegistry", () => {
     await expect(promise).rejects.toBeInstanceOf(CancelledError);
   });
 
+  // Issue #86: pre-aborted register MUST NOT insert an entry into the map.
+  // Otherwise long-running sessions leak one entry per pre-aborted register.
+  it("pre-aborted signal does not leak entries in the registry", async () => {
+    const r = new PendingRegistry();
+    const ctrl = new AbortController();
+    ctrl.abort();
+    for (let i = 0; i < 1000; i += 1) {
+      const promise = r.register<unknown>(`c${i}`, { signal: ctrl.signal });
+      await expect(promise).rejects.toBeInstanceOf(CancelledError);
+    }
+    expect(r.size).toBe(0);
+  });
+
+  it("removes the abort listener once the entry settles", async () => {
+    const r = new PendingRegistry();
+    const ctrl = new AbortController();
+    const promise = r.register<number>("c1", { signal: ctrl.signal });
+    r.resolve("c1", 7);
+    await expect(promise).resolves.toBe(7);
+    // Aborting after resolve must not double-settle or rescheduling.
+    expect(() => { ctrl.abort(); }).not.toThrow();
+    expect(r.size).toBe(0);
+  });
+
   it("rejectAll clears every entry with the same reason", async () => {
     const r = new PendingRegistry();
     const a = r.register<unknown>("a");

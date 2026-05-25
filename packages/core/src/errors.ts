@@ -269,7 +269,7 @@ export class LeaseExpiredError extends ARCPError {
     message: string,
     opts: Omit<ARCPErrorOptions, "message" | "code"> = {},
   ) {
-    super({ retryable: false, ...opts, code: "LEASE_EXPIRED", message });
+    super({ ...opts, retryable: false, code: "LEASE_EXPIRED", message });
     this.name = "LeaseExpiredError";
   }
 }
@@ -283,7 +283,7 @@ export class BudgetExhaustedError extends ARCPError {
     message: string,
     opts: Omit<ARCPErrorOptions, "message" | "code"> = {},
   ) {
-    super({ retryable: false, ...opts, code: "BUDGET_EXHAUSTED", message });
+    super({ ...opts, retryable: false, code: "BUDGET_EXHAUSTED", message });
     this.name = "BudgetExhaustedError";
   }
 }
@@ -298,8 +298,8 @@ export class AgentVersionNotAvailableError extends ARCPError {
     opts: Omit<ARCPErrorOptions, "message" | "code"> = {},
   ) {
     super({
-      retryable: false,
       ...opts,
+      retryable: false,
       code: "AGENT_VERSION_NOT_AVAILABLE",
       message,
     });

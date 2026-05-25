@@ -255,6 +255,16 @@ describe("Tagged* errors encode → decode round-trip", () => {
   }
 });
 
+// v1.1 §12 — these error codes are documented as always non-retryable.
+// Their constructors MUST enforce `retryable: false` regardless of what the
+// caller passes, so the ARCP→Tagged tests can't assume a user-supplied
+// `retryable: true` survives the construction step.
+const ALWAYS_NON_RETRYABLE = new Set<string>([
+  "LEASE_EXPIRED",
+  "BUDGET_EXHAUSTED",
+  "AGENT_VERSION_NOT_AVAILABLE",
+]);
+
 describe("bridge converters: taggedFromARCP / arcpFromTagged", () => {
   for (const { code, tag, Legacy, Tagged } of ROWS) {
     it(`${code}: ARCP → Tagged preserves shape`, () => {
@@ -267,7 +277,7 @@ describe("bridge converters: taggedFromARCP / arcpFromTagged", () => {
       expect(tagged._tag).toBe(tag);
       expect(tagged.code).toBe(code);
       expect(tagged.message).toBe("hello");
-      expect(tagged.retryable).toBe(true);
+      expect(tagged.retryable).toBe(!ALWAYS_NON_RETRYABLE.has(code));
       expect(tagged.details).toEqual({ k: "v" });
     });
 
@@ -296,7 +306,10 @@ describe("bridge converters: taggedFromARCP / arcpFromTagged", () => {
       expect(after).toBeInstanceOf(Legacy);
       expect(after.code).toBe(before.code);
       expect(after.message).toBe(before.message);
-      expect(after.retryable).toBe(before.retryable);
+      // Always-non-retryable subclasses enforce `false` at construction.
+      expect(after.retryable).toBe(
+        ALWAYS_NON_RETRYABLE.has(code) ? false : before.retryable,
+      );
       expect(after.details).toEqual(before.details);
     });
   }

@@ -169,20 +169,18 @@ export class SessionContext implements EventSeqSource {
   }
 
   private async fanOutToSubscribers(envelope: BaseEnvelope): Promise<void> {
-    if (envelope.job_id === undefined) return;
-    if (
-      envelope.type !== "job.event" &&
-      envelope.type !== "job.result" &&
-      envelope.type !== "job.error"
-    ) {
-      return;
-    }
+    if (!isForwardable(envelope)) return;
     const subs = this.server.subscribers.get(envelope.job_id);
     if (subs === undefined || subs.size === 0) return;
+    // Deliver concurrently so one slow or wedged subscriber transport cannot
+    // stall the owner's send path or starve sibling subscribers. Each
+    // delivery is isolated; failures are logged inside the helper.
+    const deliveries: Promise<unknown>[] = [];
     for (const sub of subs) {
       if (sub === this || sub.state.id === undefined) continue;
-      await this.forwardEnvelopeToSubscriber(sub, envelope);
+      deliveries.push(this.forwardEnvelopeToSubscriber(sub, envelope));
     }
+    if (deliveries.length > 0) await Promise.allSettled(deliveries);
   }
 
   private async forwardEnvelopeToSubscriber(
@@ -190,25 +188,40 @@ export class SessionContext implements EventSeqSource {
     envelope: BaseEnvelope,
   ): Promise<void> {
     if (sub.state.id === undefined) return;
+    if (sub.closed || sub.transport.closed) return;
+    const forwarded = buildEnvelope({
+      id: newMessageId(),
+      type: envelope.type,
+      payload: envelope.payload,
+      optional: {
+        session_id: sub.state.id,
+        job_id: envelope.job_id,
+        ...(envelope.trace_id === undefined
+          ? {}
+          : { trace_id: envelope.trace_id }),
+        ...(envelope.event_seq === undefined
+          ? {}
+          : { event_seq: sub.nextEventSeq() }),
+      },
+    });
+    // Persist under the subscriber's session id before sending so the
+    // forwarded envelope's subscriber-scoped event_seq is resumable, matching
+    // the behavior of envelopes emitted by the subscriber's own session.
     try {
-      const forwarded = buildEnvelope({
-        id: newMessageId(),
-        type: envelope.type,
-        payload: envelope.payload,
-        optional: {
-          session_id: sub.state.id,
-          job_id: envelope.job_id,
-          ...(envelope.trace_id === undefined
-            ? {}
-            : { trace_id: envelope.trace_id }),
-          ...(envelope.event_seq === undefined
-            ? {}
-            : { event_seq: sub.nextEventSeq() }),
-        },
-      });
+      await this.server.eventLog.append(forwarded);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, subscriber: sub.state.id, type: envelope.type },
+        "event log append (subscriber forward) failed",
+      );
+    }
+    try {
       await sub.transport.send(forwarded);
-    } catch {
-      // best-effort
+    } catch (error) {
+      this.logger.warn(
+        { err: error, subscriber: sub.state.id, type: envelope.type },
+        "subscriber transport send failed",
+      );
     }
   }
 
@@ -304,6 +317,7 @@ export class SessionContext implements EventSeqSource {
 
   /** Dispatch an inbound, raw frame. */
   public async dispatchRaw(frame: WireFrame): Promise<void> {
+    if (this.closed || this.transport.closed) return;
     this.touch();
     this.lastInboundAt = Date.now();
     const parsed = this.parseInboundFrame(frame);
@@ -487,4 +501,15 @@ export class SessionContext implements EventSeqSource {
     this.server.dropSession(this);
     await this.transport.close(reason);
   }
+}
+
+function isForwardable(
+  envelope: BaseEnvelope,
+): envelope is BaseEnvelope & { job_id: string } {
+  if (envelope.job_id === undefined) return false;
+  return (
+    envelope.type === "job.event" ||
+    envelope.type === "job.result" ||
+    envelope.type === "job.error"
+  );
 }

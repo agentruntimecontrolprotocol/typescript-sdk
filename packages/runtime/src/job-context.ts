@@ -1,14 +1,20 @@
-import { InvalidRequestError } from "@agentruntimecontrolprotocol/core/errors";
+import {
+  ARCPError,
+  InvalidRequestError,
+} from "@agentruntimecontrolprotocol/core/errors";
 import type {
+  DelegateBody,
   LogPayload,
   ProgressBody,
   ResultChunkBody,
   StatusBody,
   ThoughtBody,
+  ToolCallBody,
 } from "@agentruntimecontrolprotocol/core/messages";
 import { newJobId } from "@agentruntimecontrolprotocol/core/util";
 
 import type { Job } from "./job.js";
+import { validateLeaseOp } from "./lease.js";
 import type { JobContext, ResultStream } from "./types.js";
 
 /** Build a {@link JobContext} backed by a {@link Job}. */
@@ -109,6 +115,12 @@ function jobToolingEmitters(
 ): Pick<JobContext, "toolCall" | "toolResult" | "artifactRef" | "delegate"> {
   return {
     async toolCall(body) {
+      try {
+        gateLeaseOp(job, "tool.call", body.tool);
+      } catch (error) {
+        await surfaceLeaseDenial(job, body, error);
+        return;
+      }
       await job.emitEventKind("tool_call", body);
     },
     async toolResult(body) {
@@ -117,10 +129,70 @@ function jobToolingEmitters(
     async artifactRef(body) {
       await job.emitEventKind("artifact_ref", body);
     },
-    async delegate(body) {
+    async delegate(body: DelegateBody) {
+      try {
+        gateLeaseOp(job, "agent.delegate", body.agent);
+      } catch (error) {
+        // No call_id slot on delegate; surface as a job.error sub-event but
+        // do not terminate the job — the runtime submit path also enforces
+        // delegation; this guards same-host emitters.
+        await emitDelegateDenial(job, body, error);
+        return;
+      }
       await job.emitEventKind("delegate", body);
     },
   };
+}
+
+function gateLeaseOp(job: Job, capability: string, target: string): void {
+  validateLeaseOp({
+    lease: job.lease,
+    capability,
+    target,
+    ctx: {
+      ...(job.leaseConstraints === undefined
+        ? {}
+        : { constraints: job.leaseConstraints }),
+      budgetRemaining: job.budget,
+    },
+  });
+}
+
+async function surfaceLeaseDenial(
+  job: Job,
+  body: ToolCallBody,
+  err: unknown,
+): Promise<void> {
+  const error = err instanceof ARCPError ? err : null;
+  // Per the v1.1 lease docs, a denied tool surfaces as `tool_result` carrying
+  // the ARCP error payload — never as a successful `tool_call` event.
+  await job.emitEventKind("tool_result", {
+    call_id: body.call_id,
+    error: {
+      code: error?.code ?? "INTERNAL",
+      message: error?.message ?? "lease denied",
+      retryable: error?.retryable ?? false,
+      ...(error?.details === undefined ? {} : { details: error.details }),
+    },
+  });
+}
+
+async function emitDelegateDenial(
+  job: Job,
+  body: DelegateBody,
+  err: unknown,
+): Promise<void> {
+  const error = err instanceof ARCPError ? err : null;
+  await job.emitEventKind("log", {
+    level: "error",
+    message: "delegate denied by lease",
+    attributes: {
+      delegate_id: body.delegate_id,
+      agent: body.agent,
+      code: error?.code ?? "INTERNAL",
+      reason: error?.message ?? "lease denied",
+    },
+  });
 }
 
 function jobStreamingEmitters(

@@ -1,27 +1,31 @@
 # Job events (§8)
 
 Every signal an agent emits during a job is one `job.event` envelope.
-There are ten reserved kinds, including the v1.1 `progress` and
-`result_chunk` additions, plus the `x-vendor.*` extension namespace.
+ARCP v1.1 defines ten reserved kinds — the eight v1.0 originals plus the
+v1.1 additions `progress` and `result_chunk`. Vendor-specific kinds live
+outside the reserved set in the `x-vendor.*` extension namespace and
+MUST follow the `x-vendor.<vendor>.<name>` form.
 
-## The ten kinds
+## The ten reserved kinds
 
-| Kind           | Body                                            | Purpose                                    |
-| -------------- | ----------------------------------------------- | ------------------------------------------ |
-| `log`          | `{ level, message, attributes? }`               | Plain log line.                            |
-| `thought`      | `{ text }`                                      | Model reasoning / internal monologue.      |
-| `tool_call`    | `{ tool, args, call_id }`                       | Agent invoked a tool.                      |
-| `tool_result`  | `{ call_id, result? \| error? }`                | Result for a `tool_call`.                  |
-| `status`       | `{ phase, message? }`                           | Lifecycle hint (`running`, `fetching`, ...). |
-| `metric`       | `{ name, value, unit?, attributes? }`           | Numeric measurement.                       |
-| `artifact_ref` | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact.                  |
-| `delegate`     | `{ delegate_id, agent, input, lease_request? }` | Spawn a child job (§10).                   |
-| `progress`     | `{ current, total?, units?, message? }`         | Structured progress update.                |
-| `result_chunk` | `{ result_id, chunk_seq, data, encoding, more }`| Fragment of a streamed result.             |
+| Kind           | Since | Body                                            | Purpose                                    |
+| -------------- | ----- | ----------------------------------------------- | ------------------------------------------ |
+| `log`          | v1.0  | `{ level, message, attributes? }`               | Plain log line.                            |
+| `thought`      | v1.0  | `{ text }`                                      | Model reasoning / internal monologue.      |
+| `tool_call`    | v1.0  | `{ tool, args, call_id }`                       | Agent invoked a tool.                      |
+| `tool_result`  | v1.0  | `{ call_id, result? \| error? }`                | Result for a `tool_call`.                  |
+| `status`       | v1.0  | `{ phase, message? }`                           | Lifecycle hint (`running`, `fetching`, ...). |
+| `metric`       | v1.0  | `{ name, value, unit?, attributes? }`           | Numeric measurement.                       |
+| `artifact_ref` | v1.0  | `{ uri, content_type, byte_size?, sha256? }`    | Reference to an artifact.                  |
+| `delegate`     | v1.0  | `{ delegate_id, agent, input, lease_request? }` | Spawn a child job (§10).                   |
+| `progress`     | v1.1  | `{ current, total?, units?, message? }`         | Structured progress update.                |
+| `result_chunk` | v1.1  | `{ result_id, chunk_seq, data, encoding, more }`| Fragment of a streamed result.             |
 
 `tool_result` carries either `result` or `error` (mutually exclusive).
 `artifact_ref` is a reference; storage is out of scope for ARCP. The
-client is expected to fetch from `uri` separately.
+client is expected to fetch from `uri` separately. Vendor kinds remain
+outside this reserved set and MUST use the `x-vendor.*` namespace; see
+the [extensions guide](./extensions.md) for the namespace rules.
 
 ## Emitting from an agent
 

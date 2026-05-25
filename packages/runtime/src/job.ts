@@ -13,6 +13,7 @@ import type {
   JobStateName,
   Lease,
   LeaseConstraints,
+  ResultChunkBody,
 } from "@agentruntimecontrolprotocol/core/messages";
 import { newJobId, newMessageId, nowTimestamp } from "@agentruntimecontrolprotocol/core/util";
 
@@ -33,6 +34,13 @@ export interface JobDependencies {
 // State machine: pending → running → {success | error | cancelled | timed_out}.
 // All event-bearing envelopes (job.event / job.result / job.error) carry a
 // session-scoped `event_seq` stamped by the SessionContext at emit time.
+
+/**
+ * Minimum absolute change in remaining budget required to re-emit a
+ * `cost.budget.remaining` metric when the percentage-based threshold rounds
+ * to zero (e.g. when the initial budget is zero).
+ */
+const MIN_BUDGET_DEBOUNCE_DELTA = 1;
 
 const JOB_TRANSITIONS = {
   pending: new Set<JobStateName>([
@@ -104,6 +112,16 @@ export class Job {
   /** v1.1 §8.4 — set true after the first `result_chunk` event is emitted. */
   public chunkedResultStarted = false;
   /**
+   * The `result_id` of the active result_chunk stream, captured the first
+   * time a `result_chunk` event is emitted. The unfinalized-stream fallback
+   * uses this to emit a terminal `result_chunk { more: false }` and a
+   * matching `job.result.result_id` so client-side `collectChunks()` does
+   * not look up an empty bucket.
+   */
+  public activeResultId: string | undefined;
+  /** Next `chunk_seq` to allocate on the active result stream. */
+  public activeResultNextChunkSeq = 0;
+  /**
    * v1.1 §9.7–§9.8 — short-lived credentials issued by the provisioner at
    * job acceptance. Wire shapes are included in `job.accepted`; provisioner
    * ids are used for revocation. `wire.value` MUST NOT appear in logs.
@@ -111,6 +129,12 @@ export class Job {
   public credentials: readonly IssuedCredential[] = [];
   /** Track last-emitted remaining per currency for chatty-emit debounce. */
   private readonly lastEmittedRemaining = new Map<string, number>();
+  /**
+   * Highest `event_seq` value this job has stamped onto an envelope. Used by
+   * `session.list_jobs` to advertise each job's resumable cursor without
+   * conflating it with the *subscriber's* seq.
+   */
+  public lastEventSeq = 0;
 
   private missedHeartbeats = 0;
   private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
@@ -174,19 +198,27 @@ export class Job {
   /**
    * Whether to emit a debounced `cost.budget.remaining` metric for `currency`.
    * Only emits when the remaining has changed by ≥5% of the initial budget
-   * since the last emit (or on first emission).
+   * since the last emit (or on first emission). When the initial budget is
+   * zero or negative, debounce falls back to {@link MIN_BUDGET_DEBOUNCE_DELTA}
+   * so a zero-initial budget does not spam events on every tick.
    */
   public shouldEmitBudgetRemaining(currency: string): boolean {
     const remaining = this.budget.get(currency);
     if (remaining === undefined) return false;
-    const initial = this.initialBudget.get(currency) ?? 0;
+    const initialRaw = this.initialBudget.get(currency) ?? 0;
+    const initial = Math.max(initialRaw, 0);
     const last = this.lastEmittedRemaining.get(currency);
     if (last === undefined) {
       this.lastEmittedRemaining.set(currency, remaining);
       return true;
     }
-    const threshold = initial * 0.05;
-    if (Math.abs(last - remaining) >= threshold || remaining <= 0) {
+    const threshold = Math.max(initial * 0.05, MIN_BUDGET_DEBOUNCE_DELTA);
+    // Emit on a significant delta, OR on the *transition* to a zero/negative
+    // remaining (a once-per-job "budget exhausted" tick). When the previous
+    // remaining was already <= 0, do not emit again — otherwise an
+    // always-zero budget spams an event on every tick.
+    const crossedExhaustion = remaining <= 0 && last > 0;
+    if (Math.abs(last - remaining) >= threshold || crossedExhaustion) {
       this.lastEmittedRemaining.set(currency, remaining);
       return true;
     }
@@ -304,7 +336,22 @@ export class Job {
   public async emitEventKind(kind: string, body: unknown): Promise<void> {
     if (this.isTerminal) return;
     this.markHeartbeat();
-    if (kind === "result_chunk") this.chunkedResultStarted = true;
+    if (kind === "result_chunk") {
+      this.chunkedResultStarted = true;
+      const chunkBody = body as Partial<ResultChunkBody>;
+      if (
+        typeof chunkBody.result_id === "string" &&
+        this.activeResultId === undefined
+      ) {
+        this.activeResultId = chunkBody.result_id;
+      }
+      if (typeof chunkBody.chunk_seq === "number") {
+        this.activeResultNextChunkSeq = Math.max(
+          this.activeResultNextChunkSeq,
+          chunkBody.chunk_seq + 1,
+        );
+      }
+    }
     const env = buildEnvelope({
       id: newMessageId(),
       type: "job.event" as const,
@@ -312,7 +359,7 @@ export class Job {
       optional: {
         session_id: this.sessionId,
         job_id: this.jobId,
-        event_seq: this.seq.nextEventSeq(),
+        event_seq: this.allocateEventSeq(),
         ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
     });
@@ -349,7 +396,7 @@ export class Job {
       optional: {
         session_id: this.sessionId,
         job_id: this.jobId,
-        event_seq: this.seq.nextEventSeq(),
+        event_seq: this.allocateEventSeq(),
         ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
     });
@@ -369,7 +416,7 @@ export class Job {
       optional: {
         session_id: this.sessionId,
         job_id: this.jobId,
-        event_seq: this.seq.nextEventSeq(),
+        event_seq: this.allocateEventSeq(),
         ...(this.traceId === undefined ? {} : { trace_id: this.traceId }),
       },
     });
@@ -381,6 +428,16 @@ export class Job {
         "failed to emit job.error envelope",
       );
     }
+  }
+
+  /**
+   * Allocate the next `event_seq` from the owning session and remember it on
+   * the job so `session.list_jobs` can advertise a per-job cursor.
+   */
+  private allocateEventSeq(): number {
+    const seq = this.seq.nextEventSeq();
+    this.lastEventSeq = seq;
+    return seq;
   }
 
   // -------- Credential revocation (§9.7–§9.8) -------------------

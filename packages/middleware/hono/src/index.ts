@@ -13,6 +13,7 @@ import {
   type ArcpUpgradeHandle,
   type AttachArcpUpgradeOptions,
   attachArcpUpgrade,
+  parseHostHeader,
 } from "@agentruntimecontrolprotocol/node";
 import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
@@ -75,7 +76,7 @@ function hostHeaderGuard(allowed: readonly string[]): MiddlewareHandler {
     if (typeof raw !== "string") {
       return c.text("Missing Host header", 400);
     }
-    const host = raw.split(":", 1)[0] ?? "";
+    const host = parseHostHeader(raw);
     if (!allowed.includes(host)) {
       return c.text("Forbidden: Host header not allowed", 403);
     }

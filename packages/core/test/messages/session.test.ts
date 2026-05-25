@@ -33,9 +33,14 @@ describe("AuthCredentialSchema (Effect Schema)", () => {
     await expect(decode(AuthCredentialSchema)(input)).resolves.toEqual(input);
   });
 
-  it("accepts a bearer credential without a token (token is optional)", async () => {
+  it("rejects a bearer credential without a token (v1.1 §6.1 requires token)", async () => {
     const input = { scheme: "bearer" as const };
-    await expect(decode(AuthCredentialSchema)(input)).resolves.toEqual(input);
+    await expect(decode(AuthCredentialSchema)(input)).rejects.toThrow();
+  });
+
+  it("rejects a bearer credential with an empty token", async () => {
+    const input = { scheme: "bearer" as const, token: "" };
+    await expect(decode(AuthCredentialSchema)(input)).rejects.toThrow();
   });
 
   it("rejects unknown auth schemes", async () => {

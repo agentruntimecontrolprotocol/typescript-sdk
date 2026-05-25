@@ -260,8 +260,15 @@ function makeQuery(db: DatabaseInstance) {
 }
 
 /** Build an {@link EventLogEffect} bound to a pre-opened `better-sqlite3` handle. */
-function makeEventLogOps(db: DatabaseInstance): EventLogEffect {
-  db.exec(SCHEMA_SQL);
+function makeEventLogOps(
+  db: DatabaseInstance,
+  opts: { readonly?: boolean } = {},
+): EventLogEffect {
+  // A read-only handle (or a caller-provided database — caller owns lifecycle)
+  // must not run DDL: better-sqlite3 refuses writes on a readonly connection.
+  if (opts.readonly !== true) {
+    db.exec(SCHEMA_SQL);
+  }
   const stmts = prepareStmts(db);
   return {
     append: makeAppend(stmts),
@@ -283,9 +290,10 @@ function makeEventLogOps(db: DatabaseInstance): EventLogEffect {
  */
 export function eventLogLayer(
   db: DatabaseInstance,
+  opts: { readonly?: boolean } = {},
 ): Layer.Layer<EventLogService> {
   return Layer.succeed(
     EventLogService,
-    EventLogService.make(makeEventLogOps(db)),
+    EventLogService.make(makeEventLogOps(db, opts)),
   );
 }

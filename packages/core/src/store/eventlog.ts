@@ -44,8 +44,14 @@ export class EventLog {
 
   public constructor(opts: EventLogOptions = {}) {
     this.readOnly = opts.readonly === true;
-    this.db = opts.db ?? new Database(opts.path ?? ":memory:");
-    this.db.exec(SCHEMA_SQL);
+    this.db =
+      opts.db ??
+      new Database(opts.path ?? ":memory:", { readonly: this.readOnly });
+    // Read-only handles cannot execute schema DDL; better-sqlite3 throws
+    // "attempt to write a readonly database" otherwise.
+    if (!this.readOnly) {
+      this.db.exec(SCHEMA_SQL);
+    }
     this.insertStmt = this.db.prepare(
       `INSERT OR IGNORE INTO events (
         session_id, id, type, trace_id, job_id, event_seq, raw

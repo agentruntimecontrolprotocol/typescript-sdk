@@ -35,36 +35,49 @@ export class PendingRegistry {
       );
     }
     const deferred = new Deferred<T>();
-    const entry: PendingEntry<T> = { deferred, cancelTimer: null };
-
-    if (options.deadlineMs !== undefined) {
-      const timer = setTimeout(() => {
-        this.expire(correlationId);
-      }, options.deadlineMs);
-      timer.unref();
-      entry.cancelTimer = () => {
-        clearTimeout(timer);
-      };
+    // Pre-aborted signal: settle the deferred and return without inserting
+    // an entry — otherwise the registry leaks unreachable settled deferreds.
+    if (options.signal?.aborted === true) {
+      deferred.reject(
+        new CancelledError("Pending request aborted before registration"),
+      );
+      return deferred.promise;
     }
-    if (options.signal !== undefined) {
-      const sig = options.signal;
-      if (sig.aborted) {
-        deferred.reject(
-          new CancelledError("Pending request aborted before registration"),
-        );
-      } else {
-        sig.addEventListener(
-          "abort",
-          () => {
-            this.cancel(correlationId, sig.reason);
-          },
-          { once: true },
-        );
-      }
-    }
-
+    const entry: PendingEntry<T> = {
+      deferred,
+      cancelTimer: this.armDeadline(correlationId, options.deadlineMs),
+      detachSignal: this.armAbort(correlationId, options.signal),
+    };
     this.entries.set(correlationId, entry as PendingEntry<unknown>);
     return deferred.promise;
+  }
+
+  private armDeadline(
+    correlationId: string,
+    deadlineMs: number | undefined,
+  ): (() => void) | null {
+    if (deadlineMs === undefined) return null;
+    const timer = setTimeout(() => {
+      this.expire(correlationId);
+    }, deadlineMs);
+    timer.unref();
+    return () => {
+      clearTimeout(timer);
+    };
+  }
+
+  private armAbort(
+    correlationId: string,
+    signal: AbortSignal | undefined,
+  ): (() => void) | null {
+    if (signal === undefined) return null;
+    const onAbort = (): void => {
+      this.cancel(correlationId, signal.reason);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    return () => {
+      signal.removeEventListener("abort", onAbort);
+    };
   }
 
   public registerMeta(correlationId: string, meta: PendingMeta): void {
@@ -86,6 +99,7 @@ export class PendingRegistry {
     this.entries.delete(correlationId);
     this.meta.delete(correlationId);
     entry.cancelTimer?.();
+    entry.detachSignal?.();
     entry.deferred.resolve(value);
     return true;
   }
@@ -96,6 +110,7 @@ export class PendingRegistry {
     this.entries.delete(correlationId);
     this.meta.delete(correlationId);
     entry.cancelTimer?.();
+    entry.detachSignal?.();
     entry.deferred.reject(reason);
     return true;
   }
@@ -132,6 +147,7 @@ export class PendingRegistry {
 interface PendingEntry<T> {
   deferred: Deferred<T>;
   cancelTimer: (() => void) | null;
+  detachSignal: (() => void) | null;
 }
 
 // ============================================================================

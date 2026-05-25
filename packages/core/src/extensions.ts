@@ -26,20 +26,28 @@ export function isVendorExtensionName(
 }
 
 /**
- * Closed set of core v1.1 message types. Any other type must be in the
- * `x-vendor.*` namespace.
+ * Closed set of core ARCP v1.0 + v1.1 message types. Any other type must be
+ * in the `x-vendor.*` namespace.
  */
 export const CORE_MESSAGE_TYPES = [
   "session.hello",
   "session.welcome",
   "session.error",
   "session.bye",
+  "session.ping",
+  "session.pong",
+  "session.ack",
+  "session.list_jobs",
+  "session.jobs",
   "job.submit",
   "job.accepted",
   "job.cancel",
   "job.event",
   "job.result",
   "job.error",
+  "job.subscribe",
+  "job.subscribed",
+  "job.unsubscribe",
 ] as const;
 export type CoreMessageType = (typeof CORE_MESSAGE_TYPES)[number];
 
@@ -47,7 +55,7 @@ const CORE_TYPE_SET: ReadonlySet<string> = new Set(CORE_MESSAGE_TYPES);
 
 const CORE_PREFIXES = ["session.", "job."] as const;
 
-/** Whether `type` is one of the ten core ARCP v1.1 message types. */
+/** Whether `type` is one of the core ARCP v1.0 + v1.1 message types. */
 export function isCoreType(type: string): type is CoreMessageType {
   return CORE_TYPE_SET.has(type);
 }
@@ -87,6 +95,14 @@ export function classifyUnknownType(
   type: string,
   options: { extensionsObject?: Record<string, unknown> | undefined } = {},
 ): UnknownTypeDisposition {
+  // A known core type is not "unknown"; report it as a no-op drop so callers
+  // that defensively invoke this on every inbound envelope (e.g. to triage a
+  // v1.1 session.ping) do not surface a spurious INVALID_REQUEST.
+  if (isCoreType(type)) {
+    return { kind: "drop", reason: `Known core message type "${type}"` };
+  }
+  // `looksLikeCoreType` is true for unknown strings that share a core prefix.
+  // That is the "core typo" disposition.
   if (looksLikeCoreType(type)) {
     return {
       kind: "error",

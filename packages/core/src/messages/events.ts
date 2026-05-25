@@ -129,7 +129,13 @@ export const ProgressBodySchema = Schema.Struct({
   total: Schema.optional(Schema.Number.pipe(Schema.nonNegative())),
   units: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
   message: Schema.optional(Schema.String),
-});
+}).pipe(
+  Schema.filter((p) =>
+    p.total !== undefined && p.current > p.total
+      ? "progress.current must not exceed progress.total"
+      : undefined,
+  ),
+);
 export type ProgressBody = Schema.Schema.Type<typeof ProgressBodySchema>;
 
 /**

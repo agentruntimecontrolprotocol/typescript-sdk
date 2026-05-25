@@ -49,6 +49,20 @@ describe("ProgressBodySchema (Effect Schema)", () => {
       decode(ProgressBodySchema)({ current: 1, units: "" }),
     ).rejects.toThrow();
   });
+
+  // Issue #66: `total` (when present) is the upper bound for `current`. The
+  // schema used to only check non-negativity, so `{ current: 10, total: 3 }`
+  // decoded successfully even though docs forbade it.
+  it("rejects current > total", async () => {
+    await expect(
+      decode(ProgressBodySchema)({ current: 10, total: 3 }),
+    ).rejects.toThrow();
+  });
+
+  it("accepts current === total", async () => {
+    const input = { current: 3, total: 3 };
+    await expect(decode(ProgressBodySchema)(input)).resolves.toEqual(input);
+  });
 });
 
 describe("ResultChunkBodySchema (Effect Schema)", () => {

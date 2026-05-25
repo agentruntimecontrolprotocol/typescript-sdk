@@ -74,7 +74,7 @@ function buildListJobsCandidates(
       parent_job_id: job.parentJobId ?? null,
       created_at: job.createdAt,
       ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
-      last_event_seq: ctx.latestEventSeq,
+      last_event_seq: job.lastEventSeq,
     });
   }
   return out;

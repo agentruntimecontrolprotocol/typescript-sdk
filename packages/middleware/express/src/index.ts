@@ -14,6 +14,7 @@ import {
   type ArcpUpgradeHandle,
   type AttachArcpUpgradeOptions,
   attachArcpUpgrade,
+  parseHostHeader,
 } from "@agentruntimecontrolprotocol/node";
 import express, { type Express, type RequestHandler } from "express";
 
@@ -79,7 +80,7 @@ function hostHeaderGuard(allowed: readonly string[]): RequestHandler {
       res.status(400).type("text/plain").send("Missing Host header");
       return;
     }
-    const host = raw.split(":", 1)[0] ?? "";
+    const host = parseHostHeader(raw);
     if (!allowed.includes(host)) {
       res
         .status(403)

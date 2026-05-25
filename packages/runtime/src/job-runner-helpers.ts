@@ -153,11 +153,33 @@ export async function runAndEmitResult({
   const result = await handler(input, wrappedCtx);
   if (job.isTerminal) return;
   if (job.chunkedResultStarted) {
-    // The agent should have called `finalize` on its ResultStream.
-    // If not, emit a terminal result_chunk{more:false}+job.result.
+    // The agent emitted `result_chunk` events but returned without calling
+    // `ResultStream.finalize`. Emit a terminal `result_chunk { more: false }`
+    // on the same `result_id` so client-side `collectChunks()` finds the
+    // expected bucket, then emit the matching `job.result.result_id`.
+    const resultId = job.activeResultId;
+    if (resultId === undefined) {
+      // Should not happen: chunkedResultStarted implies we saw a result_id.
+      // Fall back to an explicit protocol error rather than fabricating an id.
+      await job.emitErrorEnvelope({
+        final_status: "error",
+        code: "INTERNAL_ERROR",
+        message:
+          "result_chunk events were emitted without a result_id; cannot auto-finalize",
+        retryable: false,
+      });
+      return;
+    }
+    await job.emitEventKind("result_chunk", {
+      result_id: resultId,
+      chunk_seq: job.activeResultNextChunkSeq,
+      data: "",
+      encoding: "utf8",
+      more: false,
+    });
     await job.emitResult({
       final_status: "success",
-      result_id: `res_${job.jobId.replace(/^job_/, "")}_auto`,
+      result_id: resultId,
     });
     return;
   }

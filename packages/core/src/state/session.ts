@@ -293,10 +293,20 @@ function applyFeatures(
 ): void {
   // v1.1 §6.2 — runtime is authoritative for advertised features; the
   // welcome MUST advertise only what is in both lists.
-  if (Array.isArray(runtime.features)) {
-    out.features = runtime.features;
-  } else if (Array.isArray(client.features)) {
-    out.features = client.features;
+  const clientFeatures = Array.isArray(client.features)
+    ? client.features
+    : undefined;
+  const runtimeFeatures = Array.isArray(runtime.features)
+    ? runtime.features
+    : undefined;
+  if (clientFeatures !== undefined && runtimeFeatures !== undefined) {
+    out.features = runtimeFeatures.filter((f) => clientFeatures.includes(f));
+    return;
+  }
+  if (runtimeFeatures !== undefined) {
+    out.features = runtimeFeatures;
+  } else if (clientFeatures !== undefined) {
+    out.features = clientFeatures;
   }
 }
 

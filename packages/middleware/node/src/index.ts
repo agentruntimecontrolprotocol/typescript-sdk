@@ -44,8 +44,10 @@ import type { Duplex } from "node:stream";
 import { WebSocketTransport } from "@agentruntimecontrolprotocol/core/transport";
 import { WebSocketServer } from "ws";
 
+import { parseHostHeader } from "./host.js";
 import type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
 
+export { parseHostHeader } from "./host.js";
 export type { ArcpUpgradeHandle, AttachArcpUpgradeOptions } from "./types.js";
 
 /**
@@ -125,9 +127,7 @@ function hostHeaderAllowed(
   if (allowed === undefined) return true;
   const raw = req.headers.host;
   if (typeof raw !== "string") return false;
-  // Strip port — `Host` can be `example.com:443`.
-  const host = raw.split(":", 1)[0] ?? "";
-  return allowed.includes(host);
+  return allowed.includes(parseHostHeader(raw));
 }
 
 function writeUpgradeError(socket: Duplex, status: number, body: string): void {

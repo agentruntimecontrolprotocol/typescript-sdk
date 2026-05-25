@@ -67,9 +67,18 @@ async function collectChunks(inv: InvocationState): Promise<Buffer | string> {
   const chunks = inv.chunks.get(resultId);
   if (chunks === undefined || chunks.length === 0) return "";
   const sorted = chunks.toSorted((a, b) => a.chunk_seq - b.chunk_seq);
-  const encoding = sorted[0]?.encoding ?? "utf8";
-  if (encoding === "base64") {
-    return Buffer.concat(sorted.map((c) => Buffer.from(c.data, "base64")));
+  // Per v1.1 §8.4 each chunk carries its own `encoding`. A stream that mixes
+  // `utf8` text and `base64` binary chunks is valid on the wire, so decode
+  // per chunk rather than sampling encoding from the first.
+  const allUtf8 = sorted.every((c) => c.encoding === "utf8");
+  if (allUtf8) {
+    return sorted.map((c) => c.data).join("");
   }
-  return sorted.map((c) => c.data).join("");
+  return Buffer.concat(
+    sorted.map((c) =>
+      c.encoding === "base64"
+        ? Buffer.from(c.data, "base64")
+        : Buffer.from(c.data, "utf8"),
+    ),
+  );
 }

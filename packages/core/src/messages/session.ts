@@ -18,11 +18,26 @@ import { ErrorPayloadSchema } from "../errors.js";
 export const AuthSchemeSchema = Schema.Literal("bearer");
 export type AuthScheme = Schema.Schema.Type<typeof AuthSchemeSchema>;
 
-/** §6.1 credential block. Token is REQUIRED for the `bearer` scheme. */
+/**
+ * §6.1 credential block. Token is REQUIRED for the `bearer` scheme.
+ *
+ * v1.0 currently models only one scheme (`bearer`), but the filter is written
+ * against the discriminator so future schemes (mTLS, anonymous, ...) can opt
+ * out of the token requirement without changing this validator.
+ */
 export const AuthCredentialSchema = Schema.Struct({
   scheme: AuthSchemeSchema,
   token: Schema.optional(Schema.String),
-});
+}).pipe(
+  Schema.filter((c) => {
+    const requiresToken = (c.scheme as string) === "bearer";
+    if (!requiresToken) return undefined;
+    if (c.token === undefined || c.token.length === 0) {
+      return "bearer scheme requires a non-empty token";
+    }
+    return undefined;
+  }),
+);
 export type AuthCredential = Schema.Schema.Type<typeof AuthCredentialSchema>;
 
 /** §6.2 client identity block. */

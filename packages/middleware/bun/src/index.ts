@@ -158,7 +158,22 @@ function checkHostHeader(
   if (allowed === undefined) return null;
   const raw = req.headers.get("host");
   if (raw === null) return new Response("Missing Host header", { status: 400 });
-  const hostOnly = raw.split(":", 1)[0] ?? "";
-  if (allowed.includes(hostOnly)) return null;
+  if (allowed.includes(parseHostHeader(raw))) return null;
   return new Response("Forbidden: Host header not allowed", { status: 403 });
+}
+
+/**
+ * Parse the host portion of an HTTP `Host` header, stripping any trailing
+ * port while preserving IPv6 literals like `[::1]` and `[::1]:443`.
+ *
+ * Mirrors `@agentruntimecontrolprotocol/node`'s `parseHostHeader`. Inlined here so the
+ * Bun middleware has no Node-only dependency.
+ */
+export function parseHostHeader(raw: string): string {
+  if (raw.length === 0) return "";
+  const lastColon = raw.lastIndexOf(":");
+  if (lastColon === -1) return raw;
+  const lastBracket = raw.lastIndexOf("]");
+  if (lastBracket !== -1 && lastColon < lastBracket) return raw;
+  return raw.slice(0, lastColon);
 }

@@ -107,6 +107,26 @@ describe("EventLogService", () => {
     await log.close();
   });
 
+  // Issue #81: readonly: true must open the underlying handle in read-only
+  // mode AND skip schema DDL. Previously the flag was ignored and DDL ran
+  // even when the file was read-only on disk.
+  it("readonly EventLog forbids append and reads existing data", async () => {
+    const writer = new Database(":memory:");
+    const writerLog = new EventLog({ db: writer });
+    await writerLog.append(envFor(1));
+    await writerLog.append(envFor(2));
+
+    // A read-only EventLog sharing the same in-memory handle must surface
+    // append() as a clean ARCP error rather than a SQLite write attempt.
+    const readerLog = new EventLog({ db: writer, readonly: true });
+    await expect(readerLog.append(envFor(3))).rejects.toThrow(
+      /read-only|readonly/i,
+    );
+    const rows = await readerLog.readSinceSeq(SESSION, 0);
+    expect(rows.map((e) => e.event_seq)).toEqual([1, 2]);
+    await writerLog.close();
+  });
+
   it("legacy EventLog and EventLogService share a single SQLite handle", async () => {
     const db = new Database(":memory:");
     const legacy = new EventLog({ db });

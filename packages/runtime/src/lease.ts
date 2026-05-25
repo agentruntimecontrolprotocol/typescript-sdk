@@ -319,18 +319,81 @@ function sumBudgetPatterns(
   return m;
 }
 
-/** Is `child` subsumed by any pattern in `parents`? */
+/**
+ * Is the language accepted by `child` (a glob) a subset of the language
+ * accepted by any pattern in `parents`?
+ *
+ * Subsumption is checked **syntactically**, segment-by-segment:
+ *   - parent and child are split on `/`.
+ *   - At each position, the parent segment must subsume the child segment:
+ *     `**` subsumes anything (and may match multiple path segments).
+ *     `*`  subsumes `*` or a single literal segment, but NOT `**`.
+ *     `?`  subsumes `?` or a single-character literal (no `/`), but NOT `*`/`**`.
+ *     A literal subsumes only the identical literal.
+ *
+ * Compiling the parent as a regex and testing it against the *child pattern
+ * string* (the previous implementation) is unsound: `[^/]*` happily matches
+ * the literal `**` in the child string, so `/a/*` was reported as subsuming
+ * `/a/**`. That widened delegated leases and is a privilege escalation.
+ */
 function patternSubsumes(parents: readonly string[], child: string): boolean {
   for (const p of parents) {
     if (p === child) return true;
-    // A pattern `p` subsumes `child` if `p` viewed as a regex matches the
-    // string `child` directly — i.e. every concrete target matching `child`
-    // is also covered by the broader `p`. This catches the common cases:
-    //   parent="/a/**" subsumes child="/a/b" and child="/a/**".
-    //   parent="*" subsumes child="x".
-    if (compileGlob(p).test(child)) return true;
+    if (singleParentSubsumes(p, child)) return true;
   }
   return false;
+}
+
+interface SubsumeState {
+  readonly p: readonly string[];
+  readonly c: readonly string[];
+}
+
+function singleParentSubsumes(parent: string, child: string): boolean {
+  const state: SubsumeState = {
+    p: parent.split("/"),
+    c: child.split("/"),
+  };
+  return segmentsSubsume(state, 0, 0);
+}
+
+function segmentsSubsume(
+  state: SubsumeState,
+  pi: number,
+  ci: number,
+): boolean {
+  if (pi === state.p.length) return ci === state.c.length;
+  const pSeg = state.p[pi] ?? "";
+  if (pSeg === "**") {
+    // `**` matches zero or more whole segments. Try every consumption from
+    // the current position to the end of `c`.
+    for (let take = state.c.length - ci; take >= 0; take -= 1) {
+      if (segmentsSubsume(state, pi + 1, ci + take)) return true;
+    }
+    return false;
+  }
+  if (ci === state.c.length) return false;
+  const cSeg = state.c[ci] ?? "";
+  // A child `**` segment is broader than `*`, `?`, or any literal — only `**`
+  // on the parent side subsumes it.
+  if (cSeg === "**") return false;
+  if (!segmentSubsumes(pSeg, cSeg)) return false;
+  return segmentsSubsume(state, pi + 1, ci + 1);
+}
+
+function segmentSubsumes(parent: string, child: string): boolean {
+  if (parent === "*") {
+    // `*` matches one full segment (no `/`). Subsumes `*`, `?`, and any
+    // literal — but the child segment must itself describe a single segment.
+    return child.length > 0;
+  }
+  if (parent === "?") {
+    // `?` matches exactly one non-`/` character. Subsumes `?` and any
+    // single-character literal.
+    return child === "?" || child.length === 1;
+  }
+  // Literal parent subsumes only the identical literal child.
+  return parent === child;
 }
 
 /**

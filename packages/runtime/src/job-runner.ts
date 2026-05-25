@@ -18,6 +18,7 @@ import {
   type MetricBody,
   parseAgentRef,
 } from "@agentruntimecontrolprotocol/core/messages";
+import { newJobId } from "@agentruntimecontrolprotocol/core/util";
 
 import {
   type DelegateOutcome,
@@ -274,9 +275,13 @@ export class JobRunner {
     const traceId: TraceId =
       input.env.trace_id ?? randomBytes(16).toString("hex");
     const idempotencyHit = input.idempotencyHit;
+    // Generate the job id up-front so the logger can be bound with the
+    // final value at construction time, preserving Job.logger's readonly
+    // contract instead of mutating it via Object.assign post-construction.
+    const jobId = idempotencyHit === null ? newJobId() : idempotencyHit.jobId;
     const job = new Job({
       options: {
-        ...(idempotencyHit === null ? {} : { jobId: idempotencyHit.jobId }),
+        jobId,
         sessionId: input.sessionId,
         agent: input.parsedAgentName,
         agentVersion:
@@ -293,15 +298,12 @@ export class JobRunner {
       },
       send: (out) => input.ctx.send(out),
       seq: input.ctx,
-      logger: input.ctx.logger.child({ job_id: "<pending>" }),
+      logger: input.ctx.logger.child({ job_id: jobId }),
     });
     job.submitterPrincipal = input.principal;
     job.owningSession = input.ctx;
     this.server.globalJobs.set(job.jobId, job);
     input.ctx.jobs.register(job);
-    Object.assign(job, {
-      logger: input.ctx.logger.child({ job_id: job.jobId }),
-    });
     return job;
   }
 
@@ -582,8 +584,12 @@ export class JobRunner {
     const { ctx, parent, body, sessionId, requested } = input;
     const effectiveConstraints: LeaseConstraints | undefined =
       body.lease_constraints ?? parent.leaseConstraints;
+    // Generate the child id up-front so the logger is bound with the final
+    // value at construction (see constructJob).
+    const childJobId = newJobId();
     const child = new Job({
       options: {
+        jobId: childJobId,
         sessionId,
         agent: input.parsedAgentName,
         agentVersion:
@@ -601,7 +607,7 @@ export class JobRunner {
       send: (out) => ctx.send(out),
       seq: ctx,
       logger: ctx.logger.child({
-        job_id: "<pending>",
+        job_id: childJobId,
         parent_job_id: parent.jobId,
       }),
     });
@@ -609,7 +615,6 @@ export class JobRunner {
     child.owningSession = ctx;
     this.server.globalJobs.set(child.jobId, child);
     ctx.jobs.register(child);
-    Object.assign(child, { logger: ctx.logger.child({ job_id: child.jobId }) });
     return child;
   }
 
