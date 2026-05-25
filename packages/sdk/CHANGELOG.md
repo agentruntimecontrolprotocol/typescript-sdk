@@ -1,5 +1,11 @@
 # @agentruntimecontrolprotocol/sdk
 
+## 1.0.1
+
+### Patch Changes
+
+- Add the package README to the published npm tarball.
+
 ## 1.0.0
 
 ### Minor Changes

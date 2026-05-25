@@ -1,6 +1,6 @@
 {
   "name": "@agentruntimecontrolprotocol/sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Meta-package for the Agent Runtime Control Protocol (ARCP) TypeScript reference SDK. Re-exports @agentruntimecontrolprotocol/core, @agentruntimecontrolprotocol/client, and @agentruntimecontrolprotocol/runtime, and ships the `arcp` CLI. Install this if you want everything; install the individual packages for a smaller footprint.",
   "license": "Apache-2.0",
   "repository": {
