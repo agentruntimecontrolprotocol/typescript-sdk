@@ -1,5 +1,11 @@
 # @agentruntimecontrolprotocol/sdk
 
+## 1.0.2
+
+### Patch Changes
+
+- 6834cd9: fix(publish): pack with `pnpm pack` before `npm publish` so internal `workspace:*` deps resolve to concrete versions in the published manifest. 1.0.1 shipped `workspace:*` unresolved and failed to install with `EUNSUPPORTEDPROTOCOL`.
+
 ## 1.0.1
 
 ### Patch Changes
