@@ -123,7 +123,15 @@ jobs:
               # publishConfig in each package.json carries access=public and
               # provenance=true; --provenance here is the CLI counterpart that
               # activates the OIDC token flow in GitHub Actions.
-              (cd "$dir" && npm publish --provenance --registry=https://registry.npmjs.org)
+              #
+              # Pack with pnpm first: `npm publish` does NOT rewrite the
+              # `workspace:*` protocol in internal deps, so publishing the dir
+              # directly leaks `workspace:*` into the registry manifest and
+              # makes the package uninstallable (EUNSUPPORTEDPROTOCOL). `pnpm
+              # pack` resolves workspace:* to the concrete versions in the
+              # produced tarball; we then publish that tarball.
+              tarball="$(cd "$dir" && pnpm pack --pack-destination "${RUNNER_TEMP:-/tmp}" | tail -n1)"
+              npm publish "$tarball" --provenance --registry=https://registry.npmjs.org
               published=$((published + 1))
             fi
           done < .publish-dirs.txt
@@ -161,7 +169,9 @@ jobs:
               skipped=$((skipped + 1))
             else
               echo "[publish] $name@$local_ver (GitHub Packages has '${gh_ver:-nothing}')"
-              (cd "$dir" && npm publish --registry=https://npm.pkg.github.com)
+              # pnpm pack to resolve workspace:* (see npm step above for why).
+              tarball="$(cd "$dir" && pnpm pack --pack-destination "${RUNNER_TEMP:-/tmp}" | tail -n1)"
+              npm publish "$tarball" --registry=https://npm.pkg.github.com
               published=$((published + 1))
             fi
           done < .publish-dirs.txt
