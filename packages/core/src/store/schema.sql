@@ -1,7 +1,7 @@
--- ARCP v1.0 event log schema. Append-only; primary keying enforces idempotent
+-- ARCP event log schema. Append-only; primary keying enforces idempotent
 -- inserts per (session_id, id) per §5.1 / §7.2.
 --
--- Columns mirror the v1.0 envelope: session_id, id, type, trace_id, job_id,
+-- Columns mirror the envelope: session_id, id, type, trace_id, job_id,
 -- event_seq, raw.
 
 PRAGMA journal_mode = WAL;

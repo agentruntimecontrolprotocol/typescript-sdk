@@ -10,7 +10,7 @@ import { Schema } from "effect";
  * Behavior parity with the legacy zod schema is preserved field-for-field:
  *   - `uri`, `content_type` are non-empty strings.
  *   - `byte_size` is an optional non-negative integer.
- *   - `sha256` is an optional string (no length floor in v1.0).
+ *   - `sha256` is an optional string (no length floor).
  *
  * Use `Schema.decodeUnknownSync(ArtifactRefSchema)(x)` to validate inbound
  * JSON (throws `ParseError` on bad input, matching the throw semantics of
@@ -26,5 +26,5 @@ export const ArtifactRefSchema = Schema.Struct({
 });
 export type ArtifactRef = Schema.Schema.Type<typeof ArtifactRefSchema>;
 
-/** No top-level artifact envelopes in v1.0. */
+/** No top-level artifact envelopes are defined. */
 export const ARTIFACT_ENVELOPES = [] as const;

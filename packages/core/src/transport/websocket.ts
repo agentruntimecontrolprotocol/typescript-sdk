@@ -14,12 +14,10 @@ import type {
 } from "./types.js";
 
 /**
- * WebSocket transport (§22 mandatory).
+ * WebSocket transport (ARCP v1.1 §8 mandatory).
  *
  * Wraps a single `ws` connection. Used on either side. Frames are JSON,
- * one per WS message; binary sidecar frames are out of scope for v0.1.
- *
- * @see PLAN.md §6 transport layer.
+ * one per WS message; binary sidecar frames are out of scope.
  */
 export class WebSocketTransport implements Transport {
   private handler: FrameHandler | null = null;
@@ -41,7 +39,7 @@ export class WebSocketTransport implements Transport {
   }
 
   private handleMessage(data: unknown, isBinary: boolean): void {
-    if (isBinary) return; // v0.1 does not support binary sidecar frames.
+    if (isBinary) return; // Binary sidecar frames are not supported.
     const frame = parseWireFrame(data);
     if (frame === null) return;
     const h = this.handler;

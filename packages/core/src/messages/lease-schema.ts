@@ -19,14 +19,14 @@ export const RESERVED_CAPABILITY_NAMES = [
 ] as const;
 export type ReservedCapabilityName = (typeof RESERVED_CAPABILITY_NAMES)[number];
 
-/** Whether `name` is a v1.0 reserved capability namespace. */
+/** Whether `name` is a reserved capability namespace (§9.2). */
 export function isReservedCapabilityName(
   name: string,
 ): name is ReservedCapabilityName {
   return (RESERVED_CAPABILITY_NAMES as readonly string[]).includes(name);
 }
 
-/** Whether `name` is a syntactically valid v1.0 capability name. */
+/** Whether `name` is a syntactically valid capability name (§9.2/§15). */
 export function isValidCapabilityName(name: string): boolean {
   if (isReservedCapabilityName(name)) return true;
   // x-vendor.<vendor>.<capability> per §15.
