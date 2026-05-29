@@ -12,7 +12,7 @@
 //      parent/child structure preserved (the §11 acceptance scenario,
 //      reduced to a single Effect-shape workflow).
 //   3) The legacy `withTracing` re-export still works (regression guard
-//      for the published 0.1.0 surface — no behavior change in slice #49).
+//      for the published surface — no behavior change).
 
 import {
   InMemorySpanExporter,
@@ -103,8 +103,8 @@ describe("OtelTracerLayer", () => {
   });
 
   it("re-exports the legacy withTracing wrapper unchanged", () => {
-    // Regression guard: slice #49 must not alter the published 0.1.0
-    // surface. We only assert the export is a callable function — its
+    // Regression guard: this must not alter the published surface.
+    // We only assert the export is a callable function — its
     // behavior is exercised by consumers (no tests previously existed
     // in this package).
     expect(typeof withTracing).toBe("function");

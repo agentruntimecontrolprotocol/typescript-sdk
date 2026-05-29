@@ -2,8 +2,6 @@
  * Minimal JSON-Schema (Draft 7 subset) validator for `human.input.request`
  * response validation (§12.1).
  *
- * @see PLAN.md §4 open question 2.
- *
  * Supported keywords:
  *   - `type`: "string" | "number" | "integer" | "boolean" | "array" | "object" | "null"
  *   - `properties`, `required` (for object)

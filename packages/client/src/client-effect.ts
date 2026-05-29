@@ -22,8 +22,8 @@
 //     {@link ManagedRuntime.make}.
 //   - {@link subscribeEnvelopes}: turns the legacy single-handler-per-type
 //     `client.on(type, handler)` callback API into a multi-subscriber
-//     {@link Stream.Stream}. Closes risk #23 — the legacy `on()` callback
-//     shape stays available, AND Effect consumers can fan out via Stream.
+//     {@link Stream.Stream}. The legacy `on()` callback shape stays
+//     available, AND Effect consumers can fan out via Stream.
 //
 // The legacy `ARCPClient` is NOT replaced. Calls to `client.on(type, ...)`
 // after `subscribeEnvelopes(type)` will REPLACE the multiplexer wrapper
@@ -233,9 +233,8 @@ function emitterRegistry(client: ARCPClient): Map<string, Set<Emitter>> {
 
 /**
  * Fan-out handler installed once per (client, type) pair. Walks the live
- * emitter set in registration order — mirroring the FIFO semantics in the
- * issue's acceptance criterion ("observe all 3 called once in registration
- * order").
+ * emitter set in registration order, so every subscriber observes each
+ * envelope exactly once in the order they registered.
  */
 function installFanoutHandler(
   client: ARCPClient,
@@ -265,8 +264,8 @@ function installFanoutHandler(
  * function. Multiple Stream subscribers on the same type share the
  * underlying handler.
  *
- * Risk #23 closure: the legacy `client.on(type, handler)` callback shape is
- * preserved and remains the documented one-handler-per-type primitive.
+ * The legacy `client.on(type, handler)` callback shape is preserved and
+ * remains the documented one-handler-per-type primitive.
  * Effect consumers get a multi-subscriber Stream layered on top, with no
  * mutation of `ARCPClient` itself. If a caller installs their own
  * `client.on(type, ...)` AFTER `subscribeEnvelopes(type)` has been called,

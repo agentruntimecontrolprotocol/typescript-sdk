@@ -7,9 +7,9 @@
 //   1) `ARCPClientLayer` + `subscribeEnvelopes` → Stream delivery.
 //   2) `ARCPClientService.submit` returning a usable `JobHandle`.
 //   3) The legacy `client.on(type, handler)` callback API still working
-//      when used standalone (smoke test for risk #23).
+//      when used standalone (smoke test).
 //   4) Multiple subscribers on the same type all fire in registration
-//      order (issue #46 acceptance test).
+//      order.
 //   5) `ManagedRuntime.dispose()` deterministically closes the client.
 
 import {
@@ -291,7 +291,7 @@ describe("subscribeEnvelopes fan-out", () => {
   });
 });
 
-describe("legacy ARCPClient unchanged (risk #23 smoke)", () => {
+describe("legacy ARCPClient unchanged (smoke)", () => {
   it("new ARCPClient(...).on('job.event', handler) still fires", async () => {
     // The legacy callback contract — one handler per envelope type — must
     // keep working without going through any Effect machinery.

@@ -10,8 +10,8 @@ import { LogPayloadSchema, MetricPayloadSchema } from "./telemetry.js";
 //
 // This module owns the per-kind body schemas and the `parseJobEventBody`
 // dispatch over the reserved-kind set. Bodies for `log`, `metric`, and
-// `artifact_ref` are imported from their owning modules (slice #35 migrated
-// them); the remaining bodies are defined here as native Effect `Schema`.
+// `artifact_ref` are imported from their owning modules; the remaining bodies
+// are defined here as native Effect `Schema`.
 
 export const RESERVED_EVENT_KINDS = [
   "log",
