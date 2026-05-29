@@ -251,16 +251,10 @@ export function initialBudgetFromLease(lease: Lease): Map<string, number> {
  * of `parent`. If a capability is absent from `parent` but present in `child`,
  * it's not a subset.
  *
- * Pattern-vs-pattern subset is approximated by "every string matching
- * `child_pattern` also matches `parent_pattern`". We use a syntactic check:
- * each `child_pattern` MUST match against some `parent_pattern` interpreted
- * as a regex, AND the parent pattern must be at least as general (we allow
- * exact equality and the cases where the parent is a strict super-pattern).
- *
- * A simple yet correct rule for the common cases: a child pattern `p2` is
- * subset-conforming under parent pattern `p1` iff `p1` matches every prefix
- * of `p2`'s segment specification. Implementations MAY validate more strictly;
- * we err on rejecting ambiguous cases.
+ * Pattern-vs-pattern subset is decided syntactically, segment-by-segment (see
+ * `patternSubsumes`/`segmentsSubsume` below): a child pattern is conforming
+ * when some parent pattern subsumes it position-by-position. Ambiguous cases
+ * are rejected.
  *
  * v1.1 §9.4: `cost.budget` is compared as numeric per-currency totals (not
  * patterns); a child's total per currency MUST NOT exceed the parent's. If
