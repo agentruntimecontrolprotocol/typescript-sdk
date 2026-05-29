@@ -67,6 +67,17 @@ async function collectChunks(inv: InvocationState): Promise<Buffer | string> {
   const chunks = inv.chunks.get(resultId);
   if (chunks === undefined || chunks.length === 0) return "";
   const sorted = chunks.toSorted((a, b) => a.chunk_seq - b.chunk_seq);
+  // §8.4 — chunk_seq MUST be 0-based, contiguous, and unique; the assembled
+  // result is the concatenation in chunk_seq order. A dropped or duplicated
+  // chunk would otherwise silently yield a corrupt result, so validate that
+  // sorted[i].chunk_seq === i across the whole sequence.
+  for (const [i, chunk] of sorted.entries()) {
+    if (chunk.chunk_seq !== i) {
+      throw new InvalidRequestError(
+        `result_chunk sequence for "${resultId}" is not 0-based contiguous: expected chunk_seq ${i}, found ${String(chunk.chunk_seq)}`,
+      );
+    }
+  }
   // Per v1.1 §8.4 each chunk carries its own `encoding`. A stream that mixes
   // `utf8` text and `base64` binary chunks is valid on the wire, so decode
   // per chunk rather than sampling encoding from the first.
