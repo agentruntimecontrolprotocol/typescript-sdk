@@ -167,7 +167,14 @@ function withHandler(
 function pickFromBucket(
   bucket: ReadonlyMap<string, AgentHandler>,
   version: string | null,
-): ResolvedAgent | { readonly missingVersion: string } {
+):
+  | ResolvedAgent
+  | { readonly missingVersion: string }
+  | { readonly emptyBucket: true } {
+  // An empty bucket means the name itself has no registered handlers; that is
+  // §7.5 AGENT_NOT_AVAILABLE, not AGENT_VERSION_NOT_AVAILABLE. Distinguish it
+  // explicitly so the classification is correct regardless of caller guards.
+  if (bucket.size === 0) return { emptyBucket: true };
   if (version !== null) {
     const handler = bucket.get(version);
     return handler === undefined
@@ -177,7 +184,7 @@ function pickFromBucket(
   const unversioned = bucket.get("");
   if (unversioned !== undefined) return { handler: unversioned, version: "" };
   const first = bucket.entries().next().value;
-  if (first === undefined) return { missingVersion: "" };
+  if (first === undefined) return { emptyBucket: true };
   const [v, h] = first;
   return { handler: h, version: v };
 }
@@ -188,7 +195,7 @@ function resolveFromState(
   version: string | null,
 ): Effect.Effect<ResolvedAgent, AgentRegistryFailure> {
   const bucket = state.get(name);
-  if (bucket === undefined || bucket.size === 0) {
+  if (bucket === undefined) {
     return Effect.fail(
       new TaggedAgentNotAvailable({
         message: `Agent "${name}" is not registered`,
@@ -196,6 +203,13 @@ function resolveFromState(
     );
   }
   const picked = pickFromBucket(bucket, version);
+  if ("emptyBucket" in picked) {
+    return Effect.fail(
+      new TaggedAgentNotAvailable({
+        message: `Agent "${name}" is not registered`,
+      }),
+    );
+  }
   if ("missingVersion" in picked) {
     return Effect.fail(
       new TaggedAgentVersionNotAvailable({
