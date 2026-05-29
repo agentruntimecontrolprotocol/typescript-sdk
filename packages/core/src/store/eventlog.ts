@@ -32,9 +32,9 @@ export interface EventSeqBounds {
  * Idempotent appends per (session_id, id) per ARCP v1.1 §5.1.
  * Replay is by `event_seq` per §6.3 / §8.3.
  *
- * The underlying `better-sqlite3` driver is synchronous; this class wraps
- * each operation in a `Promise.resolve(...)` so callers do not couple to
- * the sync API.
+ * The underlying `better-sqlite3` driver is synchronous; each method is
+ * declared `async` so callers can await results without coupling to the
+ * synchronous driver.
  */
 export class EventLog {
   private readonly db: DatabaseInstance;
