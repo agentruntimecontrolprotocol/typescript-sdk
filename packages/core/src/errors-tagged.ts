@@ -271,7 +271,11 @@ export function arcpFromTagged(t: TaggedSdkError): ARCPError {
   const Ctor = LEGACY_BY_CODE[t.code];
   const cause = t.cause;
   return new Ctor(t.message, {
-    retryable: t.retryable ?? false,
+    // Pass `retryable` through only when explicitly set; coercing an
+    // undefined value to `false` would override the legacy constructor's own
+    // per-code default (§12), silently flipping TIMEOUT/INTERNAL_ERROR from
+    // retryable:true to false.
+    ...(t.retryable === undefined ? {} : { retryable: t.retryable }),
     ...(t.details === undefined ? {} : { details: { ...t.details } }),
     ...(cause instanceof Error ? { cause } : {}),
   });
