@@ -12,8 +12,8 @@
 // `setTimeout`-driven watchdog inside `Job`. It is intended for new
 // Effect-graph callers that want a typed `TaggedHeartbeatLost` failure
 // without bridging `AbortSignal` manually. Reset semantics use a
-// `Ref<Instant>` deadline polled by a `Schedule.fixed("250 millis")`
-// fiber, matching the 250 ms resolution called out in #44.
+// `Ref<number>` (epoch-ms) deadline polled by a `Schedule.fixed("250
+// millis")` fiber, giving 250 ms detection resolution.
 
 import {
   type JobId,
@@ -217,7 +217,7 @@ export function makeJobManagerEffect(
  *     on a `Schedule.fixed("250 millis")` cadence; it fails the moment
  *     `now >= deadline`. Fork this onto a daemon fiber and `Effect.race` the
  *     job's workflow against it for the §6.4 "heartbeat lost" failure
- *     pattern called out in #44.
+ *     pattern.
  *
  * No transport coupling — this is the Effect-shape twin of the legacy
  * `Job`-owned `setTimeout` watchdog, intended for new Effect-graph callers
