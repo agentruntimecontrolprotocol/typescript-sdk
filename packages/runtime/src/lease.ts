@@ -486,8 +486,10 @@ export function assertLeaseConstraintsSubset(
   if (parentExpiry === undefined) return;
   const c = Date.parse(childExpiry);
   const p = Date.parse(parentExpiry);
-  if (!Number.isFinite(c) || !Number.isFinite(p)) return;
-  if (c > p) {
+  // Fail closed: if either side is unparseable we cannot prove the child does
+  // not exceed the parent, so treat it as a §9.4 violation rather than
+  // returning silently.
+  if (!Number.isFinite(c) || !Number.isFinite(p) || c > p) {
     throw new LeaseSubsetViolationError(
       "Child lease_constraints.expires_at exceeds parent's expires_at",
       {
