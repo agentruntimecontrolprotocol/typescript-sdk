@@ -1,10 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import type { SessionId, TraceId } from "@agentruntimecontrolprotocol/core";
-import {
-  type BaseEnvelope,
-  buildEnvelope,
-} from "@agentruntimecontrolprotocol/core/envelope";
+import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 /* eslint-disable max-lines, max-depth */
 import {
   AgentNotAvailableError,
@@ -30,13 +27,11 @@ import {
   emitArcpError,
   emitHandlerFailure,
   emitParseError,
-  forwardEventToSubscriber,
   type MetricInterceptor,
   type ResolvedSubmitAgent,
   runAndEmitResult,
   scheduleRuntimeTimeout,
   type SubmitPayload,
-  type SubscriberBroadcaster,
   validateDelegateLease,
   wrapJobCtx,
 } from "./job-runner-helpers.js";
@@ -461,7 +456,6 @@ export class JobRunner {
       base: jobCtx,
       delegateInterceptor: this.makeDelegateInterceptor(ctx, job),
       metricInterceptor: this.metricInterceptor(job),
-      broadcast: this.subscriberBroadcaster(job),
     });
 
     try {
@@ -671,21 +665,6 @@ export class JobRunner {
         throw new BudgetExhaustedError(
           `Budget exhausted for ${body.unit ?? "unknown currency"}`,
         );
-      }
-    };
-  }
-
-  /**
-   * Build a hook that re-broadcasts the job's events to every subscriber
-   * session (other than the submitting session).
-   */
-  private subscriberBroadcaster(job: Job): SubscriberBroadcaster {
-    return (env: BaseEnvelope) => {
-      const subs = this.server.subscribers.get(job.jobId);
-      if (subs === undefined || subs.size === 0) return;
-      for (const sub of subs) {
-        // Re-emit with the subscriber's session-scoped event_seq.
-        void forwardEventToSubscriber(sub, env).catch(() => undefined);
       }
     };
   }

@@ -63,7 +63,6 @@ describe("job-runner-helpers", () => {
       base,
       delegateInterceptor: delegate,
       metricInterceptor: metric,
-      broadcast: vi.fn(),
     });
     await ctx.metric({ name: "cost.usd", value: 1 } as never);
     await ctx.delegate({ delegate_id: "d_1", agent: "helper" } as never);

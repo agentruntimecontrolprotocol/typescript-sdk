@@ -47,16 +47,11 @@ export type DelegateOutcome =
 
 export type DelegateInterceptor = (body: DelegateBody) => Promise<void>;
 export type MetricInterceptor = (body: MetricBody) => Promise<void>;
-export type SubscriberBroadcaster = (env: BaseEnvelope) => void;
 
 export interface WrapJobCtxArgs {
   base: JobContext;
   delegateInterceptor: DelegateInterceptor;
   metricInterceptor: MetricInterceptor;
-  // subscriberBroadcaster is invoked at the Job-emit-level via a Job wrapper;
-  // event broadcasting actually hooks via the SessionContext.send pipeline,
-  // not here. The field is retained for future expansion.
-  broadcast: SubscriberBroadcaster;
 }
 
 export function wrapJobCtx(args: WrapJobCtxArgs): JobContext {
