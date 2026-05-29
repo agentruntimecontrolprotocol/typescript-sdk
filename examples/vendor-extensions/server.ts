@@ -2,14 +2,14 @@
  * vendor-extensions — server.
  *
  * Hosts a "render-job" agent that mixes reserved event kinds with a
- * custom vendor namespace `x-acme.*`:
+ * custom vendor namespace `x-vendor.acme.*`:
  *
  *   - reserved: status, log.
  *   - vendor:   x-vendor.acme.progress (percent + eta_seconds).
  *
- * The agent also requests a custom lease namespace `x-acme.metrics:*`
+ * The agent also requests a custom lease namespace `x-vendor.acme.metrics`
  * alongside the standard `net.fetch`, to demonstrate that capability
- * namespaces follow the same `x-vendor.*` extension rule.
+ * namespaces follow the same `x-vendor.<vendor>.<name>` extension rule.
  */
 
 import {
@@ -18,8 +18,8 @@ import {
   startWebSocketServer,
 } from "@agentruntimecontrolprotocol/sdk";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7884);
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7884);
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 async function main(): Promise<void> {
   const server = new ARCPServer({
