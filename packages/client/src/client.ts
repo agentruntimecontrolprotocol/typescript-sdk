@@ -1,6 +1,4 @@
 /* eslint-disable max-lines */
-import { randomBytes } from "node:crypto";
-
 import type { JobId, SessionId } from "@agentruntimecontrolprotocol/core";
 import {
   type BaseEnvelope,
@@ -747,6 +745,3 @@ function removeFromArray<T>(arr: T[], value: T): void {
   const idx = arr.indexOf(value);
   if (idx !== -1) arr.splice(idx, 1);
 }
-
-// Silence unused — re-exported for future timers.
-void randomBytes;
