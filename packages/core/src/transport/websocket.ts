@@ -158,8 +158,16 @@ function wsDataToString(data: unknown): string | null {
   if (typeof data === "string") return data;
   if (Buffer.isBuffer(data)) return data.toString("utf8");
   if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
-    return Buffer.from(data as ArrayBuffer).toString("utf8");
+  if (ArrayBuffer.isView(data)) {
+    // Honor the view's window into its backing buffer; a TypedArray/DataView
+    // is frequently a slice of a larger pooled buffer (Node socket reads), so
+    // decoding the whole ArrayBuffer would read the wrong/extra bytes.
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString(
+      "utf8",
+    );
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString("utf8");
   }
   return null;
 }
