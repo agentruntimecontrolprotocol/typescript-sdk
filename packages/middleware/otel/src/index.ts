@@ -5,14 +5,15 @@
  * wraps any transport so that:
  *
  *   - Outbound `send` calls produce a `arcp.send` span with the envelope
- *     type/id/session_id as attributes, and the active trace context is
- *     injected into the envelope's
- *     `extensions["x-vendor.opentelemetry.tracecontext"]` field (W3C
- *     `traceparent` + `tracestate`) so the peer can continue the trace.
- *   - Inbound frames produce a `arcp.recv` span, extracting any
- *     `extensions["x-vendor.opentelemetry.tracecontext"]` trace context so
- *     the inbound frame appears as a child of the originating span on the
- *     remote end.
+ *     type/id/session_id as attributes. The active trace-id is written to the
+ *     envelope `trace_id` field (§11, the canonical propagation channel) and
+ *     the full W3C context (`traceparent` + `tracestate`) is also injected
+ *     into `extensions["x-vendor.opentelemetry.tracecontext"]` for richer
+ *     peers.
+ *   - Inbound frames produce a `arcp.recv` span. The parent context is taken
+ *     from the vendor extension when present, otherwise seeded from the
+ *     envelope `trace_id`, so the inbound frame appears as a child of the
+ *     originating trace even against a peer that only sets `trace_id`.
  *
  * Wire it on either side:
  * ```ts
@@ -24,7 +25,10 @@
  * server.accept(traced); // or client.connect(traced);
  * ```
  */
-import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
+import {
+  type BaseEnvelope,
+  isValidTraceId,
+} from "@agentruntimecontrolprotocol/core/envelope";
 import type {
   FrameHandler,
   SendableFrame,
@@ -32,10 +36,12 @@ import type {
   WireFrame,
 } from "@agentruntimecontrolprotocol/core/transport";
 import {
+  type Context,
   context,
   propagation,
   SpanKind,
   SpanStatusCode,
+  TraceFlags,
   type Tracer,
   trace,
 } from "@opentelemetry/api";
@@ -49,6 +55,14 @@ export { OtelTracerLayer, type OtelTracerLayerOptions } from "./otel-effect.js";
 // in the `x-vendor.<vendor>.<name>` namespace. The OTel propagation carrier
 // rides under the OpenTelemetry vendor key.
 const OTEL_EXTENSION_NAME = "x-vendor.opentelemetry.tracecontext" as const;
+
+/**
+ * Synthetic remote span id used to seed a parent context from the envelope
+ * `trace_id` alone (§11). The envelope carries only the W3C trace-id, not the
+ * remote span-id, so we attach a fixed non-zero span-id; only the trace-id
+ * lineage matters for correlation.
+ */
+const SYNTHETIC_REMOTE_SPAN_ID = "0000000000000001" as const;
 
 /**
  * Wrap a {@link Transport} so each frame produces a span and W3C trace
@@ -90,7 +104,14 @@ async function sendWithSpan(
   });
   const carrier: Record<string, string> = {};
   propagation.inject(trace.setSpan(context.active(), span), carrier);
-  const enriched = injectExtension(frame, carrier);
+  // §11 — the canonical propagation channel is the envelope `trace_id` field;
+  // set it to the active trace-id so spec-conformant peers that read only
+  // `trace_id` (and ignore the vendor extension) still continue the trace.
+  const traceId = span.spanContext().traceId;
+  const enriched = setEnvelopeTraceId(
+    injectExtension(frame, carrier),
+    traceId,
+  );
   try {
     await context.with(trace.setSpan(context.active(), span), () =>
       inner.send(enriched),
@@ -111,7 +132,7 @@ async function recvWithSpan(
   const carrier = extractExtension(frame);
   const parent =
     carrier === undefined
-      ? context.active()
+      ? parentFromTraceId(frame)
       : propagation.extract(context.active(), carrier);
   const type = frameType(frame);
   const spanName = options.recvSpanName?.(frame) ?? `arcp.recv ${type}`;
@@ -213,6 +234,33 @@ function extractAttributes(
     pickLeaseAttributes(attrs, p);
   }
   return attrs;
+}
+
+function setEnvelopeTraceId(
+  frame: SendableFrame,
+  traceId: string,
+): SendableFrame {
+  // Only stamp a well-formed, non-zero trace-id; an unsampled/invalid span
+  // context yields an all-zero id which must not overwrite a real `trace_id`.
+  if (!isValidTraceId(traceId)) return frame;
+  const existing = (frame as { trace_id?: unknown }).trace_id;
+  if (typeof existing === "string" && existing === traceId) return frame;
+  return { ...frame, trace_id: traceId };
+}
+
+function parentFromTraceId(frame: WireFrame): Context {
+  const tid = frame["trace_id"];
+  if (typeof tid !== "string" || !isValidTraceId(tid)) {
+    return context.active();
+  }
+  // §11 — seed the parent span context from the envelope trace_id so the
+  // recv span joins the inbound trace even without the vendor extension.
+  return trace.setSpanContext(context.active(), {
+    traceId: tid,
+    spanId: SYNTHETIC_REMOTE_SPAN_ID,
+    traceFlags: TraceFlags.SAMPLED,
+    isRemote: true,
+  });
 }
 
 function injectExtension(
