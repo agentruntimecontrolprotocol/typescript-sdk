@@ -22,7 +22,10 @@ import {
   type TaggedSdkError,
   taggedFromARCP,
 } from "@agentruntimecontrolprotocol/core";
-import { ARCPError as ARCPErrorClass } from "@agentruntimecontrolprotocol/core/errors";
+import {
+  ARCPError as ARCPErrorClass,
+  InternalError,
+} from "@agentruntimecontrolprotocol/core/errors";
 import type {
   JobErrorPayload,
   JobResultPayload,
@@ -292,7 +295,14 @@ function transitionEffect(
 
 function liftToTagged(cause: unknown): TaggedSdkError {
   if (cause instanceof ARCPErrorClass) return taggedFromARCP(cause);
-  throw cause as Error;
+  // A non-ARCP rejection (e.g. a transport TypeError) must still land on the
+  // typed failure channel; rethrowing here would turn a recoverable typed
+  // failure into an Effect defect and violate the declared return type.
+  const message =
+    cause instanceof Error ? cause.message : "non-ARCP failure in job effect";
+  return taggedFromARCP(
+    new InternalError(message, cause instanceof Error ? { cause } : {}),
+  );
 }
 
 function unboundJobStub(): JobEffect {
