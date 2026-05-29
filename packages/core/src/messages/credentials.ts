@@ -1,6 +1,14 @@
 import { Schema } from "effect";
 
 /**
+ * RFC 3339 timestamp constrained to UTC (`Z` suffix). Fractional seconds are
+ * permitted; non-UTC offsets (e.g. `+05:00`) and missing suffixes are rejected
+ * so §9.5 "expires_at MUST be UTC" is enforced at the schema layer.
+ */
+const UTC_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
+/**
  * ARCP v1.1 §9.7–§9.8 — Provisioned credentials wire shapes.
  *
  * The runtime may mint short-lived, scope-restricted credentials at job
@@ -21,8 +29,15 @@ import { Schema } from "effect";
 
 // §9.8.1 — constraints embedded in the issued credential.
 export const CredentialConstraintsSchema = Schema.Struct({
-  /** ISO 8601 UTC expiry (`Z`-suffix required). */
-  expires_at: Schema.optional(Schema.String.pipe(Schema.nonEmptyString())),
+  /** ISO 8601 UTC expiry (`Z`-suffix required, §9.5). */
+  expires_at: Schema.optional(
+    Schema.String.pipe(
+      Schema.pattern(UTC_TIMESTAMP_PATTERN, {
+        message: () =>
+          "credential expires_at MUST be an RFC 3339 UTC timestamp with a `Z` suffix (§9.5)",
+      }),
+    ),
+  ),
   /**
    * Glob patterns for the models this credential may invoke.
    * Maps to the `model.use` lease globs (possibly narrowed by the provisioner).
