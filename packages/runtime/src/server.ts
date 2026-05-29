@@ -223,8 +223,8 @@ export class ARCPServer {
    *
    * The returned {@link SessionContext} is fully wired (frame dispatch, close
    * handler, heartbeat scheduler) but the handshake completes asynchronously
-   * — observers must use {@link SessionContext.onAccept} or its event log to
-   * react to acceptance.
+   * — observers must consult the session's `state` or its event log to react
+   * to acceptance.
    *
    * @param transport - Transport to accept. The runtime takes ownership of
    *   `onFrame`/`onClose` registrations until the session terminates.
