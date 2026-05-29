@@ -283,7 +283,10 @@ export class Job {
     // Event emission no longer arms a per-job heartbeat watchdog.
   }
 
-  /** Cooperatively cancel the job; armed timer will follow per §7.4. */
+  /**
+   * Cooperatively cancel the job by aborting its signal; the run loop emits
+   * `job.cancelled` per §7.4.
+   */
   public cancel(reason: string): void {
     if (this.isTerminal) return;
     this.abortController.abort(new CancelledError(reason));
