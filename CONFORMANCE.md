@@ -175,11 +175,11 @@ Host integrations (one example per middleware):
 | Requirement                                                                                                       | Status                            | Location                                                             |
 | ----------------------------------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------- |
 | §14 `wss://` required, bearer not over cleartext                                                                  | Implemented (deployer-controlled) | SDK does not downgrade                                               |
-| §14 `resume_token` ≥128 bits entropy                                                                              | Implemented                       | `packages/runtime/src/server.ts:newResumeToken` (256 bits)           |
+| §14 `resume_token` ≥128 bits entropy                                                                              | Implemented                       | `packages/runtime/src/stores.ts:newResumeToken` (256 bits)           |
 | §14 Lease MUST be checked even with sandboxing                                                                    | Implemented (responsibility)      | `validateLeaseOp` is the SDK's interception primitive                |
 | §14 Canonicalize paths/URLs before glob check                                                                     | Implemented                       | `packages/runtime/src/lease.ts:canonicalizeTarget`                   |
 | §14 Buffered events at rest: purge at window expiry                                                               | Implemented                       | `packages/runtime/src/server.ts:sweepResume` runs on a 60 s interval |
-| §14 Per-session DoS caps (max buffered events / bytes / concurrent jobs); exceed ⇒ `INTERNAL_ERROR` non-retryable | Implemented                       | `packages/runtime/src/server.ts:SessionContext.checkCaps`            |
+| §14 Per-session DoS caps (max buffered events / bytes / concurrent jobs); exceed ⇒ `INTERNAL_ERROR` non-retryable | Implemented                       | `packages/runtime/src/session-context.ts:SessionContext.checkCaps`            |
 
 ## §15. IANA / Extension namespace
 
@@ -344,7 +344,7 @@ Helpers:
 | Requirement                                                                                                         | Status      | Location                                                                                                               |
 | ------------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Feature flag `cost.budget`                                                                                          | Implemented | `packages/core/src/version.ts:V1_1_FEATURES`                                                                           |
-| `cost.budget` in `RESERVED_CAPABILITY_NAMES`                                                                        | Implemented | `packages/core/src/messages/execution.ts:RESERVED_CAPABILITY_NAMES`                                                    |
+| `cost.budget` in `RESERVED_CAPABILITY_NAMES`                                                                        | Implemented | `packages/core/src/messages/lease-schema.ts:RESERVED_CAPABILITY_NAMES`                                                    |
 | Amount grammar `currency:decimal` (USD/EUR/credits/custom)                                                          | Implemented | `packages/core/src/messages/execution.ts:parseBudgetAmount`                                                            |
 | `validateLeaseShape` rejects malformed budget patterns with `INVALID_REQUEST`                                       | Implemented | `packages/runtime/src/lease.ts:validateLeaseShape`                                                                     |
 | Initial per-currency counters initialized from the lease at `job.accepted`                                          | Implemented | `packages/runtime/src/lease.ts:initialBudgetFromLease`; echoed in `job.accepted.payload.budget` via `Job.emitAccepted` |
