@@ -48,6 +48,27 @@ export interface ARCPClientOptions {
    * (250ms, 32 events). `false` disables auto-ack entirely. Default `false`.
    */
   autoAck?: boolean | ClientAutoAckOptions;
+  /**
+   * v1.1 §8.3 — invoked when the client detects an `event_seq` gap (a missed
+   * event). The session is marked broken before the callback runs; the
+   * callback SHOULD recover by calling {@link ARCPClient.resume} on a fresh
+   * transport using the cursor in {@link SessionBrokenInfo}.
+   */
+  onSessionBroken?: (info: SessionBrokenInfo) => void;
+}
+
+/**
+ * v1.1 §8.3 — context for an `event_seq` gap that broke session ordering.
+ */
+export interface SessionBrokenInfo {
+  /** Highest contiguous `event_seq` the client observed before the gap. */
+  readonly lastEventSeq: number;
+  /** The out-of-order `event_seq` that exposed the gap. */
+  readonly receivedEventSeq: number;
+  /** Session id to resume, when known. */
+  readonly sessionId: string | undefined;
+  /** Resume token from the latest `session.welcome`, when available. */
+  readonly resumeToken: string | undefined;
 }
 
 /** Inbound-message handler on the client side. */

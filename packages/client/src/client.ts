@@ -86,6 +86,8 @@ export class ARCPClient {
   private readonly handshakeTimeoutMs: number;
   /** Latest `event_seq` observed for this session. Used on resume. */
   private lastEventSeq = 0;
+  /** v1.1 §8.3 — set once an `event_seq` gap breaks ordering guarantees. */
+  private sessionBroken = false;
   /** Most recent welcome payload (carries the fresh `resume_token`). */
   private welcome: SessionWelcomePayload | null = null;
   /** In-flight submissions keyed by the originating envelope id (submit). */
@@ -129,6 +131,15 @@ export class ARCPClient {
 
   public get lastEventSeqObserved(): number {
     return this.lastEventSeq;
+  }
+
+  /**
+   * v1.1 §8.3 — true once the client detected an `event_seq` gap. A broken
+   * session should be recovered via {@link ARCPClient.resume} on a fresh
+   * transport.
+   */
+  public get isSessionBroken(): boolean {
+    return this.sessionBroken;
   }
 
   public get welcomePayload(): SessionWelcomePayload | null {
@@ -225,6 +236,12 @@ export class ARCPClient {
       throw new InvalidRequestError("ARCPClient is already connected");
     }
     this.transport = transport;
+    // Seed the contiguity cursor from the resume point so replayed events
+    // (event_seq > last_event_seq) are not misread as a §8.3 gap.
+    if (resume !== undefined) {
+      this.lastEventSeq = resume.last_event_seq;
+      this.sessionBroken = false;
+    }
     this.handshake = new Deferred<SessionWelcomePayload>();
     this.wireTransport(transport);
     const advertisedFeatures = this.options.features ?? V1_1_FEATURES;
@@ -688,10 +705,15 @@ export class ARCPClient {
         >,
         transport: this.transport,
         observeEventSeq: (env) => {
-          if (
-            env.event_seq !== undefined &&
-            env.event_seq > this.lastEventSeq
-          ) {
+          if (env.event_seq === undefined) return;
+          if (env.event_seq > this.lastEventSeq) {
+            // §8.3 — event_seq is contiguous per session; a jump past the
+            // expected next value means we missed an event. Treat the session
+            // as broken and surface a resume signal rather than silently
+            // accepting a hole in the stream.
+            if (env.event_seq > this.lastEventSeq + 1) {
+              this.handleEventSeqGap(env.event_seq);
+            }
             this.lastEventSeq = env.event_seq;
             this.scheduleAutoAck();
           }
@@ -699,6 +721,37 @@ export class ARCPClient {
       },
       frame,
     );
+  }
+
+  private handleEventSeqGap(receivedEventSeq: number): void {
+    // Mark broken before notifying so the callback observes a consistent
+    // state. Only fire the callback on the first gap to avoid a storm if the
+    // peer keeps sending past the hole.
+    if (this.sessionBroken) return;
+    this.sessionBroken = true;
+    this.logger.warn(
+      {
+        lastEventSeq: this.lastEventSeq,
+        receivedEventSeq,
+        sessionId: this.state.id,
+      },
+      "event_seq gap detected; session marked broken (§8.3)",
+    );
+    const onBroken = this.options.onSessionBroken;
+    if (onBroken === undefined) return;
+    try {
+      onBroken({
+        lastEventSeq: this.lastEventSeq,
+        receivedEventSeq,
+        sessionId: this.state.id,
+        resumeToken: this.welcome?.resume_token,
+      });
+    } catch (error) {
+      this.logger.error(
+        { err: error },
+        "onSessionBroken callback threw; ignoring",
+      );
+    }
   }
 
   private scheduleAutoAck(): void {
