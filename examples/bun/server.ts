@@ -15,8 +15,8 @@
 import { serveArcp } from "@agentruntimecontrolprotocol/bun";
 import { ARCPServer, StaticBearerVerifier } from "@agentruntimecontrolprotocol/sdk";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7898);
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7898);
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 function main(): void {
   const arcp = new ARCPServer({

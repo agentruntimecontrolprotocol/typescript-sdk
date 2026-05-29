@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ARCPClient, StdioTransport, silentLogger } from "@agentruntimecontrolprotocol/sdk";
 
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 async function main(): Promise<void> {
   const here = path.dirname(fileURLToPath(import.meta.url));

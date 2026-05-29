@@ -16,8 +16,8 @@ import {
   validateLeaseOp,
 } from "@agentruntimecontrolprotocol/sdk";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7890);
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7890);
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 async function main(): Promise<void> {
   const server = new ARCPServer({

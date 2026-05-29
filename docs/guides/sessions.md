@@ -36,7 +36,7 @@ import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk
 const client = new ARCPClient({
   client: { name: "my-client", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.TOKEN,
+  token: process.env["TOKEN"],
   // optional v1.1 features the client wants enabled:
   features: ["heartbeat", "ack", "list_jobs", "subscribe"],
   handshakeTimeoutMs: 5000,

@@ -19,7 +19,7 @@ import { ARCPClient } from "@agentruntimecontrolprotocol/client";
 const client = new ARCPClient({
   client: { name: "my-client", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.TOKEN,
+  token: process.env["TOKEN"],
 
   // optional:
   capabilities: { encodings: ["json"] },

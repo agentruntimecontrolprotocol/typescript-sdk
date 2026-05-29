@@ -48,7 +48,7 @@ import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk
 const client = new ARCPClient({
   client: { name: "quickstart", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.ARCP_TOKEN,
+  token: process.env["ARCP_TOKEN"],
 });
 
 const transport = await WebSocketTransport.connect("wss://runtime.example.com/arcp");
@@ -96,7 +96,7 @@ import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk
 const client = new ARCPClient({
   client: { name: "resumable", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.ARCP_TOKEN,
+  token: process.env["ARCP_TOKEN"],
 });
 
 const welcome = await client.connect(
@@ -114,7 +114,7 @@ client.on("job.event", (env) => {
 const client2 = new ARCPClient({
   client: { name: "resumable", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.ARCP_TOKEN,
+  token: process.env["ARCP_TOKEN"],
 });
 await client2.resume(
   await WebSocketTransport.connect("wss://runtime.example.com/arcp"),
@@ -150,7 +150,7 @@ Iterate the ordered event stream — `log`, `thought`, `tool_call`, `tool_result
 const client = new ARCPClient({
   client: { name: "ack-demo", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.ARCP_TOKEN,
+  token: process.env["ARCP_TOKEN"],
   autoAck: { intervalMs: 250, minSeqDelta: 32 }, // coalesced session.ack
 });
 
@@ -215,7 +215,7 @@ Attach read-only to a job submitted elsewhere and observe its live stream (with 
 const observer = new ARCPClient({
   client: { name: "dashboard", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.ARCP_TOKEN,
+  token: process.env["ARCP_TOKEN"],
 });
 await observer.connect(await WebSocketTransport.connect("wss://runtime.example.com/arcp"));
 

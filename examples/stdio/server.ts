@@ -19,7 +19,7 @@ import {
   silentLogger,
 } from "@agentruntimecontrolprotocol/sdk";
 
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 async function main(): Promise<void> {
   const server = new ARCPServer({

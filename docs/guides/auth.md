@@ -10,7 +10,7 @@ sends a token in `session.hello`; the runtime verifies it via a
 const client = new ARCPClient({
   client: { name: "my-client", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.TOKEN,
+  token: process.env["TOKEN"],
 });
 ```
 

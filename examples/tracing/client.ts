@@ -21,8 +21,8 @@ import { SEMRESATTRS_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { ARCPClient, type Envelope, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
 
-const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7895/arcp";
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const URL = process.env["ARCP_DEMO_URL"] ?? "ws://127.0.0.1:7895/arcp";
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 async function main(): Promise<void> {
   const provider = new NodeTracerProvider({

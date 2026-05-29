@@ -10,8 +10,8 @@
 import { attachArcpToExpress, createArcpExpressApp } from "@agentruntimecontrolprotocol/express";
 import { ARCPServer, StaticBearerVerifier } from "@agentruntimecontrolprotocol/sdk";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7896);
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7896);
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 const ALLOWED_HOSTS = ["localhost", "127.0.0.1"];
 
 async function main(): Promise<void> {

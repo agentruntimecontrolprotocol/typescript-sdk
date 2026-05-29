@@ -24,7 +24,7 @@ import {
 // GLM-5 via z.ai's OpenAI-compatible API. Swap baseURL for BigModel or
 // another GLM provider; the OpenAI SDK shape stays the same.
 const glm = new OpenAI({
-  apiKey: process.env.ZAI_API_KEY,
+  apiKey: process.env["ZAI_API_KEY"],
   baseURL: "https://api.z.ai/api/paas/v4/",
 });
 

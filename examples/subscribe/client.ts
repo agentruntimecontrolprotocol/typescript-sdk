@@ -18,8 +18,8 @@
 
 import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
-const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7888/arcp";
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const URL = process.env["ARCP_DEMO_URL"] ?? "ws://127.0.0.1:7888/arcp";
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 async function main(): Promise<void> {
   // -------- Client A (submitter) --------

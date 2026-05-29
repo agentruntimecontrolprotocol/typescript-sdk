@@ -8,10 +8,10 @@ import {
   type IssuedCredential,
 } from "@agentruntimecontrolprotocol/sdk";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7893);
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
-const LITELLM_URL = process.env.LITELLM_URL ?? "http://127.0.0.1:4000";
-const ADMIN_KEY = process.env.LITELLM_ADMIN_KEY;
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7893);
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
+const LITELLM_URL = process.env["LITELLM_URL"] ?? "http://127.0.0.1:4000";
+const ADMIN_KEY = process.env["LITELLM_ADMIN_KEY"];
 
 class LiteLLMProvisioner implements CredentialProvisioner {
   public constructor(

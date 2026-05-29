@@ -29,8 +29,8 @@ import {
   UnauthenticatedError,
 } from "@agentruntimecontrolprotocol/sdk";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7894);
-const SECRET = process.env.ARCP_DEMO_SECRET ?? "demo-secret";
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7894);
+const SECRET = process.env["ARCP_DEMO_SECRET"] ?? "demo-secret";
 
 class SignedTokenVerifier implements BearerVerifier {
   public constructor(private readonly secret: string) {}

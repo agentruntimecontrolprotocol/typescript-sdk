@@ -9,8 +9,8 @@ import { createHmac } from "node:crypto";
 
 import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk";
 
-const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7894/arcp";
-const SECRET = process.env.ARCP_DEMO_SECRET ?? "demo-secret";
+const URL = process.env["ARCP_DEMO_URL"] ?? "ws://127.0.0.1:7894/arcp";
+const SECRET = process.env["ARCP_DEMO_SECRET"] ?? "demo-secret";
 
 function mintToken(principal: string, ttlSec = 60): string {
   const exp = Math.floor(Date.now() / 1000) + ttlSec;

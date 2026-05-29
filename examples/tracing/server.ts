@@ -24,8 +24,8 @@ import {
 } from "@agentruntimecontrolprotocol/sdk";
 import { withTracing } from "@agentruntimecontrolprotocol/middleware-otel";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7895);
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7895);
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 async function main(): Promise<void> {
   const provider = new NodeTracerProvider({

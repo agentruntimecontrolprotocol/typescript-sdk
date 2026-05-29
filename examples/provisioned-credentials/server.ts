@@ -8,8 +8,8 @@ import {
   type IssuedCredential,
 } from "@agentruntimecontrolprotocol/sdk";
 
-const PORT = Number(process.env.ARCP_DEMO_PORT ?? 7899);
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const PORT = Number(process.env["ARCP_DEMO_PORT"] ?? 7899);
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 class MockProvisioner implements CredentialProvisioner {
   public readonly revoked: string[] = [];

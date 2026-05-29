@@ -10,3 +10,4 @@ coverage/
 .vitest/
 *.tgz
 .effect-migration/
+docs/api/

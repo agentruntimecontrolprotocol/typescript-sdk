@@ -14,8 +14,8 @@ import {
   type WireFrame,
 } from "@agentruntimecontrolprotocol/sdk";
 
-const URL = process.env.ARCP_DEMO_URL ?? "ws://127.0.0.1:7885/arcp";
-const TOKEN = process.env.ARCP_DEMO_TOKEN ?? "demo-token";
+const URL = process.env["ARCP_DEMO_URL"] ?? "ws://127.0.0.1:7885/arcp";
+const TOKEN = process.env["ARCP_DEMO_TOKEN"] ?? "demo-token";
 
 // Helper: count inbound `session.ping` frames as the client receives them.
 // (The client's built-in handler auto-responds before any user `on()` runs,

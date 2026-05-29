@@ -1,0 +1,25 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "packages/core",
+    "packages/client",
+    "packages/runtime",
+    "packages/sdk",
+    "packages/middleware/bun",
+    "packages/middleware/express",
+    "packages/middleware/fastify",
+    "packages/middleware/hono",
+    "packages/middleware/node",
+    "packages/middleware/otel"
+  ],
+  "entryPointStrategy": "packages",
+  "plugin": ["typedoc-plugin-markdown"],
+  "out": "docs/api",
+  "readme": "none",
+  "githubPages": false,
+  "hideBreadcrumbs": true,
+  "hidePageHeader": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "skipErrorChecking": true
+}

@@ -23,7 +23,7 @@ import { ARCPClient, WebSocketTransport } from "@agentruntimecontrolprotocol/sdk
 const client = new ARCPClient({
   client: { name: "quickstart", version: "1.0.0" },
   authScheme: "bearer",
-  token: process.env.ARCP_TOKEN,
+  token: process.env["ARCP_TOKEN"],
 });
 
 const transport = await WebSocketTransport.connect("wss://runtime.example.com/arcp");
