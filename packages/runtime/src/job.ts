@@ -57,6 +57,11 @@ export interface JobDependencies {
  */
 const MIN_BUDGET_DEBOUNCE_DELTA = 1;
 
+// §8.4/§14 — result_chunk size caps; exceeding either yields INTERNAL_ERROR so
+// a misbehaving agent cannot exhaust memory on either peer.
+const MAX_RESULT_CHUNK_BYTES = 1024 * 1024; // ~1 MiB decoded, per chunk
+const MAX_RESULT_TOTAL_BYTES = 256 * 1024 * 1024; // 256 MiB decoded, assembled
+
 const JOB_TRANSITIONS = {
   pending: new Set<JobStateName>([
     "running",
@@ -139,6 +144,8 @@ export class Job {
   public activeResultNextChunkSeq = 0;
   /** True once the active result stream has emitted `more: false`. */
   public resultChunkFinalized = false;
+  /** Cumulative decoded byte count across the active result_chunk stream (§14). */
+  private activeResultTotalBytes = 0;
   /**
    * v1.1 §9.7–§9.8 — short-lived credentials issued by the provisioner at
    * job acceptance. Wire shapes are included in `job.accepted`; provisioner
@@ -500,9 +507,25 @@ export class Job {
         `result_chunk.chunk_seq MUST be ${this.activeResultNextChunkSeq}`,
       );
     }
+    // §8.4/§14 — enforce per-chunk and cumulative result-size caps; decoded
+    // length depends on the declared encoding.
+    const chunkBytes = Buffer.byteLength(
+      chunkBody.data,
+      chunkBody.encoding === "base64" ? "base64" : "utf8",
+    );
+    const totalBytes = this.activeResultTotalBytes + chunkBytes;
+    if (
+      chunkBytes > MAX_RESULT_CHUNK_BYTES ||
+      totalBytes > MAX_RESULT_TOTAL_BYTES
+    ) {
+      throw new InternalError(
+        `result_chunk exceeds size cap (chunk ${chunkBytes}B, total ${totalBytes}B; caps ${MAX_RESULT_CHUNK_BYTES}/${MAX_RESULT_TOTAL_BYTES})`,
+      );
+    }
     this.chunkedResultStarted = true;
     this.activeResultId = chunkBody.result_id;
     this.activeResultNextChunkSeq = chunkBody.chunk_seq + 1;
+    this.activeResultTotalBytes = totalBytes;
     if (chunkBody.more === false) this.resultChunkFinalized = true;
   }
 
