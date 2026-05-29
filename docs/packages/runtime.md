@@ -12,7 +12,8 @@ pnpm add @agentruntimecontrolprotocol/runtime @agentruntimecontrolprotocol/core
 ## `ARCPServer`
 
 ```ts
-import { ARCPServer, StaticBearerVerifier } from "@agentruntimecontrolprotocol/runtime";
+import { ARCPServer } from "@agentruntimecontrolprotocol/runtime";
+import { StaticBearerVerifier } from "@agentruntimecontrolprotocol/core";
 
 const server = new ARCPServer({
   runtime: { name: "my-runtime", version: "1.0.0" },
