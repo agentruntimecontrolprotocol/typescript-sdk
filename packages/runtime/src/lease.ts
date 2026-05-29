@@ -175,7 +175,15 @@ function checkLeaseExpiration(
   if (expiresAt === undefined) return;
   const now = ctx.now ?? Date.now();
   const expiresMs = Date.parse(expiresAt);
-  if (!Number.isFinite(expiresMs) || now < expiresMs) return;
+  // Fail closed: an unparseable expires_at must not be treated as "never
+  // expires" (§9.5). If a lease reaches enforcement with a malformed
+  // timestamp, deny the operation rather than running it unbounded.
+  if (!Number.isFinite(expiresMs)) {
+    throw new LeaseExpiredError(`Lease expires_at is not parseable`, {
+      details: { capability, target, expires_at: expiresAt },
+    });
+  }
+  if (now < expiresMs) return;
   throw new LeaseExpiredError(`Lease expired at ${expiresAt}`, {
     details: { capability, target, expires_at: expiresAt },
   });
