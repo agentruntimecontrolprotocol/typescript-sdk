@@ -401,9 +401,9 @@ export class ARCPServer {
     ctx: SessionContext,
   ): Capabilities {
     const base: Capabilities = { ...this.options.capabilities };
-    // Advertise the rich agent inventory shape when the agent_versions
-    // feature is negotiated and we have versioned handlers; else fall back to
-    // the v1.0 flat shape (or what the caller supplied).
+    // Attach the rich agent inventory when either the `agent_versions` feature
+    // is negotiated OR the caller supplied no `agents` block, provided the
+    // registry is non-empty. Otherwise keep whatever `agents` the caller set.
     const clientFeatures = payload.capabilities?.features;
     const features = intersectFeatures(this.advertisedFeatures, clientFeatures);
     ctx.assignNegotiatedFeatures(features);
