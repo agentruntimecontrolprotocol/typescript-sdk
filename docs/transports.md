@@ -125,10 +125,7 @@ const child = spawn("pnpm", [
   "me",
 ]);
 
-const transport = new StdioTransport({
-  input: child.stdout!,
-  output: child.stdin!,
-});
+const transport = new StdioTransport(child.stdout!, child.stdin!);
 
 const client = new ARCPClient({
   /* ... */

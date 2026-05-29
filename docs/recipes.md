@@ -237,10 +237,7 @@ const child = spawn("node", ["./agent.js"], {
   stdio: ["pipe", "pipe", "inherit"], // stderr passes through
 });
 
-const transport = new StdioTransport({
-  input: child.stdout!,
-  output: child.stdin!,
-});
+const transport = new StdioTransport(child.stdout!, child.stdin!);
 
 const client = new ARCPClient({
   /* ... */

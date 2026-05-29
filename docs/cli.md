@@ -133,10 +133,7 @@ const child = spawn("arcp", [
   "serve", "--transport", "stdio",
   "--token", "tok", "--principal", "me",
 ]);
-const transport = new StdioTransport({
-  input: child.stdout,
-  output: child.stdin,
-});
+const transport = new StdioTransport(child.stdout, child.stdin);
 ```
 
 See [transports.md#stdio](./transports.md#stdio) for the full pattern.
