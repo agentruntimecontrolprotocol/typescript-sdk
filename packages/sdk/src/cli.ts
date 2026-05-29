@@ -15,7 +15,6 @@
  * `@agentruntimecontrolprotocol/runtime`) and `makeARCPClientRuntime` (from `@agentruntimecontrolprotocol/client`)
  * themselves; the building blocks are public.
  */
-import { readFileSync } from "node:fs";
 import process from "node:process";
 
 import { Command } from "commander";
@@ -159,9 +158,5 @@ program
     };
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
   });
-
-// Self-check ensures the package can find its own version on disk; no-op
-// otherwise, but kept here for readers of the CLI to reason about packaging.
-void readFileSync;
 
 await program.parseAsync(process.argv);
