@@ -159,6 +159,7 @@ v1.1 features (one example per addition):
 | `cost-budget/`      | §9.6 / §12  |
 | `progress/`         | §8.2.1      |
 | `result-chunk/`     | §8.4        |
+| `provisioned-credentials/` | §9.7 / §9.8 |
 
 Host integrations (one example per middleware):
 
@@ -412,7 +413,8 @@ The full canonical v1.1 set is 15 codes; see
 - **Each v1.1 feature is exercised by a dedicated example** under
   `examples/` (`heartbeat/`, `ack-backpressure/`, `list-jobs/`,
   `subscribe/`, `agent-versions/`, `lease-expires-at/`,
-  `cost-budget/`, `progress/`, `result-chunk/`). See
+  `cost-budget/`, `progress/`, `result-chunk/`,
+  `provisioned-credentials/`). See
   [`examples/README.md`](./examples/README.md) for the full §13 cross-reference.
 
 The package set:
