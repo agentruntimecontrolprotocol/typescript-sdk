@@ -62,10 +62,10 @@ describe("JobBudgetSchema (Effect Schema)", () => {
     await expect(decode(JobBudgetSchema)({})).resolves.toEqual({});
   });
 
-  it("drops empty keys (Effect Record divergence from zod)", async () => {
-    // Effect's `Schema.Record` filters keys that fail the key schema; the
-    // zod twin in `messageEnvelope()` enforces the wire-level rejection.
-    await expect(decode(JobBudgetSchema)({ "": 1 })).resolves.toEqual({});
+  it("rejects empty currency keys rather than silently dropping them (§9.6)", async () => {
+    // A malformed budget must fail decode, not yield a reduced (no-currency)
+    // budget that would silently disable budget enforcement.
+    await expect(decode(JobBudgetSchema)({ "": 1 })).rejects.toThrow();
   });
 
   it("rejects non-numeric values", async () => {

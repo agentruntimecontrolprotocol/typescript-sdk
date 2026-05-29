@@ -160,13 +160,21 @@ export type JobSubmitPayload = Schema.Schema.Type<
  * lease includes `cost.budget`. Keys are currency identifiers (e.g., `USD`);
  * values are positive decimals (§9.6).
  */
-// Note: Effect's `Schema.Record` silently drops keys that fail the key
-// schema (so `{ "": 1 }` decodes to `{}`).
+// Effect's `Schema.Record` silently drops keys that fail the key schema (so a
+// `nonEmptyString` key would make `{ "": 1 }` decode to `{}`). Accept any
+// string key and reject empty keys in the filter so a malformed budget fails
+// decode instead of yielding a reduced, no-currency budget (§9.6).
 export const JobBudgetSchema = Schema.mutable(
   Schema.Record({
-    key: Schema.String.pipe(Schema.nonEmptyString()),
+    key: Schema.String,
     value: Schema.Number,
   }),
+).pipe(
+  Schema.filter((budget) =>
+    Object.keys(budget).some((k) => k.length === 0)
+      ? "budget currency identifiers MUST be non-empty (§9.6)"
+      : undefined,
+  ),
 );
 export type JobBudget = Schema.Schema.Type<typeof JobBudgetSchema>;
 

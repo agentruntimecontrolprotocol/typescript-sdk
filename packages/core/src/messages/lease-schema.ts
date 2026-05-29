@@ -40,17 +40,25 @@ export function isValidCapabilityName(name: string): boolean {
  * consumers (`runtime/lease.ts`, `client-handle.ts`, etc.) keep their
  * existing `Lease` contract.
  *
- * Effect's `Schema.Record` silently drops keys that fail the key schema, so
- * `{ "": [...] }` decodes to `{}` (zod's twin used to reject at the wire
- * layer — see migration notes in PR notes for slice #50).
+ * Effect's `Schema.Record` silently drops keys that fail the key schema, so a
+ * `nonEmptyString` key would make `{ "": [...] }` decode to `{}` rather than
+ * fail. To preserve §9.1 reject-on-bad-key semantics we accept any string key
+ * and reject empty keys in the filter below, so no requested capability is
+ * ever silently discarded.
  */
 export const LeaseSchema = Schema.mutable(
   Schema.Record({
-    key: Schema.String.pipe(Schema.nonEmptyString()),
+    key: Schema.String,
     value: Schema.mutable(
       Schema.Array(Schema.String.pipe(Schema.nonEmptyString())),
     ),
   }),
+).pipe(
+  Schema.filter((lease) =>
+    Object.keys(lease).some((k) => k.length === 0)
+      ? "lease capability names MUST be non-empty (§9.1)"
+      : undefined,
+  ),
 );
 
 /**

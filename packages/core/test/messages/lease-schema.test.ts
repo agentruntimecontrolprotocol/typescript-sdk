@@ -29,10 +29,10 @@ describe("LeaseSchema (Effect Schema)", () => {
     await expect(decode(LeaseSchema)({})).resolves.toEqual({});
   });
 
-  it("drops empty capability keys (Effect Record divergence from zod)", async () => {
-    // Effect's `Schema.Record` filters keys that fail the key schema; the
-    // zod twin rejects them at the wire layer where it counts.
-    await expect(decode(LeaseSchema)({ "": ["x"] })).resolves.toEqual({});
+  it("rejects empty capability keys rather than silently dropping them (§9.1)", async () => {
+    // A malformed lease must fail decode, not yield a reduced (no-capability)
+    // lease — otherwise a requested capability could be silently discarded.
+    await expect(decode(LeaseSchema)({ "": ["x"] })).rejects.toThrow();
   });
 
   it("rejects empty pattern strings inside the value array", async () => {
