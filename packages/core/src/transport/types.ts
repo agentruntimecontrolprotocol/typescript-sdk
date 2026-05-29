@@ -6,9 +6,9 @@
  * runtime. WebSocket, stdio, and the in-memory test transport all implement
  * this interface.
  *
- * Transports MUST preserve message body and delivery contract per RFC 0001
- * v2 §22. Ordering inside a `stream_id`/`job_id` is the only ordering
- * guarantee the protocol relies on.
+ * Transports MUST preserve message body and delivery contract per ARCP v1.1
+ * §8. Ordering inside a `job_id` (by `event_seq`) is the only ordering
+ * guarantee the protocol relies on (§8.3).
  */
 
 import type { Effect, Stream } from "effect";
