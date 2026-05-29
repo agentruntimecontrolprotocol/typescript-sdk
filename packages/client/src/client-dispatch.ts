@@ -315,7 +315,29 @@ function routeJobEvent(target: DispatchTarget, parsed: BaseEnvelope): void {
 
 function routeJobAccepted(target: DispatchTarget, parsed: BaseEnvelope): void {
   const payload = decodeJobAcceptedPayload(parsed.payload);
-  if (payload !== null) onJobAccepted(target, payload);
+  if (payload !== null) onJobAccepted(target, payload, parsed.trace_id);
+}
+
+/**
+ * Bind an incoming acceptance/rejection to its originating submit. Prefer
+ * correlation by the envelope `trace_id` (stable per submit when the caller
+ * supplies one) so out-of-order acceptances bind to the correct invocation;
+ * fall back to positional FIFO only when no trace correlation is available.
+ */
+function takePendingAccept(
+  target: DispatchTarget,
+  traceId: string | undefined,
+): InvocationState | undefined {
+  if (traceId !== undefined) {
+    const idx = target.pendingAccepts.findIndex(
+      (inv) => inv.traceId === traceId,
+    );
+    if (idx !== -1) {
+      const [inv] = target.pendingAccepts.splice(idx, 1);
+      return inv;
+    }
+  }
+  return target.pendingAccepts.shift();
 }
 
 function routeJobEventFrame(
@@ -342,14 +364,20 @@ function routeJobErrorFrame(
 ): void {
   if (parsed.job_id === undefined) return;
   const payload = decodePayload(JobErrorPayloadSchema, parsed.payload);
-  if (payload !== null) onJobError(target, parsed.job_id, payload);
+  if (payload !== null) {
+    onJobError(target, payload, {
+      jobId: parsed.job_id,
+      traceId: parsed.trace_id,
+    });
+  }
 }
 
 function onJobAccepted(
   target: DispatchTarget,
   payload: JobAcceptedPayload,
+  traceId: string | undefined,
 ): void {
-  const inv = target.pendingAccepts.shift();
+  const inv = takePendingAccept(target, traceId);
   if (inv === undefined || inv.acceptance.settled) return;
   inv.jobId = payload.job_id;
   inv.lease = payload.lease;
@@ -403,15 +431,17 @@ function onJobResult(
 
 function onJobError(
   target: DispatchTarget,
-  jobId: JobId,
   payload: JobErrorPayload,
+  correlation: { jobId: JobId; traceId: string | undefined },
 ): void {
+  const { jobId, traceId } = correlation;
   const err = ARCPError.fromPayload(jobErrorToErrorPayload(payload));
   let inv = target.invocationsByJobId.get(jobId);
   if (inv === undefined) {
     // No binding yet — this can happen when the runtime rejects the submit
     // (AGENT_NOT_AVAILABLE, DUPLICATE_KEY, etc) without emitting job.accepted.
-    inv = target.pendingAccepts.shift();
+    // Correlate by trace_id when available, else fall back to FIFO.
+    inv = takePendingAccept(target, traceId);
     if (inv !== undefined) {
       inv.jobId = jobId;
       target.invocationsByJobId.set(jobId, inv);
