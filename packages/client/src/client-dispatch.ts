@@ -36,6 +36,14 @@ import { type Schema as EffectSchema, Schema } from "effect";
 
 import type { InvocationState } from "./client-handle.js";
 
+/**
+ * Upper bound on per-invocation buffered `job.event` payloads. `inv.events` is
+ * not read by the public client surface, so a long-running chatty job would
+ * otherwise grow client memory without bound. Keep only the most recent
+ * events, dropping the oldest once the cap is reached.
+ */
+const MAX_BUFFERED_INVOCATION_EVENTS = 1024;
+
 /** Decode a wire payload against an Effect schema; returns null on failure. */
 function decodePayload<S extends EffectSchema.Schema.AnyNoContext>(
   schema: S,
@@ -362,6 +370,11 @@ function onJobEvent(
   const inv = target.invocationsByJobId.get(jobId);
   if (inv === undefined) return;
   inv.events.push(ep);
+  if (inv.events.length > MAX_BUFFERED_INVOCATION_EVENTS) {
+    // Drop the oldest event(s) so a chatty job cannot grow this buffer without
+    // bound; `inv.events` is not exposed by the public client surface.
+    inv.events.splice(0, inv.events.length - MAX_BUFFERED_INVOCATION_EVENTS);
+  }
   if (ep.kind !== "result_chunk") return;
   let body: ResultChunkBody;
   try {
