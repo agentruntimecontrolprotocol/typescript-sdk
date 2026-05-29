@@ -71,7 +71,7 @@
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@effect/platform": "^0.96.1",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "effect": "^3.21.2"
   },
   "devDependencies": {
