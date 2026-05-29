@@ -6,7 +6,7 @@ export interface EventLogFilter {
   job_id?: string;
   trace_id?: string;
   types?: readonly string[];
-  /** Inclusive lower bound on `id` (lexical, ULID-ordered). */
+  /** Exclusive lower bound on `id` (strict; lexical, ULID-ordered). */
   after_id?: string;
   /** Lower bound on `event_seq` (strict). When set, replaces `after_id` semantics. */
   after_event_seq?: number;
