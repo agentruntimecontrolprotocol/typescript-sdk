@@ -18,8 +18,10 @@ import type { LeaseOpContext } from "./types.js";
 //
 // A lease is an immutable record granted to a job at submission. It maps
 // capability names to lists of glob patterns. Enforcement is the runtime's
-// responsibility (§9.3). Validation is static; there is no lifecycle,
-// extension, or revocation in v1.0.
+// responsibility (§9.3). Beyond static validation, this module enforces
+// §9.5 lease expiration (checkLeaseExpiration) and §9.6 per-currency budget
+// exhaustion (checkBudgetExhaustion). Lease renewal/extension is not
+// supported.
 
 /** Compile a single ARCP glob pattern into an anchored RegExp. */
 export function compileGlob(pattern: string): RegExp {
