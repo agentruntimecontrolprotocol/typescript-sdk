@@ -37,7 +37,7 @@ import {
   ARCPServerService,
   acceptSessionEffect,
 } from "@agentruntimecontrolprotocol/runtime";
-import { memoryTransportEffect } from "@agentruntimecontrolprotocol/core";
+import { pairMemoryTransportsEffect } from "@agentruntimecontrolprotocol/core";
 
 const runtime = ManagedRuntime.make(
   ARCPRuntimeLayer({
