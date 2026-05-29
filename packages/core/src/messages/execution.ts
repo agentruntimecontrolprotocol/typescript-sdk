@@ -254,7 +254,17 @@ export const JobResultPayloadSchema = Schema.Struct({
   result_size: Schema.optional(
     Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
   ),
-});
+}).pipe(
+  // §8.4 — inline `result` and streamed `result_id` are mutually exclusive;
+  // once chunks are emitted the terminating job.result carries `result_id`,
+  // never an inline body.
+  Schema.filter(
+    (p) =>
+      p.result !== undefined && p.result_id !== undefined
+        ? "job.result MUST NOT carry both inline `result` and streamed `result_id` (§8.4)"
+        : undefined,
+  ),
+);
 export type JobResultPayload = Schema.Schema.Type<
   typeof JobResultPayloadSchema
 >;
