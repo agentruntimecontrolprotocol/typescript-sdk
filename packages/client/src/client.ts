@@ -6,6 +6,7 @@ import {
 } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   CancelledError,
+  HeartbeatLostError,
   InvalidRequestError,
   UnauthenticatedError,
 } from "@agentruntimecontrolprotocol/core/errors";
@@ -115,6 +116,10 @@ export class ARCPClient {
   } | null = null;
   private autoAckTimer: ReturnType<typeof setTimeout> | null = null;
   private lastAckedSeq = 0;
+  /** v1.1 §6.4 — negotiated heartbeat interval in ms (0 = disabled). */
+  private heartbeatIntervalMs = 0;
+  /** v1.1 §6.4 — inactivity timer; fires HEARTBEAT_LOST after two intervals. */
+  private livenessTimer: ReturnType<typeof setTimeout> | null = null;
 
   public constructor(public readonly options: ARCPClientOptions) {
     this.logger =
@@ -317,6 +322,7 @@ export class ARCPClient {
         advertisedFeatures,
         welcome.capabilities.features,
       );
+      this.startLivenessTimer(welcome);
       return welcome;
     } finally {
       clearTimeout(timeout);
@@ -370,6 +376,7 @@ export class ARCPClient {
   public async close(reason?: string): Promise<void> {
     this.rejectAllPending(new CancelledError("Client closing"));
     this.clearAutoAckTimer();
+    this.clearLivenessTimer();
     if (this.transport === null) return;
     await this.sendBye(reason);
     await this.transport.close(reason);
@@ -689,6 +696,9 @@ export class ARCPClient {
   // -------------------------------------------------------------------
 
   private async dispatchRaw(frame: WireFrame): Promise<void> {
+    // §6.4 — any inbound frame is evidence the peer is alive; re-arm the
+    // inactivity timer before processing.
+    this.touchLiveness();
     await dispatchEnvelope(
       {
         logger: this.logger,
@@ -721,6 +731,57 @@ export class ARCPClient {
       },
       frame,
     );
+  }
+
+  private startLivenessTimer(welcome: SessionWelcomePayload): void {
+    const interval = welcome.heartbeat_interval_sec;
+    if (
+      !this.hasFeature("heartbeat") ||
+      interval === undefined ||
+      interval <= 0
+    ) {
+      return;
+    }
+    this.heartbeatIntervalMs = interval * 1000;
+    this.touchLiveness();
+  }
+
+  private touchLiveness(): void {
+    if (this.heartbeatIntervalMs <= 0) return;
+    if (this.livenessTimer !== null) clearTimeout(this.livenessTimer);
+    // §6.4 — two silent intervals is the conventional liveness budget.
+    this.livenessTimer = setTimeout(() => {
+      this.livenessTimer = null;
+      this.handleHeartbeatLost();
+    }, this.heartbeatIntervalMs * 2);
+    this.livenessTimer.unref();
+  }
+
+  private clearLivenessTimer(): void {
+    if (this.livenessTimer !== null) {
+      clearTimeout(this.livenessTimer);
+      this.livenessTimer = null;
+    }
+  }
+
+  private handleHeartbeatLost(): void {
+    const lostError = new HeartbeatLostError(
+      "No inbound frames within two heartbeat intervals (§6.4)",
+    );
+    this.logger.warn(
+      { heartbeatIntervalMs: this.heartbeatIntervalMs },
+      "heartbeat lost; connection appears dead",
+    );
+    const cb = this.options.onHeartbeatLost;
+    if (cb === undefined) return;
+    try {
+      cb(lostError);
+    } catch (error) {
+      this.logger.error(
+        { err: error },
+        "onHeartbeatLost callback threw; ignoring",
+      );
+    }
   }
 
   private handleEventSeqGap(receivedEventSeq: number): void {

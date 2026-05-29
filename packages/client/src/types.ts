@@ -1,4 +1,5 @@
 import type { JobId, TraceId } from "@agentruntimecontrolprotocol/core";
+import type { HeartbeatLostError } from "@agentruntimecontrolprotocol/core/errors";
 import type { Logger } from "@agentruntimecontrolprotocol/core/logger";
 import type {
   AuthScheme,
@@ -55,6 +56,13 @@ export interface ARCPClientOptions {
    * transport using the cursor in {@link SessionBrokenInfo}.
    */
   onSessionBroken?: (info: SessionBrokenInfo) => void;
+  /**
+   * v1.1 §6.4 — invoked when no inbound frame arrives within two negotiated
+   * `heartbeat_interval_sec` windows (only active when the `heartbeat` feature
+   * is negotiated and the runtime advertised an interval). Detection is a
+   * spec MAY; use this to tear down or resume a silently-dead connection.
+   */
+  onHeartbeatLost?: (error: HeartbeatLostError) => void;
 }
 
 /**
