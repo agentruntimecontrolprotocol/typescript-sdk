@@ -218,6 +218,7 @@ export class SessionContext implements EventSeqSource {
     // the behavior of envelopes emitted by the subscriber's own session.
     try {
       await this.server.eventLog.append(forwarded);
+      this.accountForwardedAgainstSubscriber(sub, forwarded);
     } catch (error) {
       this.logger.warn(
         { err: error, subscriber: sub.state.id, type: envelope.type },
@@ -232,6 +233,21 @@ export class SessionContext implements EventSeqSource {
         "subscriber transport send failed",
       );
     }
+  }
+
+  /**
+   * §14 — count a forwarded envelope against the *subscriber's* replay buffer
+   * just like its own outbound envelopes; without this a subscriber observing
+   * a high-volume job would never trip its buffered cap and its replay buffer
+   * would grow unbounded.
+   */
+  private accountForwardedAgainstSubscriber(
+    sub: SessionContext,
+    forwarded: BaseEnvelope,
+  ): void {
+    sub.bufferedEventCount += 1;
+    sub.bufferedBytes += JSON.stringify(forwarded).length;
+    sub.checkCaps();
   }
 
   private maybeEmitBackPressure(): void {
