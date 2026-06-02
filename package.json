@@ -39,16 +39,16 @@
     "prepare": "simple-git-hooks || true"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.18.2",
-    "@biomejs/biome": "^2.4.15",
+    "@arethetypeswrong/cli": "^0.18.3",
+    "@biomejs/biome": "^2.4.16",
     "@changesets/cli": "^2.31.0",
     "@effect/eslint-plugin": "^0.3.2",
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.1",
-    "@vitest/coverage-v8": "^4.1.7",
-    "eslint": "^9.39.4",
+    "@vitest/coverage-v8": "^4.1.8",
+    "eslint": "^10.4.1",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-n": "^18.0.1",
     "eslint-plugin-tsdoc": "^0.5.2",
@@ -58,13 +58,13 @@
     "publint": "^0.3.21",
     "rimraf": "^6.0.1",
     "simple-git-hooks": "^2.11.1",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typedoc": "^0.28.19",
     "typedoc-plugin-markdown": "^4.11.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.4",
-    "vite": "^8.0.14",
-    "vitest": "^4.1.7"
+    "typescript-eslint": "^8.60.1",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint:biome && pnpm typecheck && pnpm test"

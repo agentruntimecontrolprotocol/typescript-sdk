@@ -71,14 +71,14 @@
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@effect/platform": "^0.96.1",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "effect": "^3.21.2"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
-    "@vitest/coverage-v8": "^4.1.7",
-    "tsx": "^4.22.3",
+    "@vitest/coverage-v8": "^4.1.8",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
