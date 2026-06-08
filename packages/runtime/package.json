@@ -44,12 +44,12 @@
   "dependencies": {
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@effect/platform": "^0.96.1",
-    "effect": "^3.21.2"
+    "effect": "^3.21.3"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
-    "@vitest/coverage-v8": "^4.1.7",
+    "@types/node": "^25.9.2",
+    "@vitest/coverage-v8": "^4.1.8",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
