@@ -205,6 +205,53 @@ describe("handleResume", () => {
     expect(ctx.send).toHaveBeenCalled();
   });
 
+  it("rejects resume when the buffer exceeds the replay cap (issue #141)", async () => {
+    const server = makeServer();
+    const ctx = makeCtx();
+    const sessionId = newSessionId();
+    const token = newResumeToken();
+    server.resumeStore.set(sessionId, {
+      sessionId,
+      resumeToken: token,
+      expiresAt: Date.now() + 60_000,
+    });
+    // The true tail (max=20_000) is far beyond the contiguous slice the capped
+    // read returns (ending at event_seq 3). Replaying only the slice would set
+    // event_seq to 3 and the next live event would collide with a persisted row.
+    server.eventLog.getSeqBounds = vi.fn(async () => ({ min: 1, max: 20_000 }));
+    server.eventLog.readSinceSeq = vi.fn(async () =>
+      [1, 2, 3].map((seq) => ({
+        id: `msg_${seq}`,
+        type: "job.event",
+        session_id: sessionId,
+        job_id: "job_1",
+        event_seq: seq,
+        payload: { kind: "log", ts: new Date().toISOString(), body: {} },
+      })),
+    ) as never;
+
+    await handleResume({
+      server: server as never,
+      ctx: ctx as never,
+      identity: { principal: "alice" },
+      payload: {
+        client: { name: "client", version: "0.1.0" },
+        capabilities: { encodings: ["json"] },
+        auth: { scheme: "bearer", token: "tok" },
+        resume: {
+          session_id: sessionId,
+          resume_token: token,
+          last_event_seq: 0,
+        },
+      } as never,
+    });
+
+    expect(ctx.emitSessionError).toHaveBeenCalled();
+    // The resume is rejected: nothing replayed, no truncated cursor written.
+    expect(ctx.send).not.toHaveBeenCalled();
+    expect(ctx.setEventSeq).not.toHaveBeenCalled();
+  });
+
   it("rejects when resume replay fails before welcome", async () => {
     const server = makeServer();
     const ctx = makeCtx();

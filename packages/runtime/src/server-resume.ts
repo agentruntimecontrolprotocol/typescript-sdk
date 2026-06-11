@@ -18,6 +18,14 @@ import { newResumeToken } from "./stores.js";
 
 const DEFAULT_RESUME_WINDOW_SECONDS = 600;
 
+/**
+ * Maximum number of buffered events replayed in a single resume. A session
+ * whose buffer extends beyond this many events past the cursor cannot be
+ * replayed gap-free in one pass, so the resume is rejected rather than
+ * silently truncated (§6.3, §8.3).
+ */
+const RESUME_REPLAY_CAP = 10_000;
+
 export interface HandleResumeArgs {
   server: ARCPServer;
   ctx: SessionContext;
@@ -184,9 +192,10 @@ async function readResumeEvents(
     const replayed = await server.eventLog.readSinceSeq(
       resume.session_id,
       resume.last_event_seq,
-      10_000,
+      RESUME_REPLAY_CAP,
     );
     validateResumeCoverage(bounds, replayed, resume.last_event_seq);
+    assertFullReplay(bounds, replayed);
     return replayed;
   } catch (error) {
     ctx.logger.warn({ err: error }, "resume replay unavailable");
@@ -196,6 +205,36 @@ async function readResumeEvents(
         : new ResumeWindowExpiredError("Resume buffer no longer covers cursor"),
     );
     return null;
+  }
+}
+
+/**
+ * Reject a resume whose replay was truncated by {@link RESUME_REPLAY_CAP}.
+ *
+ * `readSinceSeq` returns at most `RESUME_REPLAY_CAP` events. `validateResumeCoverage`
+ * only proves the *returned* slice is contiguous, so a session with more than
+ * the cap of events past the cursor passes coverage while the tail
+ * `(highestReplayed, bounds.max]` is silently dropped. Replaying the truncated
+ * slice and then setting `event_seq` to that lower value makes the next live
+ * emission re-allocate a seq already present in the log (a duplicate-`event_seq`
+ * collision under `INSERT OR IGNORE`), corrupting future resumes. If the capped
+ * read did not reach the buffer's true tail, fail the resume instead (§8.3).
+ */
+function assertFullReplay(
+  bounds: EventSeqBounds,
+  replayed: readonly BaseEnvelope[],
+): void {
+  if (bounds.max === null) return;
+  let highest = 0;
+  for (const env of replayed) {
+    if (env.event_seq !== undefined && env.event_seq > highest) {
+      highest = env.event_seq;
+    }
+  }
+  if (bounds.max > highest) {
+    throw new ResumeWindowExpiredError(
+      "Resume buffer exceeds the replay cap; cannot replay without a gap",
+    );
   }
 }
 
