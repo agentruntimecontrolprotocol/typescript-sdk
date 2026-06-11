@@ -42,6 +42,7 @@ export const CORE_MESSAGE_TYPES = [
   "job.submit",
   "job.accepted",
   "job.cancel",
+  "job.cancelled",
   "job.event",
   "job.result",
   "job.error",

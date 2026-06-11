@@ -2,7 +2,9 @@ import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
+  EnvelopeSchema,
   JobBudgetSchema,
+  JobCancelledPayloadSchema,
   JobCancelPayloadSchema,
   JobErrorFinalStatusSchema,
   JobErrorPayloadSchema,
@@ -83,6 +85,32 @@ describe("JobCancelPayloadSchema (Effect Schema)", () => {
   it("accepts a reason", async () => {
     const input = { reason: "client requested" };
     await expect(decode(JobCancelPayloadSchema)(input)).resolves.toEqual(input);
+  });
+});
+
+describe("JobCancelledPayloadSchema (§7.4, issue #147)", () => {
+  it("accepts an empty body", async () => {
+    await expect(decode(JobCancelledPayloadSchema)({})).resolves.toEqual({});
+  });
+
+  it("accepts a reason", async () => {
+    const input = { reason: "client requested" };
+    await expect(decode(JobCancelledPayloadSchema)(input)).resolves.toEqual(
+      input,
+    );
+  });
+
+  it("round-trips a job.cancelled envelope through the union", async () => {
+    const env = {
+      arcp: "1.1",
+      id: "msg_cancelled_1",
+      type: "job.cancelled",
+      session_id: "sess_1",
+      job_id: "job_1",
+      payload: { reason: "client requested" },
+    };
+    const decoded = await decode(EnvelopeSchema)(env);
+    expect(decoded.type).toBe("job.cancelled");
   });
 });
 

@@ -52,6 +52,14 @@ describe("CORE_MESSAGE_TYPES / isCoreType (issue #75)", () => {
       expect(classifyUnknownType(t).kind).not.toBe("error");
     }
   });
+
+  // Issue #147: the §7.4 `job.cancelled` acknowledgement was missing from the
+  // taxonomy, so it could not round-trip or be recognized by receivers.
+  it("recognizes the §7.4 job.cancelled acknowledgement", () => {
+    expect(CORE_MESSAGE_TYPES).toContain("job.cancelled");
+    expect(isCoreType("job.cancelled")).toBe(true);
+    expect(classifyUnknownType("job.cancelled").kind).not.toBe("error");
+  });
 });
 
 describe("classifyUnknownType", () => {

@@ -71,6 +71,44 @@ describe("§7 job lifecycle", () => {
     await h.close();
   });
 
+  it("§7.4 job.cancel acks with job.cancelled before job.error{CANCELLED}", async () => {
+    const h = makePairedHarness();
+    h.server.registerAgent("slow", async (_input, ctx) => {
+      await new Promise<void>((_resolve, reject) => {
+        ctx.signal.addEventListener(
+          "abort",
+          () => {
+            reject(
+              ctx.signal.reason instanceof Error
+                ? ctx.signal.reason
+                : new Error("aborted"),
+            );
+          },
+          { once: true },
+        );
+      });
+      return null;
+    });
+    await h.connect();
+
+    const timeline: string[] = [];
+    h.client.on("job.cancelled", (env) => {
+      timeline.push(env.type);
+    });
+    h.client.on("job.error", (env) => {
+      timeline.push(env.type);
+    });
+
+    const handle = await h.client.submit({ agent: "slow" });
+    await h.client.cancelJob(handle.jobId, { reason: "user requested" });
+    await expect(handle.done).rejects.toMatchObject({ code: "CANCELLED" });
+
+    // The §7.4 acknowledgement MUST arrive ahead of the terminal job.error.
+    expect(timeline[0]).toBe("job.cancelled");
+    expect(timeline).toContain("job.error");
+    await h.close();
+  });
+
   it("event_seq is monotonic across emit kinds", async () => {
     const h = makePairedHarness();
     h.server.registerAgent("emit", async (_i, ctx) => {

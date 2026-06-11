@@ -552,8 +552,30 @@ export class ARCPServer {
       return;
     }
     if (job.isTerminal) return;
+    // §7.4 — acknowledge with `job.cancelled` *before* the cooperative abort so
+    // the ack is observed ahead of the terminal `job.error{CANCELLED}` the run
+    // loop emits. This lets the client distinguish "cancel accepted" from
+    // "cancel ignored" without waiting for the terminal error.
+    await this.emitJobCancelledAck(ctx, jobId, env.payload.reason);
     job.cancel(env.payload.reason ?? "client_cancel");
     this.scheduleCancelGrace(job);
+  }
+
+  private async emitJobCancelledAck(
+    ctx: SessionContext,
+    jobId: JobId,
+    reason: string | undefined,
+  ): Promise<void> {
+    const sessionId = ctx.state.id;
+    if (sessionId === undefined) return;
+    await ctx.send(
+      buildEnvelope({
+        id: newMessageId(),
+        type: "job.cancelled" as const,
+        payload: reason === undefined ? {} : { reason },
+        optional: { session_id: sessionId, job_id: jobId },
+      }),
+    );
   }
 
   private async emitCancelTargetMissing(

@@ -216,6 +216,21 @@ export type JobCancelPayload = Schema.Schema.Type<
   typeof JobCancelPayloadSchema
 >;
 
+/**
+ * §7.4 — `job.cancelled` acknowledgement. The runtime emits this immediately
+ * after accepting a `job.cancel` for a live job, ahead of (and independent of)
+ * the terminal `job.error{code: CANCELLED, final_status: "cancelled"}`. It lets
+ * a client distinguish "cancel accepted" from "cancel ignored". The target
+ * `job_id` travels on the envelope; the payload echoes the cancel `reason` when
+ * one was supplied.
+ */
+export const JobCancelledPayloadSchema = Schema.Struct({
+  reason: Schema.optional(Schema.String),
+});
+export type JobCancelledPayload = Schema.Schema.Type<
+  typeof JobCancelledPayloadSchema
+>;
+
 // Job lifecycle states (§7.3)
 
 export const JOB_STATES = [
@@ -316,6 +331,11 @@ export const JobCancelEnvelopeSchema = messageEnvelope(
   JobCancelPayloadSchema,
 );
 
+export const JobCancelledEnvelopeSchema = messageEnvelope(
+  "job.cancelled",
+  JobCancelledPayloadSchema,
+);
+
 export const JobEventEnvelopeSchema = messageEnvelope(
   "job.event",
   JobEventPayloadSchema,
@@ -396,6 +416,7 @@ export const EXECUTION_ENVELOPES = [
   JobSubmitEnvelopeSchema,
   JobAcceptedEnvelopeSchema,
   JobCancelEnvelopeSchema,
+  JobCancelledEnvelopeSchema,
   JobEventEnvelopeSchema,
   JobResultEnvelopeSchema,
   JobErrorEnvelopeSchema,
