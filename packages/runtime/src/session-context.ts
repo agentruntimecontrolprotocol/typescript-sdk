@@ -158,8 +158,15 @@ export class SessionContext implements EventSeqSource {
       throw new InvalidRequestError("Cannot send: session closed");
     }
     this.touch();
-    await this.transport.send(envelope);
+    // §6.3 / §8.3 — persist BEFORE the wire send so a durable record exists for
+    // anything the client could observe. Persisting after sending leaves a hole
+    // in the replay buffer if the append fails: the client already holds an
+    // `event_seq` the runtime cannot replay, permanently breaking resume.
     await this.persistOutbound(envelope);
+    await this.transport.send(envelope);
+    // Cap-trip termination runs after the send so the current envelope is not
+    // dropped purely because it pushed the buffer over the threshold.
+    this.checkCaps();
     await this.fanOutToSubscribers(envelope);
     this.maybeEmitBackPressure();
   }
@@ -168,13 +175,24 @@ export class SessionContext implements EventSeqSource {
     if (envelope.session_id === undefined || envelope.session_id === "") return;
     try {
       await this.server.eventLog.append(envelope);
-      // Account against per-session caps for replay buffer estimation.
-      this.bufferedEventCount += 1;
-      this.bufferedBytes += JSON.stringify(envelope).length;
-      this.checkCaps();
     } catch (error) {
       this.logger.error({ err: error }, "event log append (outbound) failed");
+      // An `event_seq`-bearing envelope that cannot be persisted would create
+      // an undetectable gap on resume (`readSinceSeq` would miss it while the
+      // client holds it). Treat that as fatal to the send rather than silently
+      // emitting an unresumable event. Non-seq envelopes (acks, welcome) are
+      // not part of the resume replay, so a persist failure for them is logged
+      // and tolerated.
+      if (envelope.event_seq !== undefined) {
+        throw error instanceof Error
+          ? error
+          : new InternalError("event log append (outbound) failed");
+      }
+      return;
     }
+    // Account against per-session caps for replay buffer estimation.
+    this.bufferedEventCount += 1;
+    this.bufferedBytes += JSON.stringify(envelope).length;
   }
 
   private async fanOutToSubscribers(envelope: BaseEnvelope): Promise<void> {
