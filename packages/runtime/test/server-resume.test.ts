@@ -138,6 +138,73 @@ describe("handleResume", () => {
     expect(ctx.setEventSeq).toHaveBeenCalledWith(3);
   });
 
+  it("rejects a wrong resume_token of equal length (constant-time path)", async () => {
+    const server = makeServer();
+    const ctx = makeCtx();
+    const sessionId = newSessionId();
+    const token = newResumeToken();
+    server.resumeStore.set(sessionId, {
+      sessionId,
+      resumeToken: token,
+      expiresAt: Date.now() + 60_000,
+    });
+    // Same length as the real token but every byte differs.
+    const wrongToken = `${"x".repeat(token.length - 1)}y`;
+    expect(wrongToken).toHaveLength(token.length);
+
+    await handleResume({
+      server: server as never,
+      ctx: ctx as never,
+      identity: { principal: "alice" },
+      payload: {
+        client: { name: "client", version: "0.1.0" },
+        capabilities: { encodings: ["json"] },
+        auth: { scheme: "bearer", token: "tok" },
+        resume: {
+          session_id: sessionId,
+          resume_token: wrongToken,
+          last_event_seq: 1,
+        },
+      } as never,
+    });
+
+    expect(ctx.emitSessionError).toHaveBeenCalled();
+    expect(ctx.send).not.toHaveBeenCalled();
+    // The valid token in the store must be unchanged (no rotation on reject).
+    expect(server.resumeStore.get(sessionId)?.resumeToken).toBe(token);
+  });
+
+  it("accepts the correct resume_token", async () => {
+    const server = makeServer();
+    const ctx = makeCtx();
+    const sessionId = newSessionId();
+    const token = newResumeToken();
+    server.resumeStore.set(sessionId, {
+      sessionId,
+      resumeToken: token,
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await handleResume({
+      server: server as never,
+      ctx: ctx as never,
+      identity: { principal: "alice" },
+      payload: {
+        client: { name: "client", version: "0.1.0" },
+        capabilities: { encodings: ["json"] },
+        auth: { scheme: "bearer", token: "tok" },
+        resume: {
+          session_id: sessionId,
+          resume_token: token,
+          last_event_seq: 1,
+        },
+      } as never,
+    });
+
+    expect(ctx.emitSessionError).not.toHaveBeenCalled();
+    expect(ctx.send).toHaveBeenCalled();
+  });
+
   it("rejects when resume replay fails before welcome", async () => {
     const server = makeServer();
     const ctx = makeCtx();

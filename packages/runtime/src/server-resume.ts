@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import type { SessionId } from "@agentruntimecontrolprotocol/core";
 import type { BearerIdentity } from "@agentruntimecontrolprotocol/core/auth";
 import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
@@ -74,7 +76,15 @@ async function validateResumeRecord(
   resume: NonNullable<SessionHelloPayload["resume"]>,
 ): Promise<boolean> {
   const record = server.resumeStore.get(resume.session_id);
-  if (record?.resumeToken !== resume.resume_token) {
+  // §14 — the resume token is a session secret that grants full session
+  // takeover. Compare it in constant time so an attacker cannot recover a
+  // valid token by measuring how early a plain `!==` short-circuits. Guard the
+  // missing-record case first and only compare equal-length buffers (a length
+  // mismatch is itself an immediate, non-secret-dependent rejection).
+  if (
+    record === undefined ||
+    !secretEquals(record.resumeToken, resume.resume_token)
+  ) {
     await ctx.emitSessionError(
       new ResumeWindowExpiredError("Invalid or unknown resume_token"),
     );
@@ -88,6 +98,19 @@ async function validateResumeRecord(
     return false;
   }
   return true;
+}
+
+/**
+ * Constant-time comparison of two session secrets (§14). Returns `false`
+ * immediately on a length mismatch (length is not secret), otherwise defers to
+ * {@link timingSafeEqual} so the comparison time does not leak how many leading
+ * bytes matched.
+ */
+function secretEquals(expected: string, provided: string): boolean {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(provided);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 function rotateResumeToken(
