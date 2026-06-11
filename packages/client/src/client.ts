@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 import type { JobId, SessionId } from "@agentruntimecontrolprotocol/core";
 import {
   type BaseEnvelope,
@@ -6,7 +5,6 @@ import {
 } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   CancelledError,
-  HeartbeatLostError,
   InvalidRequestError,
   UnauthenticatedError,
 } from "@agentruntimecontrolprotocol/core/errors";
@@ -52,6 +50,7 @@ import {
   type InvocationState,
   makeHandleFromInvocation,
 } from "./client-handle.js";
+import { ClientLiveness } from "./client-liveness.js";
 import type {
   ARCPClientOptions,
   ClientHandler,
@@ -85,10 +84,11 @@ export class ARCPClient {
   private transport: Transport | null = null;
   private handshake: Deferred<SessionWelcomePayload> | null = null;
   private readonly handshakeTimeoutMs: number;
-  /** Latest `event_seq` observed for this session. Used on resume. */
-  private lastEventSeq = 0;
-  /** v1.1 §8.3 — set once an `event_seq` gap breaks ordering guarantees. */
-  private sessionBroken = false;
+  /**
+   * §6.4 heartbeat/liveness, §6.5 auto-ack, and §8.3 event_seq gap detection.
+   * Extracted so the client facade stays a thin protocol surface.
+   */
+  private readonly liveness: ClientLiveness;
   /** Most recent welcome payload (carries the fresh `resume_token`). */
   private welcome: SessionWelcomePayload | null = null;
   /** In-flight submissions keyed by the originating envelope id (submit). */
@@ -109,33 +109,23 @@ export class ARCPClient {
     string,
     Deferred<JobSubscribedPayload>
   >();
-  /** v1.1 §6.5 — auto-ack scheduler state. */
-  private readonly autoAckOpts: {
-    intervalMs: number;
-    minSeqDelta: number;
-  } | null = null;
-  private autoAckTimer: ReturnType<typeof setTimeout> | null = null;
-  private lastAckedSeq = 0;
-  /** v1.1 §6.4 — negotiated heartbeat interval in ms (0 = disabled). */
-  private heartbeatIntervalMs = 0;
-  /** v1.1 §6.4 — inactivity timer; fires HEARTBEAT_LOST after two intervals. */
-  private livenessTimer: ReturnType<typeof setTimeout> | null = null;
 
   public constructor(public readonly options: ARCPClientOptions) {
     this.logger =
       options.logger ?? rootLogger.child({ component: "arcp-client" });
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 5000;
-    if (options.autoAck !== undefined && options.autoAck !== false) {
-      const o = options.autoAck === true ? {} : options.autoAck;
-      this.autoAckOpts = {
-        intervalMs: o.intervalMs ?? 250,
-        minSeqDelta: o.minSeqDelta ?? 32,
-      };
-    }
+    this.liveness = new ClientLiveness({
+      logger: this.logger,
+      options,
+      hasFeature: (name) => this.hasFeature(name),
+      sendAck: (seq) => this.ack(seq),
+      getSessionId: () => this.state.id,
+      getResumeToken: () => this.welcome?.resume_token,
+    });
   }
 
   public get lastEventSeqObserved(): number {
-    return this.lastEventSeq;
+    return this.liveness.lastEventSeqObserved;
   }
 
   /**
@@ -144,7 +134,7 @@ export class ARCPClient {
    * transport.
    */
   public get isSessionBroken(): boolean {
-    return this.sessionBroken;
+    return this.liveness.isSessionBroken;
   }
 
   public get welcomePayload(): SessionWelcomePayload | null {
@@ -244,8 +234,7 @@ export class ARCPClient {
     // Seed the contiguity cursor from the resume point so replayed events
     // (event_seq > last_event_seq) are not misread as a §8.3 gap.
     if (resume !== undefined) {
-      this.lastEventSeq = resume.last_event_seq;
-      this.sessionBroken = false;
+      this.liveness.seedFromResume(resume.last_event_seq);
     }
     this.handshake = new Deferred<SessionWelcomePayload>();
     this.wireTransport(transport);
@@ -322,7 +311,7 @@ export class ARCPClient {
         advertisedFeatures,
         welcome.capabilities.features,
       );
-      this.startLivenessTimer(welcome);
+      this.liveness.start(welcome);
       return welcome;
     } finally {
       clearTimeout(timeout);
@@ -375,8 +364,7 @@ export class ARCPClient {
    */
   public async close(reason?: string): Promise<void> {
     this.rejectAllPending(new CancelledError("Client closing"));
-    this.clearAutoAckTimer();
-    this.clearLivenessTimer();
+    this.liveness.clear();
     if (this.transport === null) return;
     await this.sendBye(reason);
     await this.transport.close(reason);
@@ -396,12 +384,6 @@ export class ARCPClient {
     this.pendingLists.clear();
     for (const d of this.pendingSubscribes.values()) d.reject(error);
     this.pendingSubscribes.clear();
-  }
-
-  private clearAutoAckTimer(): void {
-    if (this.autoAckTimer === null) return;
-    clearTimeout(this.autoAckTimer);
-    this.autoAckTimer = null;
   }
 
   private async sendBye(reason: string | undefined): Promise<void> {
@@ -594,7 +576,7 @@ export class ARCPClient {
       optional: { session_id: sessionId },
     });
     await this.transport.send(env);
-    if (seq > this.lastAckedSeq) this.lastAckedSeq = seq;
+    this.liveness.recordAcked(seq);
   }
 
   /**
@@ -698,7 +680,7 @@ export class ARCPClient {
   private async dispatchRaw(frame: WireFrame): Promise<void> {
     // §6.4 — any inbound frame is evidence the peer is alive; re-arm the
     // inactivity timer before processing.
-    this.touchLiveness();
+    this.liveness.touch();
     await dispatchEnvelope(
       {
         logger: this.logger,
@@ -715,132 +697,11 @@ export class ARCPClient {
         >,
         transport: this.transport,
         observeEventSeq: (env) => {
-          if (env.event_seq === undefined) return;
-          if (env.event_seq > this.lastEventSeq) {
-            // §8.3 — event_seq is contiguous per session; a jump past the
-            // expected next value means we missed an event. Treat the session
-            // as broken and surface a resume signal rather than silently
-            // accepting a hole in the stream.
-            if (env.event_seq > this.lastEventSeq + 1) {
-              this.handleEventSeqGap(env.event_seq);
-            }
-            this.lastEventSeq = env.event_seq;
-            this.scheduleAutoAck();
-          }
+          this.liveness.observeEventSeq(env);
         },
       },
       frame,
     );
-  }
-
-  private startLivenessTimer(welcome: SessionWelcomePayload): void {
-    const interval = welcome.heartbeat_interval_sec;
-    if (
-      !this.hasFeature("heartbeat") ||
-      interval === undefined ||
-      interval <= 0
-    ) {
-      return;
-    }
-    this.heartbeatIntervalMs = interval * 1000;
-    this.touchLiveness();
-  }
-
-  private touchLiveness(): void {
-    if (this.heartbeatIntervalMs <= 0) return;
-    if (this.livenessTimer !== null) clearTimeout(this.livenessTimer);
-    // §6.4 — two silent intervals is the conventional liveness budget.
-    this.livenessTimer = setTimeout(() => {
-      this.livenessTimer = null;
-      this.handleHeartbeatLost();
-    }, this.heartbeatIntervalMs * 2);
-    this.livenessTimer.unref();
-  }
-
-  private clearLivenessTimer(): void {
-    if (this.livenessTimer !== null) {
-      clearTimeout(this.livenessTimer);
-      this.livenessTimer = null;
-    }
-  }
-
-  private handleHeartbeatLost(): void {
-    const lostError = new HeartbeatLostError(
-      "No inbound frames within two heartbeat intervals (§6.4)",
-    );
-    this.logger.warn(
-      { heartbeatIntervalMs: this.heartbeatIntervalMs },
-      "heartbeat lost; connection appears dead",
-    );
-    const cb = this.options.onHeartbeatLost;
-    if (cb === undefined) return;
-    try {
-      cb(lostError);
-    } catch (error) {
-      this.logger.error(
-        { err: error },
-        "onHeartbeatLost callback threw; ignoring",
-      );
-    }
-  }
-
-  private handleEventSeqGap(receivedEventSeq: number): void {
-    // Mark broken before notifying so the callback observes a consistent
-    // state. Only fire the callback on the first gap to avoid a storm if the
-    // peer keeps sending past the hole.
-    if (this.sessionBroken) return;
-    this.sessionBroken = true;
-    this.logger.warn(
-      {
-        lastEventSeq: this.lastEventSeq,
-        receivedEventSeq,
-        sessionId: this.state.id,
-      },
-      "event_seq gap detected; session marked broken (§8.3)",
-    );
-    const onBroken = this.options.onSessionBroken;
-    if (onBroken === undefined) return;
-    try {
-      onBroken({
-        lastEventSeq: this.lastEventSeq,
-        receivedEventSeq,
-        sessionId: this.state.id,
-        resumeToken: this.welcome?.resume_token,
-      });
-    } catch (error) {
-      this.logger.error(
-        { err: error },
-        "onSessionBroken callback threw; ignoring",
-      );
-    }
-  }
-
-  private scheduleAutoAck(): void {
-    if (this.autoAckOpts === null) return;
-    if (!this.hasFeature("ack")) return;
-    const { intervalMs, minSeqDelta } = this.autoAckOpts;
-    const delta = this.lastEventSeq - this.lastAckedSeq;
-    if (delta >= minSeqDelta) {
-      // Fire immediately (still async-safe).
-      void this.flushAutoAck().catch(() => undefined);
-      return;
-    }
-    if (this.autoAckTimer !== null) return;
-    this.autoAckTimer = setTimeout(() => {
-      this.autoAckTimer = null;
-      void this.flushAutoAck().catch(() => undefined);
-    }, intervalMs);
-    this.autoAckTimer.unref();
-  }
-
-  private async flushAutoAck(): Promise<void> {
-    if (this.lastEventSeq <= this.lastAckedSeq) return;
-    if (!this.hasFeature("ack")) return;
-    try {
-      await this.ack(this.lastEventSeq);
-    } catch {
-      // best-effort
-    }
   }
 }
 
