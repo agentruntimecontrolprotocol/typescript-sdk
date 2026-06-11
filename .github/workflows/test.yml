@@ -55,6 +55,10 @@ jobs:
         with:
           version: 9.15.0
           run_install: false
+          # The default installer needs a system node at install time, which
+          # the containerized self-hosted runner doesn't have. The standalone
+          # binary is dependency-free (linux-arm64 builds available).
+          standalone: true
 
       - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v6
