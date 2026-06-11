@@ -319,7 +319,7 @@ importers:
         version: 25.9.1
       hono:
         specifier: ^4.12.22
-        version: 4.12.22
+        version: 4.12.25
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -2482,8 +2482,8 @@ packages:
     resolution: {integrity: sha512-RWzP96k/yv0PQfyXnWjs6zot20TqfpfsNXhOnev8d1InAxubW93L11/oNUc3tQqn2G0bSdAOBpX+2uDFHV7kdQ==}
     engines: {node: '>=16.9.0'}
 
-  hono@4.12.22:
-    resolution: {integrity: sha512-7fvVPbB92zNRsQke+uiRGwtTuef0tB2Dg4hWxYfFNvkQhIltWoyi0ONReM5LWA+jJWS3nfT5lTq+qbsIpX0IQw==}
+  hono@4.12.25:
+    resolution: {integrity: sha512-2NFaIyNVgJmBs/ecmtGzlmluTFs5cHEWGTdu0t1HBwYzoGXOL5nUQBRMXsXWla5i4KkG//QMzVP88m1+I3fdAQ==}
     engines: {node: '>=16.9.0'}
 
   html-escaper@2.0.2:
@@ -6335,7 +6335,7 @@ snapshots:
 
   hono@4.12.18: {}
 
-  hono@4.12.22: {}
+  hono@4.12.25: {}
 
   html-escaper@2.0.2: {}
 
