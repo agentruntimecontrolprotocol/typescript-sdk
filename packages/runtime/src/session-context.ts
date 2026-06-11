@@ -527,6 +527,16 @@ export class SessionContext implements EventSeqSource {
     await this.closeSession(reason, { cancelJobs: true });
   }
 
+  /**
+   * §6.7 — graceful close (`session.bye`/`session.close`). In-flight jobs are
+   * NOT affected: they keep running and remain resumable within the resume
+   * window (the resume record and event log are left intact). This mirrors the
+   * transport-drop path, which also leaves jobs running.
+   */
+  public async closeGraceful(reason: string | undefined): Promise<void> {
+    await this.closeSession(reason, { cancelJobs: false });
+  }
+
   private async closeSession(
     reason: string | undefined,
     opts: { cancelJobs: boolean },

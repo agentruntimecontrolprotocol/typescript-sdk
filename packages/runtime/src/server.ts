@@ -447,13 +447,16 @@ export class ARCPServer {
     });
     ctx.registerHandler("session.bye", async (env) => {
       if (env.type !== "session.bye") return;
-      ctx.jobs.cancelAll("session closed");
+      // §6.7 — a graceful close MUST NOT cancel in-flight jobs; they continue
+      // running and stay resumable within the resume window (§7.7). Use the
+      // graceful close path (cancelJobs: false) rather than terminate(), which
+      // would cancel every job a client cleanly closing a long-running job.
       try {
         ctx.state.transition("closing");
       } catch {
         // already in terminal phase
       }
-      await ctx.terminate(env.payload.reason);
+      await ctx.closeGraceful(env.payload.reason);
     });
   }
 
