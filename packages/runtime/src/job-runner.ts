@@ -6,7 +6,6 @@ import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import {
   AgentNotAvailableError,
   ARCPError,
-  BudgetExhaustedError,
   InternalError,
   InvalidRequestError,
   LeaseExpiredError,
@@ -661,11 +660,13 @@ export class JobRunner {
             .catch(() => undefined);
         });
       }
-      if (remaining !== null && remaining <= 0) {
-        throw new BudgetExhaustedError(
-          `Budget exhausted for ${body.unit ?? "unknown currency"}`,
-        );
-      }
+      // §9.6 / §13.5 — do NOT throw here. Throwing from the metric path would
+      // (a) swallow the triggering cost.* metric (it never reaches base.metric
+      // and so is never observed by the client) and (b) fatal the job at report
+      // time with final_status: "error". The spec SHOULDs the tool_result form
+      // so the agent can decide whether to continue; budget exhaustion is
+      // surfaced as BUDGET_EXHAUSTED on the next authority-bearing op by
+      // `checkBudgetExhaustion` (wired through `gateLeaseOp`).
     };
   }
 

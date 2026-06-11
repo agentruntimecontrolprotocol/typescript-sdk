@@ -71,6 +71,49 @@ describe("§7 job lifecycle", () => {
     await h.close();
   });
 
+  it("§9.6 cost metric that exhausts the budget is delivered and does not fatal the job", async () => {
+    const h = makePairedHarness();
+    h.server.registerAgent("spender", async (_input, ctx) => {
+      // This metric drives the USD budget to zero.
+      await ctx.metric({ name: "cost.tokens", value: 100, unit: "USD" });
+      // The next authority-bearing op surfaces BUDGET_EXHAUSTED as a
+      // tool_result; the agent decides to continue and returns successfully.
+      await ctx.toolCall({ tool: "web.search", call_id: "c1" });
+      return { done: true };
+    });
+    await h.connect();
+
+    const events: JobEventPayload[] = [];
+    h.client.on("job.event", (env) => {
+      if (env.type === "job.event") events.push(env.payload);
+    });
+
+    const handle = await h.client.submit({
+      agent: "spender",
+      lease: { "cost.budget": ["USD:100"], "tool.call": ["web.search"] },
+    });
+    const result = await handle.done;
+
+    // The job did NOT fatal on the metric call.
+    expect(result.final_status).toBe("success");
+    // The triggering cost.* metric was still delivered to the client.
+    const triggering = events.find(
+      (e) =>
+        e.kind === "metric" &&
+        (e.body as { name?: string }).name === "cost.tokens",
+    );
+    expect(triggering).toBeDefined();
+    // BUDGET_EXHAUSTED surfaced as a tool_result, not a fatal job.error.
+    const denial = events.find(
+      (e) =>
+        e.kind === "tool_result" &&
+        (e.body as { error?: { code?: string } }).error?.code ===
+          "BUDGET_EXHAUSTED",
+    );
+    expect(denial).toBeDefined();
+    await h.close();
+  });
+
   it("§7.4 job.cancel acks with job.cancelled before job.error{CANCELLED}", async () => {
     const h = makePairedHarness();
     h.server.registerAgent("slow", async (_input, ctx) => {
