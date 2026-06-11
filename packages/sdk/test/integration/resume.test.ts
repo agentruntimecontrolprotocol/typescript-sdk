@@ -111,7 +111,13 @@ describe("§6.3 resumability (in-memory)", () => {
       await ctx.status("working");
       // Stay alive until cancelled; a graceful bye MUST NOT abort this (§6.7).
       await new Promise<void>((resolve) => {
-        ctx.signal.addEventListener("abort", () => resolve(), { once: true });
+        ctx.signal.addEventListener(
+          "abort",
+          () => {
+            resolve();
+          },
+          { once: true },
+        );
       });
       return null;
     });

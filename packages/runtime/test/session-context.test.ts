@@ -20,12 +20,8 @@ describe("SessionContext heartbeat", () => {
       eventLog: { append: vi.fn(async () => true) },
       subscribers: new Map(),
     };
-    const ctx = new SessionContext(
-      transport as never,
-      server as never,
-      silentLogger,
-    );
-    ctx.state.assignId("sess_1" as never);
+    const ctx = new SessionContext(transport, server as never, silentLogger);
+    ctx.state.assignId("sess_1");
     ctx.assignNegotiatedFeatures(["heartbeat"]);
     const cancelAll = vi.spyOn(ctx.jobs, "cancelAll");
     const emitSessionError = vi
@@ -36,8 +32,8 @@ describe("SessionContext heartbeat", () => {
       lastInboundAt: number;
       heartbeatTick(intervalMs: number): Promise<void>;
     };
-    internals.lastInboundAt = Date.now() - 3_000;
-    await internals.heartbeatTick(1_000);
+    internals.lastInboundAt = Date.now() - 3000;
+    await internals.heartbeatTick(1000);
 
     expect(emitSessionError).toHaveBeenCalled();
     expect(cancelAll).not.toHaveBeenCalled();
@@ -69,12 +65,8 @@ describe("SessionContext.send durability (§6.3, issue #145)", () => {
       },
       subscribers: new Map(),
     };
-    const ctx = new SessionContext(
-      transport as never,
-      server as never,
-      silentLogger,
-    );
-    ctx.state.assignId("sess_1" as never);
+    const ctx = new SessionContext(transport, server as never, silentLogger);
+    ctx.state.assignId("sess_1");
     return { ctx, transport, server, order };
   }
 

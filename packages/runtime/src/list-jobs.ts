@@ -145,18 +145,9 @@ export interface SelectJobPageArgs {
  * calls (issue #144).
  */
 export function selectJobPage(args: SelectJobPageArgs): PaginatedJobList {
-  const { jobs, authorize, filter } = args;
   const limit =
     Number.isFinite(args.limit) && args.limit > 0 ? args.limit : 100;
-  const cursor = decodeJobCursor(args.cursor);
-  const capacity = limit + 1;
-  const selected: Job[] = [];
-  for (const job of jobs) {
-    if (!authorize(job)) continue;
-    if (!filter.matches(job)) continue;
-    if (cursor !== null && !jobAfterCursor(job, cursor)) continue;
-    insertBounded(selected, job, capacity);
-  }
+  const selected = collectBoundedJobs(args, decodeJobCursor(args.cursor), limit);
   const hasMore = selected.length > limit;
   const pageJobs = hasMore ? selected.slice(0, limit) : selected;
   const last = pageJobs.at(-1);
@@ -165,6 +156,27 @@ export function selectJobPage(args: SelectJobPageArgs): PaginatedJobList {
     nextCursor:
       hasMore && last !== undefined ? encodeJobCursor(sortKeyOf(last)) : null,
   };
+}
+
+/**
+ * Scan `jobs` once, keeping only the smallest `limit + 1` authorized, filtered
+ * jobs whose sort key is strictly greater than the cursor.
+ */
+function collectBoundedJobs(
+  args: SelectJobPageArgs,
+  cursor: JobSortKey | null,
+  limit: number,
+): Job[] {
+  const { jobs, authorize, filter } = args;
+  const capacity = limit + 1;
+  const selected: Job[] = [];
+  for (const job of jobs) {
+    if (!authorize(job)) continue;
+    if (!filter.matches(job)) continue;
+    if (cursor !== null && !jobAfterCursor(job, cursor)) continue;
+    insertBounded(selected, job, capacity);
+  }
+  return selected;
 }
 
 /**
@@ -177,7 +189,8 @@ function insertBounded(sorted: Job[], job: Job, capacity: number): void {
   let hi = sorted.length;
   while (lo < hi) {
     const mid = (lo + hi) >>> 1;
-    if (compareJobs(sorted[mid] as Job, job) <= 0) lo = mid + 1;
+    const atMid = sorted[mid];
+    if (atMid !== undefined && compareJobs(atMid, job) <= 0) lo = mid + 1;
     else hi = mid;
   }
   if (lo >= capacity) return;
