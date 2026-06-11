@@ -55,15 +55,69 @@ function matchesCreatedBefore(job: Job, threshold: number | null): boolean {
   return Number.isFinite(t) && t < threshold;
 }
 
-export function compareJobListEntries(
-  a: JobListEntry,
-  b: JobListEntry,
-): number {
-  // Sort by created_at ascending, then by job_id for determinism.
-  const ta = Date.parse(a.created_at);
-  const tb = Date.parse(b.created_at);
+/**
+ * Stable list ordering: `created_at` ascending, then `job_id` for determinism.
+ * The pagination cursor (§6.6) encodes this same key so paging stays correct
+ * even when the previous page's last job has completed and been removed from
+ * `globalJobs` between calls (issue #144).
+ */
+interface JobSortKey {
+  createdAt: string;
+  jobId: string;
+}
+
+function sortKeyOf(job: Job): JobSortKey {
+  return { createdAt: job.createdAt, jobId: job.jobId };
+}
+
+/** Compare two jobs by the stable list key (created_at, then job_id). */
+function compareJobs(a: Job, b: Job): number {
+  const ta = Date.parse(a.createdAt);
+  const tb = Date.parse(b.createdAt);
   if (ta !== tb) return ta - tb;
-  return a.job_id.localeCompare(b.job_id);
+  return a.jobId.localeCompare(b.jobId);
+}
+
+/** Whether `job` sorts strictly after the cursor key by the list ordering. */
+function jobAfterCursor(job: Job, cursor: JobSortKey): boolean {
+  const tj = Date.parse(job.createdAt);
+  const tc = Date.parse(cursor.createdAt);
+  if (tj !== tc) return tj > tc;
+  return job.jobId.localeCompare(cursor.jobId) > 0;
+}
+
+/** Encode the (created_at, job_id) sort key as an opaque pagination cursor. */
+export function encodeJobCursor(key: JobSortKey): string {
+  return Buffer.from(`${key.createdAt}\u0000${key.jobId}`, "utf8").toString(
+    "base64url",
+  );
+}
+
+/** Decode an opaque cursor back to its sort key, or `null` if malformed. */
+export function decodeJobCursor(cursor: string | undefined): JobSortKey | null {
+  if (cursor === undefined || cursor === "") return null;
+  let raw: string;
+  try {
+    raw = Buffer.from(cursor, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+  const idx = raw.indexOf("\u0000");
+  if (idx === -1) return null;
+  return { createdAt: raw.slice(0, idx), jobId: raw.slice(idx + 1) };
+}
+
+function jobToListEntry(job: Job): JobListEntry {
+  return {
+    job_id: job.jobId,
+    agent: job.agentRef,
+    status: job.state,
+    lease: job.lease,
+    parent_job_id: job.parentJobId ?? null,
+    created_at: job.createdAt,
+    ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
+    last_event_seq: job.lastEventSeq,
+  };
 }
 
 export interface PaginatedJobList {
@@ -71,22 +125,62 @@ export interface PaginatedJobList {
   nextCursor: string | null;
 }
 
-export function paginateJobList(
-  candidates: JobListEntry[],
-  cursor: string | undefined,
-  limit: number,
-): PaginatedJobList {
-  // Cursor: opaque ULID of the last-emitted job_id in the previous page.
-  let startIdx = 0;
-  if (cursor !== undefined && cursor !== "") {
-    const idx = candidates.findIndex((c) => c.job_id === cursor);
-    if (idx !== -1) startIdx = idx + 1;
+export interface SelectJobPageArgs {
+  jobs: Iterable<Job>;
+  authorize: (job: Job) => boolean;
+  filter: ListJobsFilter;
+  cursor: string | undefined;
+  limit: number;
+}
+
+/**
+ * Keyset pagination over the live job set (§6.6).
+ *
+ * Iterates `jobs` once and keeps only the smallest `limit + 1` authorized,
+ * filtered jobs whose sort key is strictly greater than the cursor. Because the
+ * selection is bounded, a small page never sorts or materializes the entire
+ * authorized set — `limit` bounds the runtime work, not just the response
+ * (issue #134). The cursor encodes the stable (created_at, job_id) key, so
+ * paging is robust to the previous page's last job having been removed between
+ * calls (issue #144).
+ */
+export function selectJobPage(args: SelectJobPageArgs): PaginatedJobList {
+  const { jobs, authorize, filter } = args;
+  const limit =
+    Number.isFinite(args.limit) && args.limit > 0 ? args.limit : 100;
+  const cursor = decodeJobCursor(args.cursor);
+  const capacity = limit + 1;
+  const selected: Job[] = [];
+  for (const job of jobs) {
+    if (!authorize(job)) continue;
+    if (!filter.matches(job)) continue;
+    if (cursor !== null && !jobAfterCursor(job, cursor)) continue;
+    insertBounded(selected, job, capacity);
   }
-  const page = candidates.slice(startIdx, startIdx + limit);
-  const lastEntry = page.length > 0 ? page.at(-1) : undefined;
-  const nextCursor =
-    startIdx + limit < candidates.length && lastEntry !== undefined
-      ? lastEntry.job_id
-      : null;
-  return { page, nextCursor };
+  const hasMore = selected.length > limit;
+  const pageJobs = hasMore ? selected.slice(0, limit) : selected;
+  const last = pageJobs.at(-1);
+  return {
+    page: pageJobs.map(jobToListEntry),
+    nextCursor:
+      hasMore && last !== undefined ? encodeJobCursor(sortKeyOf(last)) : null,
+  };
+}
+
+/**
+ * Insert `job` into the ascending-sorted `sorted` array, keeping at most
+ * `capacity` entries (the smallest ones). Jobs beyond the bounded window are
+ * dropped without growing the array.
+ */
+function insertBounded(sorted: Job[], job: Job, capacity: number): void {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (compareJobs(sorted[mid] as Job, job) <= 0) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo >= capacity) return;
+  sorted.splice(lo, 0, job);
+  if (sorted.length > capacity) sorted.pop();
 }

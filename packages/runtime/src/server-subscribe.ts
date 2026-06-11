@@ -2,21 +2,12 @@ import type { JobId } from "@agentruntimecontrolprotocol/core";
 import type { BaseEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import { buildEnvelope } from "@agentruntimecontrolprotocol/core/envelope";
 import { PermissionDeniedError } from "@agentruntimecontrolprotocol/core/errors";
-import type {
-  Envelope,
-  JobListEntry,
-  SessionListJobsFilter,
-} from "@agentruntimecontrolprotocol/core/messages";
+import type { Envelope } from "@agentruntimecontrolprotocol/core/messages";
 import { newMessageId } from "@agentruntimecontrolprotocol/core/util";
 
 import { forwardEventToSubscriber } from "./job-runner-helpers.js";
 import type { Job } from "./job.js";
-import {
-  compareJobListEntries,
-  compileListJobsFilter,
-  type ListJobsFilter,
-  paginateJobList,
-} from "./list-jobs.js";
+import { compileListJobsFilter, selectJobPage } from "./list-jobs.js";
 import type { ARCPServer } from "./server.js";
 import type { SessionContext } from "./session-context.js";
 import type { JobAuthorizationPolicy } from "./types.js";
@@ -36,13 +27,17 @@ export async function handleListJobs(
   if (env.type !== "session.list_jobs") return;
   const sessionId = ctx.state.id;
   if (sessionId === undefined) return;
-  const candidates = buildListJobsCandidates(server, ctx, env.payload.filter);
-  candidates.sort(compareJobListEntries);
-  const { page, nextCursor } = paginateJobList(
-    candidates,
-    env.payload.cursor ?? undefined,
-    env.payload.limit ?? 100,
-  );
+  const principal = ctx.state.identity?.principal;
+  const policy: JobAuthorizationPolicy =
+    server.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
+  const filter = compileListJobsFilter(env.payload.filter ?? {});
+  const { page, nextCursor } = selectJobPage({
+    jobs: server.globalJobs.values(),
+    authorize: (job) => policy(job, principal),
+    filter,
+    cursor: env.payload.cursor ?? undefined,
+    limit: env.payload.limit ?? 100,
+  });
   await ctx.send(
     buildEnvelope({
       id: newMessageId(),
@@ -51,33 +46,6 @@ export async function handleListJobs(
       optional: { session_id: sessionId },
     }),
   );
-}
-
-function buildListJobsCandidates(
-  server: ARCPServer,
-  ctx: SessionContext,
-  rawFilter: SessionListJobsFilter | undefined,
-): JobListEntry[] {
-  const principal = ctx.state.identity?.principal;
-  const policy: JobAuthorizationPolicy =
-    server.options.jobAuthorizationPolicy ?? defaultJobAuthorizationPolicy;
-  const filter: ListJobsFilter = compileListJobsFilter(rawFilter ?? {});
-  const out: JobListEntry[] = [];
-  for (const job of server.globalJobs.values()) {
-    if (!policy(job, principal)) continue;
-    if (!filter.matches(job)) continue;
-    out.push({
-      job_id: job.jobId,
-      agent: job.agentRef,
-      status: job.state,
-      lease: job.lease,
-      parent_job_id: job.parentJobId ?? null,
-      created_at: job.createdAt,
-      ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
-      last_event_seq: job.lastEventSeq,
-    });
-  }
-  return out;
 }
 
 // Credential redaction adds a few lines to the subscription handshake; keep the
