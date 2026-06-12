@@ -100,7 +100,7 @@
   "dependencies": {
     "@effect/platform": "^0.96.1",
     "better-sqlite3": "^12.10.0",
-    "effect": "^3.21.2",
+    "effect": "^3.21.3",
     "jose": "^6.2.3",
     "pino": "^10.3.1",
     "ulid": "^3.0.2",
@@ -108,10 +108,10 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^25.9.1",
+    "@types/node": "^25.9.2",
     "@types/ws": "^8.5.12",
-    "@vitest/coverage-v8": "^4.1.7",
+    "@vitest/coverage-v8": "^4.1.8",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
