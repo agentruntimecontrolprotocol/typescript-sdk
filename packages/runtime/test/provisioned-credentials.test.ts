@@ -662,4 +662,102 @@ describe("credential confidentiality in job.subscribed (§14)", () => {
     await bobClient.close();
     await server.close();
   });
+
+  it("observer receives budget + lease_constraints on job.subscribed (§7.6)", async () => {
+    const server = new ARCPServer({
+      runtime: TEST_RUNTIME,
+      capabilities: TEST_CAPABILITIES,
+      bearer: new StaticBearerVerifier(
+        new Map([
+          ["tok-alice", { principal: "alice" }],
+          ["tok-bob", { principal: "bob" }],
+        ]),
+      ),
+      // Cross-principal subscription so bob can observe alice's job.
+      jobAuthorizationPolicy: () => true,
+      logger: silentLogger,
+    });
+    server.registerAgent("slow-noop", async () => {
+      await new Promise((r) => setTimeout(r, 200));
+      return null;
+    });
+
+    const [aliceClient, aliceServerSide] = pairMemoryTransports();
+    const [bobClient, bobServerSide] = pairMemoryTransports();
+    server.accept(aliceServerSide);
+    server.accept(bobServerSide);
+    const aliceCollector = new FrameCollector(aliceClient);
+    const bobCollector = new FrameCollector(bobClient);
+
+    // Alice negotiates cost.budget + lease_expires_at so the runtime
+    // initializes/echoes those bounds.
+    await aliceClient.send({
+      arcp: PROTOCOL_VERSION,
+      id: "msg-hello",
+      type: "session.hello",
+      payload: {
+        client: { name: "test-client", version: "0.0.1" },
+        capabilities: {
+          encodings: ["json"],
+          features: ["subscribe", "cost.budget", "lease_expires_at"],
+        },
+        auth: { scheme: "bearer", token: "tok-alice" },
+      },
+    });
+    const aliceSessionId = (
+      await aliceCollector.waitFor((f) => f["type"] === "session.welcome")
+    ).find((f) => f["type"] === "session.welcome")!["session_id"] as string;
+
+    const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+    await aliceClient.send({
+      arcp: PROTOCOL_VERSION,
+      id: "msg-submit-budget",
+      type: "job.submit",
+      session_id: aliceSessionId,
+      payload: {
+        agent: "slow-noop",
+        input: {},
+        lease_request: { "cost.budget": ["USD:5.00"] },
+        lease_constraints: { expires_at: expiresAt },
+      },
+    });
+    const jobId = (
+      (await aliceCollector.waitFor((f) => f["type"] === "job.accepted")).find(
+        (f) => f["type"] === "job.accepted",
+      )!["payload"] as Record<string, unknown>
+    )["job_id"] as string;
+
+    await bobClient.send(helloFrame("tok-bob"));
+    const bobSessionId = (
+      await bobCollector.waitFor((f) => f["type"] === "session.welcome")
+    ).find((f) => f["type"] === "session.welcome")!["session_id"] as string;
+
+    await bobClient.send({
+      arcp: PROTOCOL_VERSION,
+      id: "msg-sub-budget",
+      type: "job.subscribe",
+      session_id: bobSessionId,
+      payload: { job_id: jobId },
+    });
+    const payload = (
+      await bobCollector.waitFor((f) => f["type"] === "job.subscribed")
+    ).find((f) => f["type"] === "job.subscribed")!["payload"] as Record<
+      string,
+      unknown
+    >;
+
+    // Observer (bob) gets the non-secret authority bounds...
+    expect(payload["budget"]).toEqual({ USD: 5 });
+    expect(
+      (payload["lease_constraints"] as Record<string, unknown> | undefined)?.[
+        "expires_at"
+      ],
+    ).toBe(expiresAt);
+    // ...but never credentials.
+    expect(payload["credentials"]).toBeUndefined();
+
+    await aliceClient.close();
+    await bobClient.close();
+    await server.close();
+  });
 });

@@ -219,6 +219,16 @@ function buildSubscribedPayload(args: {
     subscriberPrincipal !== undefined &&
     job.submitterPrincipal === subscriberPrincipal;
 
+  // §9.6 — current per-currency budget counters, so an observer joining
+  // mid-job sees the live remaining (the cap is derivable from the lease's
+  // `cost.budget` pattern). Empty-map guard avoids an empty `budget: {}`.
+  const budget: Record<string, number> = {};
+  let hasBudget = false;
+  for (const [currency, remaining] of job.budget.entries()) {
+    budget[currency] = remaining;
+    hasBudget = true;
+  }
+
   return {
     job_id: job.jobId,
     current_status: job.state,
@@ -227,6 +237,7 @@ function buildSubscribedPayload(args: {
     ...(job.leaseConstraints === undefined
       ? {}
       : { lease_constraints: job.leaseConstraints }),
+    ...(hasBudget ? { budget } : {}),
     parent_job_id: job.parentJobId ?? null,
     ...(job.traceId === undefined ? {} : { trace_id: job.traceId }),
     subscribed_from: subscribedFrom,

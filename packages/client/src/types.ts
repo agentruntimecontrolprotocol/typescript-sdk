@@ -7,6 +7,7 @@ import type {
   ClientIdentity,
   Envelope,
   JobResultPayload,
+  JobStateName,
   Lease,
   LeaseConstraints,
   Credential,
@@ -125,6 +126,26 @@ export interface JobHandle {
  */
 export interface JobSubscription {
   readonly jobId: JobId;
+  /** Job status at subscription time (§7.6). */
+  readonly currentStatus: JobStateName;
+  /** Resolved `name@version` (or bare name) the runtime is running. */
+  readonly agent: string;
+  /** Effective capability grants (§9.1). */
+  readonly lease: Lease;
+  /** v1.1 §9.5 — echoed lease constraints (currently `expires_at`), if any. */
+  readonly leaseConstraints: LeaseConstraints | undefined;
+  /**
+   * v1.1 §9.6 — current per-currency budget counters at subscription time,
+   * present when `cost.budget` is in the lease. The cap is derivable from the
+   * lease's `cost.budget` pattern; subsequent `cost.budget.remaining` metric
+   * events keep this live.
+   */
+  readonly budget: Readonly<Record<string, number>> | undefined;
+  /**
+   * v1.1 §9.8 — provisioned credentials, present ONLY when this subscriber is
+   * the job's original submitter. Redacted for all other observers (§14).
+   */
+  readonly credentials: readonly Credential[] | undefined;
   readonly subscribedFrom: number;
   readonly replayed: boolean;
   unsubscribe(): Promise<void>;

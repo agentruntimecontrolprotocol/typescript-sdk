@@ -660,6 +660,12 @@ export class ARCPClient {
     const ack = await deferred.promise;
     return {
       jobId,
+      currentStatus: ack.current_status,
+      agent: ack.agent,
+      lease: ack.lease,
+      leaseConstraints: ack.lease_constraints,
+      budget: ack.budget,
+      credentials: ack.credentials,
       subscribedFrom: ack.subscribed_from,
       replayed: ack.replayed,
       unsubscribe: () => this.unsubscribe(jobId, sessionId),
