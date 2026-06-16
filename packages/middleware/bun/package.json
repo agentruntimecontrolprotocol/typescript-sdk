@@ -1,6 +1,6 @@
 {
   "name": "@agentruntimecontrolprotocol/bun",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Bun runtime helpers for the Agent Runtime Control Protocol (ARCP). Uses Bun's native WebSocket server (Bun.serve) to terminate ARCP connections; no external dependency on `ws`.",
   "license": "Apache-2.0",
   "repository": {

@@ -1,5 +1,14 @@
 # @agentruntimecontrolprotocol/examples
 
+## 0.0.4
+
+### Patch Changes
+
+- @agentruntimecontrolprotocol/bun@2.0.0
+- @agentruntimecontrolprotocol/express@2.0.0
+- @agentruntimecontrolprotocol/fastify@2.0.0
+- @agentruntimecontrolprotocol/sdk@2.0.0
+
 ## 0.0.3
 
 ### Patch Changes
