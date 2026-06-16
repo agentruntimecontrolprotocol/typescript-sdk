@@ -54,11 +54,11 @@
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@fastify/websocket": "^11.2.0",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "@types/ws": "^8.5.12",
     "fastify": "^5.8.5",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8",
+    "vitest": "^4.1.9",
     "ws": "^8.20.1"
   }
 }
