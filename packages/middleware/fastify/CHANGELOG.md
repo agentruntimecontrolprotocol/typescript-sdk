@@ -1,5 +1,13 @@
 # @agentruntimecontrolprotocol/fastify
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [543b38b]
+  - @agentruntimecontrolprotocol/runtime@2.0.0
+  - @agentruntimecontrolprotocol/node@2.0.0
+
 ## 1.0.0
 
 ### Minor Changes

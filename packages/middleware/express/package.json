@@ -1,6 +1,6 @@
 {
   "name": "@agentruntimecontrolprotocol/express",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Express helpers for the Agent Runtime Control Protocol (ARCP). Creates an Express app with safe defaults and attaches the ARCP WebSocket upgrade handler at a configurable path.",
   "license": "Apache-2.0",
   "repository": {
