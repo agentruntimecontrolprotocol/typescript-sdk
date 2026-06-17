@@ -99,7 +99,7 @@
   },
   "dependencies": {
     "@effect/platform": "^0.96.1",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "effect": "^3.21.3",
     "jose": "^6.2.3",
     "pino": "^10.3.1",
@@ -108,10 +108,10 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "@types/ws": "^8.5.12",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.9",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }

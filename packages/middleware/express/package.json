@@ -58,9 +58,9 @@
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@types/express": "^5.0.0",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "express": "^5.0.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }

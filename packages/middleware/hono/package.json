@@ -47,14 +47,14 @@
   "peerDependencies": {
     "@agentruntimecontrolprotocol/core": "workspace:^",
     "@agentruntimecontrolprotocol/runtime": "workspace:^",
-    "hono": "^4.12.24"
+    "hono": "^4.12.25"
   },
   "devDependencies": {
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
-    "@types/node": "^25.9.2",
-    "hono": "^4.12.24",
+    "@types/node": "^25.9.3",
+    "hono": "^4.12.25",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }
