@@ -70,12 +70,12 @@
     "@agentruntimecontrolprotocol/client": "workspace:*",
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
-    "@effect/platform": "^0.96.1",
+    "@effect/platform": "^0.96.2",
     "commander": "^15.0.0",
-    "effect": "^3.21.3"
+    "effect": "^3.21.4"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "^4.1.9",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
