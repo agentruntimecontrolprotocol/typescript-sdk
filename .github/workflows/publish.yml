@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # For workflow_run, check out the exact commit that passed CI.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
