@@ -54,9 +54,9 @@
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
     "@fastify/websocket": "^11.2.0",
-    "@types/node": "^26.0.0",
+    "@types/node": "^26.0.1",
     "@types/ws": "^8.5.12",
-    "fastify": "^5.8.5",
+    "fastify": "^5.9.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9",
     "ws": "^8.20.1"

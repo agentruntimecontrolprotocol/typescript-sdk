@@ -108,7 +108,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^26.0.0",
+    "@types/node": "^26.0.1",
     "@types/ws": "^8.5.12",
     "@vitest/coverage-v8": "^4.1.9",
     "typescript": "^6.0.3",
