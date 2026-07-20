@@ -65,7 +65,7 @@ jobs:
         # `_authToken=${NODE_AUTH_TOKEN}` line into ~/.npmrc, which then
         # short-circuits the trusted-publisher OIDC handshake when no token is
         # present. The npm publish step passes --registry explicitly instead.
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: "pnpm"
@@ -140,7 +140,7 @@ jobs:
           echo "npm — published: $published  skipped: $skipped"
 
       - name: Setup Node.js (GitHub Packages registry)
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://npm.pkg.github.com"
