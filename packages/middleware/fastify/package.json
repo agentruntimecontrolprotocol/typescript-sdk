@@ -53,12 +53,12 @@
   "devDependencies": {
     "@agentruntimecontrolprotocol/core": "workspace:*",
     "@agentruntimecontrolprotocol/runtime": "workspace:*",
-    "@fastify/websocket": "^11.2.0",
-    "@types/node": "^26.0.0",
+    "@fastify/websocket": "^11.3.0",
+    "@types/node": "^26.1.2",
     "@types/ws": "^8.5.12",
-    "fastify": "^5.8.5",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9",
-    "ws": "^8.20.1"
+    "fastify": "^5.11.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "ws": "^8.21.1"
   }
 }
