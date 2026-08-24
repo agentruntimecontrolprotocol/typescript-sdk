@@ -98,20 +98,20 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@effect/platform": "^0.96.2",
-    "better-sqlite3": "^12.11.1",
-    "effect": "^3.21.4",
-    "jose": "^6.2.3",
+    "@effect/platform": "^0.97.1",
+    "better-sqlite3": "^13.0.3",
+    "effect": "^3.22.1",
+    "jose": "^6.2.9",
     "pino": "^10.3.1",
     "ulid": "^3.0.2",
-    "ws": "^8.20.1"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^26.0.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.2.0",
     "@types/ws": "^8.5.12",
-    "@vitest/coverage-v8": "^4.1.9",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "@vitest/coverage-v8": "^4.1.11",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }
